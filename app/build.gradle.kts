@@ -55,7 +55,9 @@ android {
     }
 
     lint {
-        abortOnError = false
+        // Les avertissements existants sont figés dans la baseline ; tout nouveau problème bloque.
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
     }
 }
 
