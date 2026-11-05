@@ -45,16 +45,24 @@ jobs:
       - name: Tests unitaires
         run: ./gradlew --no-daemon testDebugUnitTest
 
+      # Une release n'est jamais signée avec la clé de debug : sans clé, on échoue.
       - name: Clé de signature
         env:
           KEYSTORE_BASE64: ${{ secrets.TAMACOOKIE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.TAMACOOKIE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.TAMACOOKIE_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "TAMACOOKIE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-          else
-            echo "::warning::Aucune clé de release configurée : l'APK sera signé avec une clé de debug."
+          missing=""
+          for s in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!s}" ] || missing="$missing TAMACOOKIE_$s"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets de signature manquants :$missing"
+            exit 1
           fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "TAMACOOKIE_KEYSTORE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
 
       - name: APK release
         env:
@@ -65,6 +73,25 @@ jobs:
           ./gradlew --no-daemon assembleRelease \
             -PversionName=${{ steps.version.outputs.name }} \
             -PversionCode=${{ steps.version.outputs.code }}
+          rm -f "$TAMACOOKIE_KEYSTORE"
+
+      # Contrôle indépendant de Gradle : signature valide et certificat épinglé
+      # (ECDSA P-256, alias tamacookie-release). À mettre à jour en cas de rotation de clé.
+      - name: Vérifier la signature
+        env:
+          EXPECTED_CERT_SHA256: 839a8f9854abb247549496a8093c8268d06f5ad30735022a3faa5664b872523d
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          [ -f "$APK" ] || { echo "::error::APK signé introuvable (app-release-unsigned ?)"; exit 1; }
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner"
+          out="$("$APKSIGNER" verify --verbose --print-certs "$APK")"
+          echo "$out" | grep -E "^Verified using|certificate DN|certificate SHA-256|key algorithm|key size"
+          actual="$(echo "$out" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')"
+          [ "$actual" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::APK signé par $actual, attendu $EXPECTED_CERT_SHA256"; exit 1; }
+
+      - name: Préparer les artefacts
+        run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/tamacookie-${{ steps.version.outputs.name }}.apk"
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
