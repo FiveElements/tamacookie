@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône lapin (tête + oreilles) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFE9C46A"
+        android:pathData="M0,0h108v108h-108z" />
+    <!-- oreilles -->
+    <path android:fillColor="#FFFFFBF5"
+        android:pathData="M36,58 C30,40 30,18 38,14 C46,12 48,36 46,56 Z" />
+    <path android:fillColor="#FFFFFBF5"
+        android:pathData="M72,58 C78,40 78,18 70,14 C62,12 60,36 62,56 Z" />
+    <path android:fillColor="#FFF4A6B8"
+        android:pathData="M38,52 C35,40 35,24 39,20 C43,20 44,36 43,52 Z" />
+    <path android:fillColor="#FFF4A6B8"
+        android:pathData="M70,52 C73,40 73,24 69,20 C65,20 64,36 65,52 Z" />
+    <!-- tête -->
+    <path android:fillColor="#FFFFFBF5"
+        android:pathData="M54,46 a24,22 0 1,0 0.1,0 Z" />
+    <!-- yeux -->
+    <path android:fillColor="#FF3A2E39"
+        android:pathData="M45,66 a3.5,4 0 1,0 0.1,0 Z" />
+    <path android:fillColor="#FF3A2E39"
+        android:pathData="M63,66 a3.5,4 0 1,0 0.1,0 Z" />
+    <!-- nez -->
+    <path android:fillColor="#FFF07893"
+        android:pathData="M51,74 h6 l-3,3 z" />
+    <!-- joues -->
+    <path android:fillColor="#66F07893"
+        android:pathData="M40,76 a4,2.5 0 1,0 0.1,0 Z" />
+    <path android:fillColor="#66F07893"
+        android:pathData="M68,76 a4,2.5 0 1,0 0.1,0 Z" />
+</vector>

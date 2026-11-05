@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      kotlin-android:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "com.android*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

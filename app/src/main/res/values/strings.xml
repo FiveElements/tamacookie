@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TamaCookie</string>
+    <string name="a11y_summary">Permet à Cookie de sauter sur les icônes et les boutons</string>
+    <string name="a11y_description">TamaCookie utilise uniquement la position des éléments affichés (icônes, boutons) pour que le lapin puisse sauter dessus, et remarque quand tu touches un bouton, fais défiler ou tapes au clavier (sans jamais lire le texte) pour qu\'il puisse réagir et faire des bêtises. Aucun contenu n\'est enregistré ni envoyé.</string>
+</resources>

@@ -1,0 +1,337 @@
+package com.tamacookie
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.AlertDialog
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.net.Uri
+import android.os.Bundle
+import android.provider.Settings
+import android.text.InputType
+import android.util.TypedValue
+import android.view.Choreographer
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+
+@SuppressLint("SetTextI18n")
+class MainActivity : Activity(), Choreographer.FrameCallback {
+
+    private val d by lazy { resources.displayMetrics.density }
+    private lateinit var preview: BunnyView
+    private lateinit var overlayBtn: TextView
+    private lateinit var notifBtn: TextView
+    private lateinit var usageBtn: TextView
+    private lateinit var a11yBtn: TextView
+    private lateinit var a11yHelp: TextView
+    private lateinit var mainBtn: TextView
+    private lateinit var nameEdit: EditText
+    private var lastNs = 0L
+    private var previewT = 0f
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.statusBarColor = Color.parseColor("#FFF4E6")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            val p = (22 * d).toInt(); setPadding(p, p, p, p)
+        }
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(Color.parseColor("#FFF4E6"))
+            isFillViewport = true
+            addView(root)
+        }
+
+        root.addView(TextView(this).apply {
+            text = "TamaCookie"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
+            setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
+            gravity = Gravity.CENTER
+        })
+        root.addView(TextView(this).apply {
+            text = "Un petit lapin qui vit sur ton écran"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextColor(Color.parseColor("#7A6B75")); gravity = Gravity.CENTER
+        })
+
+        preview = BunnyView(this)
+        preview.setOnClickListener {
+            preview.emit(BunnyView.PType.HEART, 3)
+            preview.expr = BunnyView.Expr.HAPPY
+            preview.postDelayed({ preview.expr = BunnyView.Expr.NORMAL }, 1200)
+        }
+        root.addView(preview, LinearLayout.LayoutParams((170 * d).toInt(), (170 * d).toInt()).apply {
+            topMargin = (8 * d).toInt()
+        })
+
+        // Nom
+        val nameRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        nameEdit = EditText(this).apply {
+            setText(PetState(this@MainActivity).load().name)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            setSingleLine()
+            hint = "Nom du lapin"
+        }
+        nameRow.addView(nameEdit, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        nameRow.addView(smallButton("Renommer") { rename() })
+        nameRow.addView(smallButton("✏️ Apparence") {
+            startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, false))
+        }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = (8 * d).toInt() })
+        root.addView(nameRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (12 * d).toInt() })
+
+        // Niveau de bêtises
+        section(root, "Bêtises")
+        val prefs = getSharedPreferences("pet", MODE_PRIVATE)
+        val levels = listOf(
+            "😇 Sage" to "Il réclame de l'attention, sans plus",
+            "😜 Taquin" to "Frappe à l'écran, s'assoit parfois sur un bouton",
+            "😈 Petit monstre" to "S'assoit sur tes boutons et ton clavier, commente tout",
+        )
+        val levelRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val levelDesc = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+            setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
+        }
+        val levelChips = ArrayList<TextView>()
+        fun paintLevels() {
+            val cur = prefs.getInt("mischief", 1)
+            levelChips.forEachIndexed { i, c -> c.background = chipBg(i == cur) }
+            levelDesc.text = levels[cur].second + if (cur > 0) " (bouton/clavier : nécessite l'accessibilité)" else ""
+        }
+        levels.forEachIndexed { i, (label, _) ->
+            val c = TextView(this).apply {
+                text = label; gravity = Gravity.CENTER
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
+                val p = (10 * d).toInt(); setPadding(p, p, p, p)
+                setOnClickListener {
+                    prefs.edit().putInt("mischief", i).apply()
+                    BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
+                    paintLevels()
+                }
+            }
+            levelChips += c
+            levelRow.addView(c, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { rightMargin = (6 * d).toInt() })
+        }
+        root.addView(levelRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(levelDesc, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        paintLevels()
+
+
+        section(root, "Autorisations")
+        overlayBtn = permButton(root) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        }
+        notifBtn = permButton(root) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
+        usageBtn = permButton(root) {
+            try {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:$packageName")))
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            }
+        }
+
+        a11yBtn = permButton(root) {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+        a11yHelp = TextView(this).apply {
+            text = "Paramètres › Accessibilité › Applications installées › TamaCookie. " +
+                "Si c'est grisé (« paramètre restreint ») : touche ici, puis ⋮ › « Autoriser les paramètres restreints », et réessaie."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(Color.parseColor("#7A6B75"))
+            setPadding((12 * d).toInt(), 0, (12 * d).toInt(), (6 * d).toInt())
+            setOnClickListener {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+            }
+        }
+        root.addView(a11yHelp, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+
+        mainBtn = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextColor(Color.WHITE); paint.isFakeBoldText = true
+            val p = (16 * d).toInt(); setPadding(p, p, p, p)
+            setOnClickListener { toggleBunny() }
+        }
+        root.addView(mainBtn, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
+            topMargin = (18 * d).toInt(); bottomMargin = (18 * d).toInt()
+        })
+
+        section(root, "Comment jouer")
+        root.addView(TextView(this).apply {
+            text = """
+                👆  Touche-le pour le caresser
+                👆👆  Double-touche ou appui long : menu (nourrir, jouer, dodo…)
+                ✋  Fais-le glisser pour l'attraper… et lance-le !
+                🎾  4 jouets : balle, ballon, frisbee, doudou (tu peux les lancer aussi)
+                🏠  Bouton flottant 🏠 : installe la baignoire, le véto, la cage — chacun sur la page de ton choix
+                🫣  Cache-cache : il se cache sur une autre page du bureau, va le chercher !
+                🛁  Glisse-le dans la baignoire pour le laver
+                🩺  Chez le véto : ses statistiques et les soins
+                🔒  En cage, il est isolé… mais son bonheur chute 3x plus vite
+                💩  Touche ses crottes pour nettoyer
+                😈  Ignoré trop longtemps, il fait des bêtises pour attirer ton attention
+                📱  Change d'application : il te suit et commente ce que tu fais
+                🦘  Avec l'accessibilité : il saute sur les icônes et les boutons (lance-le dessus !)
+                💤  Il dort la nuit ou quand il est fatigué
+            """.trimIndent()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(Color.parseColor("#3A2E39"))
+            setLineSpacing(0f, 1.35f)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+
+        root.addView(smallButton("Adopter un nouveau lapin") { confirmReset() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+            topMargin = (24 * d).toInt()
+        })
+
+        setContentView(scroll)
+
+        // Premier lancement : écran d'adoption
+        if (!PetState(this).load().adopted) {
+            startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, true))
+        }
+    }
+
+    private fun chipBg(selected: Boolean) = GradientDrawable().apply {
+        cornerRadius = 14 * d
+        setColor(Color.parseColor(if (selected) "#FFE0E8" else "#FFFFFF"))
+        setStroke((if (selected) 3 * d else 1 * d).toInt(), Color.parseColor(if (selected) "#F07893" else "#E3D6CC"))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val pet = PetState(this).load()
+        preview.look = pet.look
+        nameEdit.setText(pet.name)
+        refresh()
+        Choreographer.getInstance().postFrameCallback(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Choreographer.getInstance().removeFrameCallback(this)
+        lastNs = 0L
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        refresh()
+    }
+
+    override fun doFrame(frameTimeNanos: Long) {
+        val dt = if (lastNs == 0L) 0.016f else ((frameTimeNanos - lastNs) / 1e9f).coerceIn(0f, 0.05f)
+        lastNs = frameTimeNanos
+        previewT += dt
+        // petite marche sur place dans l'aperçu
+        val cycle = previewT % 8f
+        preview.pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE
+        preview.walkPhase = (previewT * 2.2f) % 1f
+        if (cycle < 0.02f) preview.facing = -preview.facing
+        preview.update(dt)
+        Choreographer.getInstance().postFrameCallback(this)
+    }
+
+    private fun refresh() {
+        val overlay = Settings.canDrawOverlays(this)
+        val notif = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        val usage = ForegroundAppWatcher.hasPermission(this)
+        setPerm(overlayBtn, overlay, "Afficher par-dessus les autres apps", "obligatoire")
+        setPerm(notifBtn, notif, "Notifications", "recommandé")
+        setPerm(usageBtn, usage, "Accès aux données d'utilisation", "pour qu'il te suive d'app en app")
+        val a11y = Platforms.isEnabled(this)
+        setPerm(a11yBtn, a11y, "Sauter sur les icônes (accessibilité)", "optionnel")
+        a11yHelp.visibility = if (a11y) View.GONE else View.VISIBLE
+
+        val running = BunnyService.running
+        mainBtn.text = if (running) "Ranger ${nameEdit.text} 🏠" else "Faire apparaître ${nameEdit.text} 🐰"
+        mainBtn.background = GradientDrawable().apply {
+            cornerRadius = 18 * d
+            setColor(Color.parseColor(if (!overlay) "#BDB3B8" else if (running) "#7A6B75" else "#F07893"))
+        }
+    }
+
+    private fun toggleBunny() {
+        if (!Settings.canDrawOverlays(this)) {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
+        }
+        if (BunnyService.running) BunnyService.stop(this) else {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+            }
+            BunnyService.start(this)
+            moveTaskToBack(true)   // on laisse le lapin vivre sur l'écran
+        }
+        mainBtn.postDelayed({ refresh() }, 300)
+    }
+
+    private fun rename() {
+        val n = nameEdit.text.toString().trim().take(16)
+        if (n.isEmpty()) return
+        getSharedPreferences("pet", MODE_PRIVATE).edit().putString("name", n).apply()
+        BunnyService.send(this, BunnyService.ACTION_RELOAD)
+        refresh()
+    }
+
+    private fun confirmReset() {
+        AlertDialog.Builder(this)
+            .setTitle("Adopter un nouveau lapin ?")
+            .setMessage("${nameEdit.text} sera remplacé par un nouveau lapin que tu vas créer.")
+            .setPositiveButton("Oui") { _, _ ->
+                startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, true))
+            }
+            .setNegativeButton("Non", null)
+            .show()
+    }
+
+    // --- petits helpers UI ---
+    private fun section(root: LinearLayout, title: String) {
+        root.addView(TextView(this).apply {
+            text = title
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
+            setPadding(0, (8 * d).toInt(), 0, (6 * d).toInt())
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun permButton(root: LinearLayout, onClick: () -> Unit): TextView {
+        val tv = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(Color.parseColor("#3A2E39"))
+            val p = (12 * d).toInt(); setPadding(p, p, p, p)
+            setOnClickListener { onClick() }
+        }
+        root.addView(tv, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
+        return tv
+    }
+
+    private fun setPerm(tv: TextView, ok: Boolean, label: String, why: String) {
+        tv.text = if (ok) "✅  $label" else "⚠️  $label — $why (toucher pour autoriser)"
+        tv.isEnabled = !ok
+        tv.background = GradientDrawable().apply {
+            cornerRadius = 12 * d
+            setColor(Color.parseColor(if (ok) "#E3F4E8" else "#FFE3E3"))
+        }
+    }
+
+    private fun smallButton(label: String, click: () -> Unit) = TextView(this).apply {
+        text = label
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        setTextColor(Color.parseColor("#3A2E39"))
+        val p = (10 * d).toInt(); setPadding(p + p / 2, p, p + p / 2, p)
+        background = GradientDrawable().apply { cornerRadius = 12 * d; setColor(Color.parseColor("#FBE3D6")) }
+        setOnClickListener { click() }
+    }
+}

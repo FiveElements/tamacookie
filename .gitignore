@@ -1,0 +1,15 @@
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# Clés de signature
+*.jks
+*.keystore
+
