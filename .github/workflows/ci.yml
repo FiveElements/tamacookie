@@ -39,7 +39,7 @@ jobs:
 
       - name: Rapports de tests
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
@@ -49,7 +49,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: APK debug (artefact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tamacookie-debug-apk
           path: app/build/outputs/apk/debug/*.apk
