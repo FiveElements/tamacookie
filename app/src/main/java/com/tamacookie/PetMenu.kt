@@ -217,13 +217,22 @@ class ChestPanel(
     init {
         header(TextView(context).apply { text = "🧰 Le coffre de ${pet.name}" }, onClose)
         addView(small("🍽️ À manger").apply { setPadding(0, (6 * d).toInt(), 0, 0) })
-        val foods = row()
-        for (f in Food.values()) foods.addView(button(f.emoji, f.label) { onFood(f) }, btnLp())
-        addView(foods, rowLp(2))
+        for (chunk in Food.entries.chunked(PER_ROW)) {
+            val foods = row()
+            for (f in chunk) foods.addView(button(f.emoji, f.label) { onFood(f) }, btnLp())
+            addView(foods, rowLp(2))
+        }
         addView(small("🎁 Jouets").apply { setPadding(0, (6 * d).toInt(), 0, 0) })
-        val toys = row()
-        for (t in Toy.values()) toys.addView(button(t.emoji, t.label + if (t == pet.favoriteToy) "⭐" else "") { onToy(t) }, btnLp())
-        addView(toys, rowLp(2))
+        for (chunk in Toy.entries.chunked(PER_ROW)) {
+            val toys = row()
+            for (t in chunk) toys.addView(button(t.emoji, t.label + if (t == pet.favoriteToy) "⭐" else "") { onToy(t) }, btnLp())
+            addView(toys, rowLp(2))
+        }
+    }
+
+    companion object {
+        /** Boutons par rangée (les trois nourritures et les quatre jouets d'origine tenaient sur une rangée). */
+        const val PER_ROW = 4
     }
 }
 

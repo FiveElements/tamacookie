@@ -56,6 +56,18 @@ object Palette {
     const val FRISBEE_SHINE = 0x5AFFFFFF
     const val WOOD = 0xFFB07A4F.toInt()
     const val PLUSH_LIGHT = 0xFFE8C39E.toInt()
+    const val APPLE = 0xFFD94A3D.toInt()
+    const val APPLE_STEM = 0xFF6B4A2B.toInt()
+    const val HAY = 0xFFE3C46A.toInt()
+    const val HAY_DARK = 0xFFB8963F.toInt()
+    const val TREAT = 0xFFC68642.toInt()
+    const val TREAT_CHIP = 0xFF5A3A22.toInt()
+    const val ROPE = 0xFFE9D3A8.toInt()
+    const val ROPE_STRIPE = 0xFFD9534F.toInt()
+    const val YARN = 0xFFB07CE0.toInt()
+    const val TUNNEL = 0xFF4FA3E0.toInt()
+    const val TUNNEL_RING = 0xFF2F7DB8.toInt()
+    const val TUNNEL_HOLE = 0xFF1C3B57.toInt()
 
     // --- Stations ---
     const val WOOD_DARK = 0xFF7A5236.toInt()

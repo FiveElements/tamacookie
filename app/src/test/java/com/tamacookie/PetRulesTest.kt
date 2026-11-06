@@ -208,10 +208,10 @@ class PetRulesTest {
 
     internal fun randomEvent(rnd: Random): PetEvent = when (rnd.nextInt(11)) {
         0, 1, 2 -> Elapsed(rnd.nextFloat() * 6f)
-        3 -> Fed(Food.entries[rnd.nextInt(Food.entries.size)])
+        3 -> Fed(TRACE_FOODS[rnd.nextInt(TRACE_FOODS.size)])
         4 -> Petted
         5 -> PlayStarted
-        6 -> PlayHit(Toy.entries[rnd.nextInt(Toy.entries.size)], rnd.nextFloat() * 3f)
+        6 -> PlayHit(TRACE_TOYS[rnd.nextInt(TRACE_TOYS.size)], rnd.nextFloat() * 3f)
         7 -> if (rnd.nextBoolean()) Bathed else Healed
         8 -> PoopRemoved
         9 -> AppVisited
@@ -219,6 +219,13 @@ class PetRulesTest {
     }
 
     internal companion object {
+        /**
+         * Les nourritures et jouets de l'ancien `PetState` (avant l'évolution 4a) : la trace en tire un au
+         * hasard ; en ajouter aux enums changerait le tirage (donc l'empreinte) sans que les règles aient changé.
+         */
+        val TRACE_FOODS = Food.entries.take(3)
+        val TRACE_TOYS = Toy.entries.take(4)
+
         /** Empreinte de toutes les jauges, cumulée étape par étape (au bit près). */
         fun mix(h: Long, vararg v: Any): Long = v.fold(h) { acc, x ->
             acc * 1_000_003L + when (x) {

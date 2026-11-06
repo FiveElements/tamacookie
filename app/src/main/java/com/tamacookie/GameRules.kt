@@ -39,7 +39,7 @@ data class GameRules(
     // --- Interactions ---
     /** Repu au-dessus : il refuse à manger, sauf [alwaysWelcome]. */
     val fullAbove: Float = 95f,
-    val alwaysWelcome: Set<Food> = setOf(Food.STRAWBERRY),
+    val alwaysWelcome: Set<Food> = setOf(Food.STRAWBERRY, Food.TREAT),
     val eatingCleanlinessCost: Float = 3f,
     /** Caresses répétées à moins de [petCooldownMs] : elles rapportent moins. */
     val petCooldownMs: Long = 4000L,
