@@ -9,6 +9,7 @@ import com.tamacookie.feature.mischief.Mischief
 import com.tamacookie.feature.mischief.MischiefCtx
 import com.tamacookie.feature.mischief.Mischiefs
 import com.tamacookie.feature.mischief.ScrollDizzy
+import com.tamacookie.feature.mischief.StartleMischief
 import com.tamacookie.feature.mischief.SquatMischief
 import com.tamacookie.feature.mischief.UserEvents
 import org.junit.Assert.assertEquals
@@ -263,11 +264,12 @@ class MischiefTest {
     // ---------------------------------------------------------------------
     @Test
     fun `nouvelles betises - a leur place, sans changer les tirages d'avant`() {
-        assertEquals(listOf(HideSeekMischief, SquatMischief, ChewEdgeMischief, KnockMischief, ScrollDizzy, TongueMischief),
-            Mischiefs.ALL)
-        // la langue ne fait pas partie de la cascade (réaction seulement), et réagit en dernier
+        assertEquals(listOf(HideSeekMischief, SquatMischief, ChewEdgeMischief, KnockMischief, ScrollDizzy, TongueMischief,
+            StartleMischief), Mischiefs.ALL)
+        // la langue ne fait pas partie de la cascade (réaction seulement), et réagit après les bêtises d'avant
+        // (le sursaut de 4b, sans tirage pour les anciens caractères, vient ensuite)
         for (level in 0..2) assertEquals(0f, TongueMischief.chance(level), 0f)
-        assertSame(TongueMischief, Mischiefs.ALL.last())
+        assertSame(TongueMischief, Mischiefs.ALL[Mischiefs.ALL.size - 2])
         // au milieu de l'écran (cas des tests seedés d'avant), le bord n'est pas possible : aucun tirage de plus
         pet.body.fx = ctx.arena.screenW / 2
         assertFalse(ChewEdgeMischief.canStart(fakeMctx(), pet))
@@ -344,6 +346,70 @@ class MischiefTest {
         assertTrue(ctx.acts.handlerFor(pet)!!.onPet(pet))
         assertEquals(Act.IDLE, pet.act)
         assertEquals(Expr.HAPPY, pet.mind.exprOverride)
+    }
+
+    // ---------------------------------------------------------------------
+    //  Évolution 4b : caractères (farceur, peureux)
+    // ---------------------------------------------------------------------
+    @Test
+    fun `anciens caracteres - la cascade tire exactement comme avant`() {
+        // modificateurs des caractères d'avant 4b = aucun : mêmes probabilités, même consommation du Random
+        for (p in Personality.entries.take(5)) {
+            val mods = pet.species.behavior(p)
+            for (m in Mischiefs.ALL) for (level in 0..2) assertEquals("$p $m", m.chance(level), m.chance(level, mods), 0f)
+            val list = listOf(Fake(0.35f), Fake(0.35f), Fake(0.4f), Fake(1f))
+            val a = Random(11); val b = Random(11)
+            repeat(200) {
+                val m1 = Mischiefs.seek(list, 1, a, { true }, { true })
+                val m2 = Mischiefs.seek(list, 1, b, { true }, { true }, mods)
+                assertSame(m1, m2)
+            }
+        }
+    }
+
+    @Test
+    fun `farceur - chaque betise est plus probable, le peureux se cache plus`() {
+        val prank = pet.species.behavior(Personality.PRANKSTER)
+        val shy = pet.species.behavior(Personality.SHY)
+        assertEquals(0.525f, HideSeekMischief.chance(1, prank), 1e-6f)
+        assertEquals(0.7f, HideSeekMischief.chance(1, shy), 1e-6f)
+        assertEquals(SquatMischief.chance(1), SquatMischief.chance(1, shy), 0f)       // le reste inchangé
+        // sur 2 000 cascades, la première bêtise est retenue bien plus souvent chez le farceur
+        val first = Fake(0.35f); val list = listOf(first, Fake(1f))
+        var plain = 0; var pranks = 0
+        val r1 = Random(5); val r2 = Random(5)
+        repeat(2_000) {
+            if (Mischiefs.seek(list, 1, r1, { true }, { true }) === first) plain++
+            if (Mischiefs.seek(list, 1, r2, { true }, { true }, prank) === first) pranks++
+        }
+        assertTrue("$plain", plain in 600..800)
+        assertTrue("$pranks", pranks in 950..1150)
+        // il réclame deux fois plus tôt
+        assertEquals(BunnyBrain.attentionThresholdMs(1, Personality.PLAYFUL) / 2, BunnyBrain.attentionThresholdMs(1, Personality.PRANKSTER))
+    }
+
+    @Test
+    fun `sursaut - seulement le peureux, seulement pres du doigt`() {
+        val ev = UserEvents().apply { click = Box(pet.body.fx - 10f, 100f, pet.body.fx + 10f, 200f); now = 1L }
+        // caractère d'avant 4b : aucune réaction, et aucun tirage (un Random qui lève au moindre tirage)
+        val noDraw = object : MischiefCtx by fakeMctx() {
+            override val rnd: Random = object : Random() { override fun nextBits(bitCount: Int): Int = error("tirage") }
+        }
+        assertFalse(StartleMischief.react(noDraw, pet, ev))
+        assertEquals(Act.IDLE, pet.act)
+        // peureux : il finit par sursauter, en reculant loin du doigt (qui est un peu à sa gauche)
+        pet.traits = Traits(Personality.SHY)
+        ev.click = Box(pet.body.fx - 60f, 100f, pet.body.fx - 40f, 200f)
+        var steps = 0
+        while (!StartleMischief.react(fakeMctx(), pet, ev)) assertTrue("jamais de sursaut", ++steps < 200)
+        assertEquals(Act.AIR, pet.act)
+        assertEquals(Expr.SURPRISED, pet.mind.exprOverride)
+        assertEquals(-1f, pet.body.facing, 0f)                          // il regarde le doigt
+        assertTrue(ctx.said.last().let { "Hiii" in it || "peur" in it || "Oh" in it })
+        // loin du doigt : rien
+        pet.setAct(Act.IDLE)
+        ev.click = Box(pet.body.fx + 900f, 100f, pet.body.fx + 920f, 200f)
+        repeat(100) { assertFalse(StartleMischief.react(fakeMctx(), pet, ev)) }
     }
 
     /** Contexte de bêtise minimal (pour appeler une bêtise directement). */

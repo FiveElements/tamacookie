@@ -61,6 +61,19 @@ class SpeciesTest {
             napEnergyBelow = 60f), Rabbit.behavior(Personality.LAZY))
         assertEquals(BehaviorMods(pageWanderChance = 0.12f, platformChance = 0.6f), Rabbit.behavior(Personality.CURIOUS))
         assertEquals(BehaviorMods(attentionFactor = 0.6f, socialChance = 0.4f), Rabbit.behavior(Personality.CUDDLY))
+        assertEquals(BehaviorMods(attentionFactor = 1.3f, socialChance = 0.1f, platformChance = 0.25f,
+            hideChanceFactor = 2f, startleChance = 0.35f), Rabbit.behavior(Personality.SHY))
+        assertEquals(BehaviorMods(attentionFactor = 0.5f, mischiefChanceFactor = 1.5f), Rabbit.behavior(Personality.PRANKSTER))
+        assertEquals(BehaviorMods(pageWanderChance = 0.15f, platformChance = 0.7f, travelCooldownFactor = 0.5f),
+            Rabbit.behavior(Personality.EXPLORER))
+        // les nouveaux champs de 4b sont neutres par défaut (anciens caractères : comportement d'avant)
+        assertEquals(1f, none.mischiefChanceFactor); assertEquals(1f, none.hideChanceFactor)
+        assertEquals(1f, none.travelCooldownFactor); assertEquals(0f, none.startleChance)
+        for (p in Personality.entries.take(5)) {
+            val m = Rabbit.behavior(p)
+            assertEquals("$p", 1f, m.mischiefChanceFactor); assertEquals("$p", 1f, m.hideChanceFactor)
+            assertEquals("$p", 1f, m.travelCooldownFactor); assertEquals("$p", 0f, m.startleChance)
+        }
         assertEquals(35f, none.playSeconds); assertEquals(0.06f, none.pageWanderChance)
         assertSame(RabbitLines, Rabbit.lines)
     }

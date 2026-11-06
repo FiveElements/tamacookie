@@ -152,6 +152,32 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         root.addView(levelDesc, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintLevels()
 
+        // Thèmes de saison (décor et répliques ajoutés : l'apparence choisie n'est jamais modifiée)
+        section(root, "Saisons")
+        val seasonChip = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
+            val p = (10 * d).toInt(); setPadding(p, p, p, p)
+        }
+        fun paintSeason() {
+            val on = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT)
+            seasonChip.text = if (on) "🎄🎃🌸 Thèmes de saison : activés" else "Thèmes de saison : désactivés"
+            seasonChip.background = chipBg(on)
+        }
+        seasonChip.setOnClickListener {
+            val on = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT)
+            prefs.edit().putBoolean(Prefs.SEASONAL, !on).apply()
+            BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
+            paintSeason()
+        }
+        root.addView(seasonChip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(TextView(this).apply {
+            text = "Bonnet et flocons à Noël, citrouille à Halloween, fleurs au printemps"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+            setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        paintSeason()
+
 
         section(root, "Autorisations")
         overlayBtn = permButton(root) {

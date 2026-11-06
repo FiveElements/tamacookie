@@ -29,6 +29,11 @@ object Palette {
     const val YELLOW = 0xFFFFD54A.toInt()
     /** `Color.argb(60, 255, 255, 255)` */
     const val LENS = 0x3CFFFFFF
+    /** Taches du pelage tacheté crème (évolution 4b). */
+    const val FUR_SPOT = 0xFFC9935F.toInt()
+    /** Couronne : or et reflet. */
+    const val CROWN_GOLD = 0xFFF2C14E.toInt()
+    const val CROWN_SHINE = 0xFFFFE9A8.toInt()
 
     // --- Particules ---
     const val HEART = 0xFFFF5C8A.toInt()
@@ -38,6 +43,19 @@ object Palette {
     const val DROP = 0xFF6EC6FF.toInt()
     const val STAR = 0xFFFFC83D.toInt()
     const val DIRT_BUBBLE = 0xFF8DA05A.toInt()
+    /** Saisons (évolution 4b) : flocon, pétale. */
+    const val SNOW = 0xFFB9DCF7.toInt()
+    const val PETAL = 0xFFFFB3C9.toInt()
+
+    // --- Décor de saison (évolution 4b) ---
+    const val SANTA_RED = 0xFFD93A3A.toInt()
+    const val SANTA_WHITE = 0xFFFFFFFF.toInt()
+    const val PUMPKIN = 0xFFF28C28.toInt()
+    const val PUMPKIN_DARK = 0xFFC2621A.toInt()
+    const val PUMPKIN_STEM = 0xFF6B8E3A.toInt()
+    const val PUMPKIN_FACE = 0xFF4A2A12.toInt()
+    const val SPRING_FLOWER = 0xFFFF8FB1.toInt()
+    const val SPRING_FLOWER_2 = 0xFFB59CFF.toInt()
 
     // --- Nourriture et objets ---
     const val CARROT = 0xFFF28C28.toInt()

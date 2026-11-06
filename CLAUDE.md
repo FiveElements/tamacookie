@@ -122,6 +122,7 @@ Principes :
 | # | Évolution | État |
 |---|---|---|
 | 4a | Contenu peu coûteux : stations lit / gamelle / roue / jardin, jouets corde / pelote / tunnel, nourritures pomme / foin / friandise, bêtises bord de l'écran / langue, menu chanter / brosser | ✅ |
+| 4b | Caractère et apparence : personnalités peureux / farceur / explorateur, pelages roux / tacheté crème / bleu-gris, accessoires couronne / bandana / nœud papillon, thèmes de saison (Noël, Halloween, printemps) | ✅ |
 
 ### Écarts et décisions
 
@@ -645,6 +646,79 @@ Principes :
     sur deux rangées ; coffre sur deux rangées ; corde dans la gueule (position, secousse), pelote, tunnel qui cache
     le lapin ; bêtise du bord (près d'un bord) et langue (au toucher de l'écran) ; menu à six boutons.
 
+- **Évolution 4b** (caractère, apparence, saisons ; recettes « Ajouter une personnalité » suivies, ajouts **à la
+  fin** des enums) — 4 commits (personnalités ; apparence ; saisons ; ce fichier) :
+  - **Personnalités** (`Personality` : `SHY`, `PRANKSTER`, `EXPLORER` — noms sauvegardés et échangés, ordinaux
+    0..4 inchangés) :
+    - 🙈 **Peureux** : `HAPPINESS_LOSS` 1,15, `PET_JOY` 1,2 (bonheur plus sensible dans les deux sens) ;
+      comportement : `socialChance` 0,1 (se lie lentement), `platformChance` 0,25, `attentionFactor` 1,3 (réclame plus
+      tard), `hideChanceFactor` 2 (cache-cache 0,35 → 0,7 dans la cascade), `startleChance` 0,35 (sursaut).
+    - 😜 **Farceur** : `HAPPINESS_LOSS` 1,1, `PLAY_JOY` 1,2 ; `attentionFactor` 0,5 (seuil d'attention divisé par
+      deux), `mischiefChanceFactor` 1,5 (chaque bêtise de la cascade ; une probabilité qui atteint 1 est tirée sans
+      aléatoire, comme toc-toc).
+    - 🧭 **Explorateur** : `ENERGY_LOSS` 1,15, `APP_VISIT_JOY` 2 ; `pageWanderChance` 0,15, `platformChance` 0,7,
+      `travelCooldownFactor` 0,5 (il peut repartir d'app en app après 3 s au lieu de 6).
+  - **`BehaviorMods`** : quatre champs (`mischiefChanceFactor`, `hideChanceFactor`, `travelCooldownFactor`,
+    `startleChance`) **neutres par défaut** (facteurs 1 : `x * 1f == x` au bit près ; chance 0 : aucun tirage) — les
+    anciens caractères ont exactement le comportement et les tirages d'avant (testé : cascade identique avec et sans
+    leurs modificateurs, `SpeciesTest`). `Mischief.chance(level, mods)` (défaut : `chance(level) ×
+    mischiefChanceFactor` ; `HideSeekMischief` y ajoute `hideChanceFactor`) ; `Mischiefs.seek(…, mods)` ;
+    `PetBehavior.onAppChanged` lit `travelCooldownFactor`.
+  - **Sursaut** (`StartleMischief`) : un clic à moins de 140 dp, s'il a `startleChance` > 0 → petit bond en arrière
+    loin du doigt (`actor.jump`, `Act.AIR` puis `IDLE`), yeux ronds (`Expr.SURPRISED`), « Hiii ! 🙈 ». **Écart
+    assumé** : rangé dans les bêtises parce que c'est le chemin des clics (même garde : libre, pas en pause, niveau ≥ 1,
+    app non exemptée) — donc pas de sursaut au niveau « Sage » ; il ne met pas les bêtises en pause. **Dernier** de
+    `Mischiefs.ALL` (après la langue) et sans tirage hors peureux : les tirages d'avant ne changent pas. « Se cache
+    plus facilement » = cache-cache plus probable (pas de nouvelle activité de cachette).
+  - Traces seedées : `BunnyBrainTest`, `MischiefTest`, `MultiPetTest` passent sans retouche de leurs graines ;
+    `PetRulesTest.GOLDEN` est calculé sur **`TRACE_PERSONALITIES`** (les cinq d'origine) — la trace itérait
+    `Personality.entries` et aurait gagné trois lignes. Le test du seuil d'attention lit une table de facteurs.
+  - Adoption : les cartes de caractère et « Au hasard » (`Personality.values()`, `Random(nanoTime)`, hors tests)
+    proposent les nouveaux d'eux-mêmes. Échange : une version antérieure qui reçoit `SHY`/`PRANKSTER`/`EXPLORER` le
+    remplace par `CUDDLY` (`PetSnapshot.decode`, inchangé).
+  - **Apparence** (`Look.kt`, ids figés dans `LookTest`) : pelages `GINGER` (« ginger », roux), `SPOTTED_CREAM`
+    (« spotted_cream », crème + taches `Palette.FUR_SPOT` sur le corps, la tête et endormi — `Fur.spotted`),
+    `BLUE_GREY` (« blue_grey ») ; accessoires `CROWN` (« crown », couronne dorée, debout et endormi), `BANDANA`
+    (« bandana », triangle à pois de la couleur de l'accessoire), `BOW_TIE` (« bow_tie », nœud papillon) — ces deux
+    derniers seulement debout, comme l'écharpe. Lunettes et couronne de fleurs existaient déjà. Couleurs `FUR_SPOT`,
+    `CROWN_GOLD`, `CROWN_SHINE` (`Palette.GOLD` existait pour les stations). La pastille du pelage tacheté est unie
+    (crème) dans l'adoption.
+  - **Migration du schéma 0** : `Look.fromLegacyIndexes` bornait au `lastIndex` des enums : il borne désormais aux
+    listes d'alors (`Fur.LEGACY_COUNT` = 7, `Accessory.LEGACY_COUNT` = 6) — un vieil index hors bornes donne toujours
+    rose / aucun accessoire, jamais une option ajoutée depuis (testé). **À retenir** : toute option ajoutée à un enum
+    de `Look` laisse `fromLegacyIndexes` inchangé grâce à ces constantes.
+  - **Saisons** (`Season.kt`, pur) : `Season.of(LocalDate)` / `at(wallMs, zone)` — **Noël** 1er déc. – 6 janv.,
+    **Halloween** 24 oct. – 2 nov., **printemps** 20 mars – 30 avril (bornes incluses ; `NONE` sinon).
+    `SeasonalTheme(clock, zone)` : recalcul au plus une fois par minute (et si l'horloge recule), `enabled` = réglage.
+    `java.time` (API 26+, JVM) : aucune dépendance.
+  - **Ajout du rendu, jamais du `Look`** : `PetRenderState.season` + `seasonHat` (Noël **et** aucun accessoire :
+    bonnet rouge à pompon, à la place de rien — un accessoire choisi est gardé), `seasonPumpkin` (Halloween :
+    citrouille au sol à côté de lui), `seasonFlowers` (printemps : trois fleurs à ses pieds) ; décor au sol caché en
+    vol / tenu. Particules `PType.SNOW` (Noël) / `PETAL` (printemps), `Season.particle`, émises par
+    `AmbientAnimator` **après** les autres et sans tirage hors saison (testé : mêmes particules, image après image,
+    avec une saison sans particule). **Coût** : en saison à particules, une particule est presque toujours en vol,
+    donc la vue est redessinée à chaque image (comme pendant les Zzz) — 0,4 particule/s.
+  - **Répliques** : `SpeciesLines.seasonal(season)` (abstrait : une espèce doit répondre ; `RabbitLines` : 2–3 par
+    saison, vide hors saison), glissées dans le bavardage (`PetBehavior.chatter`, 30 %, tirage seulement en saison).
+    `PetCtx.season` (défaut `NONE` : `FakePetCtx` et toutes les traces seedées inchangées ; `FakePetCtx.season` est
+    un `var` pour les tests), fourni par `BunnyService` (`SeasonalTheme`). Les aperçus de l'accueil et de l'adoption
+    montrent l'apparence sans saison.
+  - **Réglage** : nouvelle clé `seasonal` (`Prefs.SEASONAL`, Boolean, vrai par défaut) dans le fichier `pet` ; bouton
+    « Thèmes de saison » sous « Bêtises » (écran principal), `ACTION_RELOAD` le relit. Aucune clé existante renommée,
+    aucune migration.
+  - Tests : `PersonalityTest`, `SpeciesTest`, `MischiefTest` (cascade des anciens caractères identique, farceur,
+    cache-cache du peureux, sursaut sans tirage), `MultiPetTest` (voyage de l'explorateur), `LookTest`, `SeasonTest`
+    (dates limites, année complète, fuseau, cache / réglage, rendu, particules, répliques, bavardage).
+    447 → 461 tests ; couverture **50,0 → 49,8 % des lignes** (49,9 → 49,7 % des instructions, 48,9 → 49,4 % des
+    branches) — le dessin ajouté (Android) n'est pas couvert ; `Season`, `StartleMischief`, `PetRenderState` 100 %,
+    `SeasonalTheme` 92 %.
+  - **À vérifier sur tablette** : choix des trois caractères à l'adoption (cartes, « Au hasard ») ; peureux qui
+    sursaute quand on touche l'écran près de lui (niveau ≥ 1) ; farceur plus pénible ; explorateur qui suit plus
+    vite d'une app à l'autre ; dessin des trois pelages (taches du tacheté debout / endormi / tenu) et des trois
+    accessoires (position de la couronne sur les oreilles tombantes, bandana et nœud papillon sous le menton) ;
+    saisons (changer la date du téléphone : bonnet sans accessoire, flocons, citrouille, fleurs et pétales,
+    répliques) et le bouton « Thèmes de saison » (effet immédiat, service lancé).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -664,8 +738,9 @@ Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
 | `pet.<id>.poops` / `.visitedApps` | Int | crottes à l'écran, apps visitées |
 | `pet.<id>.poopAcc` | Float | fraction de la prochaine crotte |
 
-Fichier **`pet`** (réglages, inchangé) : `enabled`, `mischief`, `dock_fx`, `dock_fy`, `pageW2_<largeur>`,
-`st_<STATION>_anchor` / `_fx` / `_fy`. Valeur inconnue ou absente → défaut (`PetFields.read`).
+Fichier **`pet`** (réglages) : `enabled`, `mischief`, `dock_fx`, `dock_fy`, `pageW2_<largeur>`,
+`st_<STATION>_anchor` / `_fx` / `_fy`, `seasonal` (Boolean, thèmes de saison, vrai si absent — évolution 4b).
+Valeur inconnue ou absente → défaut (`PetFields.read`).
 
 ### Ajouter une station (ex. : le lit)
 
@@ -748,7 +823,10 @@ fin de `PetMigrations.ALL`, `SCHEMA_VERSION` + 1, et un test à partir d'un fich
 2. `PersonalityTest` : sa ligne dans la table `expected` (le test d'exhaustivité l'exige).
 3. Comportement propre (hors jauges) : sa ligne dans `behavior()` de chaque espèce (`Rabbit.modsFor` : un champ de
    `BehaviorMods`, ou un nouveau champ lu là où il agit) — le `when` exhaustif l'exige. L'écran d'adoption la propose
-   tout seul.
+   tout seul. Un nouveau champ de `BehaviorMods` doit être **neutre par défaut** (facteur 1, chance 0 testée avant
+   tout tirage) pour ne rien changer aux autres caractères (modèle : `mischiefChanceFactor`, `startleChance`).
+4. Les tests qui itèrent sur `Personality.entries` avec une empreinte figée (`PetRulesTest.GOLDEN`) s'en tiennent à
+   `TRACE_PERSONALITIES` : donner son propre test au nouveau caractère.
 
 Un pair qui envoie un caractère inconnu (version plus récente) le voit remplacé par `CUDDLY` (`PetSnapshot.decode`).
 

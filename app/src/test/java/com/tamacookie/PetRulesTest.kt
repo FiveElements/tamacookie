@@ -211,7 +211,7 @@ class PetRulesTest {
      */
     @Test
     fun `trace de reference identique a l'ancien PetState`() {
-        assertEquals(GOLDEN, Personality.entries.joinToString("\n") { trace(it) })
+        assertEquals(GOLDEN, TRACE_PERSONALITIES.joinToString("\n") { trace(it) })
     }
 
     internal fun trace(p: Personality): String {
@@ -247,6 +247,9 @@ class PetRulesTest {
          */
         val TRACE_FOODS = Food.entries.take(3)
         val TRACE_TOYS = Toy.entries.take(4)
+
+        /** Les caractères de l'ancien `PetState` (avant l'évolution 4b), ceux de [GOLDEN]. */
+        val TRACE_PERSONALITIES = Personality.entries.take(5)
 
         /** Empreinte de toutes les jauges, cumulée étape par étape (au bit près). */
         fun mix(h: Long, vararg v: Any): Long = v.fold(h) { acc, x ->

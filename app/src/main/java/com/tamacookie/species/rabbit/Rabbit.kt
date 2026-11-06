@@ -44,6 +44,17 @@ object Rabbit : Species {
         )
         Personality.CURIOUS -> BehaviorMods(pageWanderChance = 0.12f, platformChance = 0.6f)
         Personality.CUDDLY -> BehaviorMods(attentionFactor = 0.6f, socialChance = 0.4f)
+        // Peureux : sursaute, se cache deux fois plus, va peu vers les autres, saute moins, réclame plus tard
+        Personality.SHY -> BehaviorMods(
+            attentionFactor = 1.3f, socialChance = 0.1f, platformChance = 0.25f,
+            hideChanceFactor = 2f, startleChance = 0.35f,
+        )
+        // Farceur : réclame deux fois plus tôt et chaque bêtise de la cascade est plus probable
+        Personality.PRANKSTER -> BehaviorMods(attentionFactor = 0.5f, mischiefChanceFactor = 1.5f)
+        // Explorateur : pages voisines, icônes, voyages deux fois plus rapprochés
+        Personality.EXPLORER -> BehaviorMods(
+            pageWanderChance = 0.15f, platformChance = 0.7f, travelCooldownFactor = 0.5f,
+        )
     }
 
     override fun behavior(p: Personality): BehaviorMods = mods.getValue(p)

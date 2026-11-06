@@ -93,4 +93,13 @@ data class BehaviorMods(
     val chestGreedChance: Float = 0f,
     /** Probabilité d'aller voir un autre animal proche quand il choisit quoi faire. */
     val socialChance: Float = 0.25f,
+    // --- Évolution 4b (défauts = comportement d'avant, au bit près : facteurs 1, chance 0 sans tirage) ---
+    /** Facteur des probabilités de la cascade des bêtises (`Mischief.chance`). */
+    val mischiefChanceFactor: Float = 1f,
+    /** Facteur supplémentaire de la probabilité du cache-cache (il se cache volontiers). */
+    val hideChanceFactor: Float = 1f,
+    /** Facteur de la pause entre deux voyages d'app en app (`Tuning.TRAVEL_COOLDOWN_MS`). */
+    val travelCooldownFactor: Float = 1f,
+    /** Probabilité de sursauter quand on touche l'écran près de lui (0 = jamais, sans tirage). */
+    val startleChance: Float = 0f,
 )

@@ -57,6 +57,9 @@ class AmbientAnimator(private val rnd: Random) {
         if (s.expr == Expr.SICK && rnd.nextFloat() < dt * 0.3f) emit(PType.DROP, 1, w, h, d, s.facing)
         if (s.expr == Expr.DIZZY && rnd.nextFloat() < dt * 5f) emit(PType.STAR, 1, w, h, d, s.facing)
         if (s.veryDirty && rnd.nextFloat() < dt * 0.6f) emit(PType.BUBBLE, 1, w, h, d, s.facing)
+        // saison (évolution 4b) : après les autres, et aucun tirage hors saison (mêmes tirages qu'avant)
+        val seasonal = s.season.particle
+        if (seasonal != null && rnd.nextFloat() < dt * SEASON_PARTICLES_PER_S) emit(seasonal, 1, w, h, d, s.facing)
 
         val it = particles.iterator()
         while (it.hasNext()) {
@@ -66,6 +69,7 @@ class AmbientAnimator(private val rnd: Random) {
             p.x += p.vx * dt; p.y += p.vy * dt
             if (p.type == PType.CRUMB || p.type == PType.DROP) p.vy += 300f * d * dt
             if (p.type == PType.ZZZ || p.type == PType.NOTE) p.x += sin(t * 3f + p.rot) * 12f * d * dt
+            if (p.type == PType.SNOW || p.type == PType.PETAL) p.x += sin(t * 2f + p.rot) * 16f * d * dt
         }
         return active || blink > 0f || earTwitch > 0f || particles.isNotEmpty() || movesWithTime(s)
     }
@@ -98,6 +102,11 @@ class AmbientAnimator(private val rnd: Random) {
                 PType.STAR -> Particle(type, cx, headY - 4f * d, 0f, 0f, 0.6f, 0.6f, 5f * d, rnd.nextFloat() * 6.28f)
                 PType.BUBBLE -> Particle(type, cx + rnd.nextFloat(-20f, 20f) * d, h - 40f * d,
                     rnd.nextFloat(-6f, 6f) * d, -25f * d, 1.5f, 1.5f, rnd.nextFloat(3f, 6f) * d, 0f)
+                // flocons et pétales : tombent doucement du haut de la fenêtre en se balançant
+                PType.SNOW -> Particle(type, cx + rnd.nextFloat(-55f, 55f) * d, h - 130f * d,
+                    0f, 24f * d, 4.5f, 4.5f, rnd.nextFloat(2.5f, 4.5f) * d, rnd.nextFloat() * 6.28f)
+                PType.PETAL -> Particle(type, cx + rnd.nextFloat(-55f, 55f) * d, h - 130f * d,
+                    0f, 18f * d, 5.5f, 5.5f, rnd.nextFloat(3f, 5f) * d, rnd.nextFloat() * 6.28f)
             }
             particles.add(p)
         }
@@ -108,6 +117,9 @@ class AmbientAnimator(private val rnd: Random) {
     companion object {
         /** Échelle du lapin : 1 unité de dessin = UNIT dp. */
         const val UNIT = 0.95f
+
+        /** Particules de saison émises par seconde (en moyenne). */
+        const val SEASON_PARTICLES_PER_S = 0.4f
 
         /**
          * Le dessin de [s] dépend du temps (respiration au repos, au sommeil, en mangeant, tenu en l'air,

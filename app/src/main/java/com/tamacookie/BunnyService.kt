@@ -79,6 +79,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override val arena = Arena()
     override val actor = BunnyActor(arena)
     override val clock: Clock = AndroidClock
+    /** Thème saisonnier (réglage `Prefs.SEASONAL`, relu à `ACTION_RELOAD`). */
+    private val seasonal = SeasonalTheme(clock)
+    override val season: Season get() = seasonal.current()
     /** Aléatoire du résident (et, avant l'étape 7, de tout le service) ; chaque compagnon a le sien. */
     private val residentRnd = Random(System.nanoTime())
     /** Aléatoire de l'animal courant. */
@@ -214,6 +217,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         computeBounds()
         for (p in world.pets.values) dropIn(p)
         mischief.loadLevel()
+        loadSeasonal()
 
         // La fenêtre du lapin est ajoutée AVANT startForeground : sur Android 15+, une fenêtre
         // en surimpression visible autorise le passage au premier plan (redémarrage START_STICKY).
@@ -417,7 +421,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             ACTION_TOGGLE -> if (hidden) show() else hide()
             ACTION_STOP -> { stop(this); return START_NOT_STICKY }
             // Réglages changés (niveau de bêtises)
-            ACTION_RELOAD -> { mischief.loadLevel(); showNewLook() }
+            ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); showNewLook() }
             PetCommands.ACTION_SET_NAME -> {
                 val n = Adoption.cleanName(intent.getStringExtra(PetCommands.EXTRA_NAME)) ?: return START_STICKY
                 resident.rename(n)
@@ -508,10 +512,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         windows.createDock { stations.toggleStationsPanel() }
     }
 
+    private fun loadSeasonal() { seasonal.enabled = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT) }
+
     /** La vue de [p] (créée à sa première apparition, avec l'écouteur des gestes). */
     private fun ensurePetWindow(p: Pet): PetWindow = petWindows.getOrPut(p.id) {
         val v = PetView(this, p.species)
-        v.render(PetRenderState.of(p), 0f)
+        v.render(PetRenderState.of(p, season = season), 0f)
         viewOwner[v] = p.id
         touch.attach(v) { viewOwner[v]?.let { world.pets[it] } }
         PetWindow(WindowId.Pet(p.id), v, windows.params(arena.bw, arena.bh, touchable = true))
@@ -726,7 +732,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         for (p in pets) world.asPet(p) { stations.checkChestBump() }
 
         // Rendu : chaque animal affiché reçoit son état de l'image
-        for (p in pets) petWindows[p.id]?.view?.render(PetRenderState.of(p), dt)
+        val sea = season
+        for (p in pets) petWindows[p.id]?.view?.render(PetRenderState.of(p, season = sea), dt)
         for (p in pets) place(p)
         // Bulle suivante (plusieurs animaux) : celle qui attendait son tour
         director.bubbles.tick(dt)?.let { l ->

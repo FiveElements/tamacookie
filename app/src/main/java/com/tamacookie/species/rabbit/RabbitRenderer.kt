@@ -75,6 +75,11 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
     private val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.HAT }
     private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.YELLOW }
     private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LENS }
+    private val spot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR_SPOT }
+    private val gold = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CROWN_GOLD }
+    private val goldLight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CROWN_SHINE }
+    // --- Saisons (décor ajouté au dessin : l'apparence sauvegardée n'est pas touchée) ---
+    private val seasonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var darkFur = false
     /** Nourriture dont la couleur est dans [carrot] (parseColor seulement quand elle change). */
     private var paintedFood = Food.CARROT
@@ -122,6 +127,8 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         c.save()
         c.translate(cx, fy)
         c.scale(facing * s, s)
+        if (state.seasonFlowers) groundFlowers(c)
+        if (state.seasonPumpkin) pumpkin(c, -50f, 0f)
 
         // --- squash & stretch ---
         var yOff = 0f
@@ -227,6 +234,14 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
                 c.drawRect(bodyCx - bodyRx - 2f, bodyCy - bodyRy - 2f, bodyCx - bodyRx * 0.1f, bodyCy + bodyRy + 2f, patch)
                 c.restore()
             }
+            if (!o && look.fur.spotted) {
+                // Tacheté : quelques taches sur le dos et le flanc
+                c.save(); clipOval(c, bodyCx, bodyCy, bodyRx, bodyRy)
+                oval(c, bodyCx - 12f, bodyCy - 9f, 8f, 6.5f, spot)
+                oval(c, bodyCx + 4f, bodyCy - 14f, 5f, 4f, spot)
+                oval(c, bodyCx - 18f, bodyCy + 7f, 5.5f, 5f, spot)
+                c.restore()
+            }
             // patte avant
             if (!dragged) oval(c, 12f, -5f, 10f, 5f, if (o) outline else fur)
             else {
@@ -242,6 +257,11 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
                     oval(c, headCx - 15f, headCy - 2f, 12f, 15f, patch)
                     oval(c, headCx + 18f, headCy - 2f, 10f, 15f, patch)
                 }
+                c.restore()
+            }
+            if (!o && look.fur.spotted) {
+                c.save(); clipOval(c, headCx, headCy, 22f, 20f)
+                oval(c, headCx - 14f, headCy - 12f, 6f, 5f, spot)
                 c.restore()
             }
             // oreille avant
@@ -286,12 +306,16 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
     //  Accessoires
     // ------------------------------------------------------------------
     private fun drawAccessory(c: Canvas, hx: Float, hy: Float, hr: Float, standing: Boolean) {
+        if (state.seasonHat) { santaHat(c, hx + 1f, hy - hr * 0.86f); return }
         when (look.accessory) {
             Accessory.BOW -> bow(c, hx + hr * 0.6f, hy - hr * 0.85f)
             Accessory.HAT -> hat(c, hx + 1f, hy - hr * 0.88f)
             Accessory.GLASSES -> if (standing) glasses(c, hx, hy)
             Accessory.SCARF -> if (standing) scarf(c, hx, hy)
             Accessory.FLOWERS -> flowers(c, hx, hy, hr)
+            Accessory.CROWN -> crown(c, hx + 1f, hy - hr * 0.86f)
+            Accessory.BANDANA -> if (standing) bandana(c, hx, hy)
+            Accessory.BOW_TIE -> if (standing) bowTie(c, hx + 1f, hy + 20f)
             Accessory.NONE -> {}
         }
     }
@@ -330,6 +354,87 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         rect.set(-4f, 0f, 4f, 17f)
         c.drawRoundRect(rect, 3f, 3f, acc); c.drawRoundRect(rect, 3f, 3f, accStroke)
         c.restore()
+    }
+
+    // ------------------------------------------------------------------
+    //  Saisons
+    // ------------------------------------------------------------------
+    /** Noël : bonnet rouge à pompon (seulement sans accessoire, voir [PetRenderState.seasonHat]). */
+    private fun santaHat(c: Canvas, x: Float, y: Float) {
+        c.save(); c.translate(x, y); c.rotate(-12f)
+        seasonPaint.color = Palette.SANTA_RED
+        path.reset()
+        path.moveTo(-13f, 0f); path.quadTo(-4f, -22f, 14f, -16f); path.quadTo(6f, -10f, 13f, 0f); path.close()
+        c.drawPath(path, seasonPaint); c.drawPath(path, accStroke)
+        seasonPaint.color = Palette.SANTA_WHITE
+        rect.set(-15f, -3.5f, 15f, 4f)
+        c.drawRoundRect(rect, 4f, 4f, seasonPaint); c.drawRoundRect(rect, 4f, 4f, accStroke)
+        c.drawCircle(15f, -16f, 4f, seasonPaint); c.drawCircle(15f, -16f, 4f, accStroke)
+        c.restore()
+    }
+
+    /** Halloween : petite citrouille posée au sol à ([x], [y]), avec son visage. */
+    private fun pumpkin(c: Canvas, x: Float, y: Float) {
+        seasonPaint.color = Palette.PUMPKIN_STEM
+        rect.set(x - 1.8f, y - 22f, x + 1.8f, y - 15f); c.drawRect(rect, seasonPaint)
+        seasonPaint.color = Palette.PUMPKIN_DARK
+        oval(c, x - 6f, y - 8f, 7f, 8f, seasonPaint); oval(c, x + 6f, y - 8f, 7f, 8f, seasonPaint)
+        seasonPaint.color = Palette.PUMPKIN
+        oval(c, x, y - 8.5f, 8f, 8.5f, seasonPaint)
+        rect.set(x - 13f, y - 17f, x + 13f, y); c.drawOval(rect, accStroke)
+        seasonPaint.color = Palette.PUMPKIN_FACE
+        path.reset()
+        path.moveTo(x - 7f, y - 11f); path.lineTo(x - 3f, y - 11f); path.lineTo(x - 5f, y - 14f); path.close()
+        path.moveTo(x + 3f, y - 11f); path.lineTo(x + 7f, y - 11f); path.lineTo(x + 5f, y - 14f); path.close()
+        c.drawPath(path, seasonPaint)
+        rect.set(x - 6f, y - 8f, x + 6f, y - 3f); c.drawArc(rect, 0f, 180f, true, seasonPaint)
+    }
+
+    /** Printemps : trois fleurs dans l'herbe, à ses pieds. */
+    private fun groundFlowers(c: Canvas) {
+        val spots = floatArrayOf(-44f, 0f, 36f, 2f, -30f, 3f)
+        for (i in 0 until 3) {
+            val x = spots[i * 2]; val y = spots[i * 2 + 1]
+            seasonPaint.color = Palette.LEAF
+            rect.set(x - 0.9f, y - 9f, x + 0.9f, y); c.drawRect(rect, seasonPaint)
+            seasonPaint.color = if (i == 1) Palette.SPRING_FLOWER_2 else Palette.SPRING_FLOWER
+            for (k in 0..4) {
+                val a = k * 1.2566f
+                c.drawCircle(x + cos(a) * 2.6f, y - 10f + sin(a) * 2.6f, 2.3f, seasonPaint)
+            }
+            c.drawCircle(x, y - 10f, 1.6f, flowerCenter)
+        }
+    }
+
+    /** Couronne dorée à trois pointes, une pierre de la couleur de l'accessoire. */
+    private fun crown(c: Canvas, x: Float, y: Float) {
+        c.save(); c.translate(x, y); c.rotate(-8f)
+        path.reset()
+        path.moveTo(-11f, 2f); path.lineTo(-12f, -10f); path.lineTo(-6f, -4f); path.lineTo(0f, -13f)
+        path.lineTo(6f, -4f); path.lineTo(12f, -10f); path.lineTo(11f, 2f); path.close()
+        c.drawPath(path, gold); c.drawPath(path, accStroke)
+        rect.set(-10f, -2f, 10f, 2f); c.drawRect(rect, goldLight)
+        c.drawCircle(0f, -1f, 2.4f, acc); c.drawCircle(0f, -1f, 2.4f, accStroke)
+        c.drawCircle(-12f, -10f, 1.6f, goldLight); c.drawCircle(12f, -10f, 1.6f, goldLight); c.drawCircle(0f, -13f, 1.6f, goldLight)
+        c.restore()
+    }
+
+    /** Bandana noué au cou : un triangle qui pointe vers le bas, avec des pois. */
+    private fun bandana(c: Canvas, hx: Float, hy: Float) {
+        path.reset()
+        path.moveTo(hx - 17f, hy + 14f); path.lineTo(hx + 15f, hy + 14f); path.lineTo(hx - 2f, hy + 30f); path.close()
+        c.drawPath(path, acc); c.drawPath(path, accStroke)
+        c.drawCircle(hx - 8f, hy + 18f, 1.4f, white); c.drawCircle(hx + 5f, hy + 18f, 1.4f, white)
+        c.drawCircle(hx - 2f, hy + 24f, 1.4f, white)
+    }
+
+    /** Nœud papillon sous le menton. */
+    private fun bowTie(c: Canvas, x: Float, y: Float) {
+        path.reset()
+        path.moveTo(0f + x, y); path.lineTo(x - 8f, y - 5f); path.lineTo(x - 8f, y + 5f); path.close()
+        path.moveTo(0f + x, y); path.lineTo(x + 8f, y - 5f); path.lineTo(x + 8f, y + 5f); path.close()
+        c.drawPath(path, acc); c.drawPath(path, accStroke)
+        c.drawCircle(x, y, 2.4f, acc); c.drawCircle(x, y, 2.4f, accStroke)
     }
 
     private fun flowers(c: Canvas, hx: Float, hy: Float, hr: Float) {
@@ -465,6 +570,11 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
             c.save(); c.translate(12f, -36f); c.rotate(-82f)
             rect.set(-6f, -36f, 6f, 3f); c.drawOval(rect, if (o) outline else fur)
             if (!o) { rect.set(-3f, -31f, 3f, -2f); c.drawOval(rect, pink) }
+            c.restore()
+        }
+        if (look.fur.spotted) {
+            c.save(); clipOval(c, -4f, -17f, 29f, 17f)
+            oval(c, -16f, -24f, 7f, 5.5f, spot); oval(c, -2f, -8f, 5f, 4f, spot)
             c.restore()
         }
         if (dirty) { circle(c, -12f, -20f, 3f, dirt); circle(c, 2f, -10f, 2.4f, dirt) }

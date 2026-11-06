@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.view.View
 import com.tamacookie.species.Species
 import kotlin.math.cos
@@ -39,6 +40,7 @@ class PetView(
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
     private val path = Path()
+    private val oval = RectF()
 
     /**
      * Affiche [s] et avance l'animation ambiante de [dt] secondes. Ne redessine que si l'image change
@@ -83,6 +85,17 @@ class PetView(
                 PType.BUBBLE -> {
                     pPaint.color = Palette.DIRT_BUBBLE; pPaint.alpha = alpha / 2
                     c.drawCircle(p.x, p.y, p.size, pPaint)
+                }
+                PType.SNOW -> {
+                    pPaint.color = Palette.SNOW; pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * 1.6f)
+                    c.drawCircle(p.x, p.y, p.size * 0.45f, pPaint)
+                }
+                PType.PETAL -> {
+                    pPaint.color = Palette.PETAL; pPaint.alpha = alpha
+                    c.save(); c.rotate(Math.toDegrees((p.rot + t * 1.5f).toDouble()).toFloat(), p.x, p.y)
+                    oval.set(p.x - p.size, p.y - p.size * 0.55f, p.x + p.size, p.y + p.size * 0.55f)
+                    c.drawOval(oval, pPaint)
+                    c.restore()
                 }
             }
         }
