@@ -1,8 +1,10 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// AGP 9 : support Kotlin intégré, le plugin org.jetbrains.kotlin.android n'est plus appliqué ici
+// (la version de KGP est fixée dans le build.gradle.kts racine).
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 // Version : passée par la CI (-PversionName=1.2.0 -PversionCode=42), sinon valeurs de dev.
@@ -75,9 +77,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     testCoverage {
         // Version de JaCoCo plus récente que celle d'AGP 8.5 : lit les classes des JDK récents (21+).
@@ -93,6 +92,12 @@ android {
         // Les avertissements existants sont figés dans la baseline ; tout nouveau problème bloque.
         baseline = file("lint-baseline.xml")
         abortOnError = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
