@@ -698,8 +698,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             }
             Act.WALK -> {
                 val speed = when {
-                    st.isSick || st.energy < 20f -> Tuning.WALK_SLOW_DP * d
-                    st.happiness > 75f -> Tuning.WALK_HAPPY_DP * d
+                    st.isSick || st.energy < rules.walkSlowEnergyBelow -> Tuning.WALK_SLOW_DP * d
+                    st.happiness > rules.walkHappyAbove -> Tuning.WALK_HAPPY_DP * d
                     else -> Tuning.WALK_NORMAL_DP * d
                 } * (if (p.personality == Personality.LAZY) Tuning.LAZY_SPEED_FACTOR else 1f)
                 if (actor.walkToward(p, b.targetX, speed, dt)) p.setAct(Act.IDLE, 2f + rnd.nextFloat() * 4f)

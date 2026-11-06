@@ -76,6 +76,30 @@ data class GameRules(
     val sadBelow: Float = 30f,
     val happyAbove: Float = 75f,
     val happySatietyAbove: Float = 50f,
+
+    // --- Comportement et affichage selon les jauges (lus par les fonctionnalités, pas par PetRules) ---
+    /** Il a l'air sale (taches) sous ce seuil de propreté, ou avec [dirtyPoops] crottes. */
+    val looksDirtyBelow: Float = 45f,
+    /** Très sale (mouches). */
+    val looksVeryDirtyBelow: Float = 20f,
+    /** Il marche lentement s'il est malade ou sous cette énergie… */
+    val walkSlowEnergyBelow: Float = 20f,
+    /** … vite s'il est heureux au-dessus de ce bonheur. */
+    val walkHappyAbove: Float = 75f,
+    /** La partie s'arrête sous cette énergie. */
+    val playStopEnergyBelow: Float = 8f,
+    /** Le câlin au doudou finit en sieste sous cette énergie. */
+    val plushNapEnergyBelow: Float = 35f,
+    /** « Pas fatigué » : il refuse d'aller dormir au-dessus. */
+    val notTiredAbove: Float = 92f,
+    /** Le véto le trouve en pleine forme (pas de soin) à partir de cette santé. */
+    val healthyAbove: Float = 90f,
+    /** Le coffre lui donne à manger sous cette satiété ou sous [chestFoodEnergyBelow]… */
+    val chestFoodSatietyBelow: Float = 60f,
+    val chestFoodEnergyBelow: Float = 25f,
+    /** … de la salade si sa santé est sous ce seuil, une fraise si son bonheur est sous [chestTreatJoyBelow]. */
+    val chestLettuceHealthBelow: Float = 60f,
+    val chestTreatJoyBelow: Float = 40f,
 ) {
     companion object {
         val DEFAULT = GameRules()

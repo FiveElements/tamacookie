@@ -45,7 +45,7 @@ object MenuEntries {
             pet.express(Expr.SLEEPY, 2f)
             ctx.say(Lines.GETTING_UP)
             pet.setActOrAfterAir(Act.IDLE, 3f)
-        } else if (st.energy > 92f) {
+        } else if (st.energy > ctx.rules.notTiredAbove) {
             ctx.speech.sayOneOf(Lines.NOT_TIRED)
         } else ctx.startSleep(pet)
     }

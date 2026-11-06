@@ -257,7 +257,7 @@ class ToyController(private val ctx: PetCtx) {
         pet.mind.playTime += dt
         if (p == null) { pet.setAct(Act.IDLE); return }
         val limit = if (pet.personality == Personality.PLAYFUL) 50f else 35f
-        if (pet.mind.playTime > limit || pet.stats.energy < 8f) { endPlay(p); return }
+        if (pet.mind.playTime > limit || pet.stats.energy < ctx.rules.playStopEnergyBelow) { endPlay(p); return }
         p.toy!!.spec.play(tctx, pet, p, dt)
     }
 

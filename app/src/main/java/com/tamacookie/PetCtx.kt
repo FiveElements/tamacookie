@@ -34,10 +34,12 @@ interface PetCtx {
      * refusé, l'animal est sauvegardé tout de suite. Seul chemin par lequel une fonctionnalité change les jauges.
      */
     fun on(pet: Pet, event: PetEvent): PetRules.Result {
-        val r = pet.on(event, clock.wallMs())
+        val r = pet.on(event, clock.wallMs(), rules)
         if (event.savesNow && !r.refused) save(pet)
         return r
     }
+    /** Règles du jeu (taux, seuils) : [GameRules.DEFAULT] en jeu. */
+    val rules: GameRules get() = GameRules.DEFAULT
     /** Sauvegarde [pet] (port `PetStore`). */
     fun save(pet: Pet)
 

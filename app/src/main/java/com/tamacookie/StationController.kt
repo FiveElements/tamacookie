@@ -434,10 +434,11 @@ class StationController(
         val rnd = ctx.rnd
         val keep = ctx.lastInteraction            // ce n'est pas l'utilisateur qui s'est occupé de lui
         val glutton = pet.personality == Personality.GLUTTON && rnd.nextFloat() < 0.6f
-        if (st.satiety < 60f || glutton || st.energy < 25f) {
+        val r = ctx.rules
+        if (st.satiety < r.chestFoodSatietyBelow || glutton || st.energy < r.chestFoodEnergyBelow) {
             val f = when {
-                st.health < 60f -> Food.LETTUCE
-                st.happiness < 40f -> Food.STRAWBERRY
+                st.health < r.chestLettuceHealthBelow -> Food.LETTUCE
+                st.happiness < r.chestTreatJoyBelow -> Food.STRAWBERRY
                 rnd.nextFloat() < 0.7f -> Food.CARROT
                 else -> Food.STRAWBERRY
             }
@@ -454,7 +455,7 @@ class StationController(
         closeVetPanel()
         panels.openVet(pet, get(StationKind.VET),
             onHeal = {
-                if (pet.stats.health >= 90f) ctx.say("Il va très bien ! ✅")
+                if (pet.stats.health >= ctx.rules.healthyAbove) ctx.say("Il va très bien ! ✅")
                 else {
                     ctx.on(pet, PetEvent.Healed)
                     ctx.emit(pet, PType.SPARKLE, 6)

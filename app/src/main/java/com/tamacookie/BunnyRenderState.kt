@@ -28,7 +28,7 @@ data class BunnyRenderState(
 ) {
     companion object {
         /** L'état affiché de [pet] ([Look] est immuable : partagée sans copie). */
-        fun of(pet: Pet): BunnyRenderState {
+        fun of(pet: Pet, rules: GameRules = GameRules.DEFAULT): BunnyRenderState {
             val b = pet.body
             val st = pet.stats
             return BunnyRenderState(
@@ -39,8 +39,8 @@ data class BunnyRenderState(
                 airVy = b.phys.airVy,
                 eatProgress = b.eatProgress,
                 food = b.eatingFood,
-                dirty = st.cleanliness < 45f || st.poops >= 3,
-                veryDirty = st.cleanliness < 20f,
+                dirty = st.cleanliness < rules.looksDirtyBelow || st.poops >= rules.dirtyPoops,
+                veryDirty = st.cleanliness < rules.looksVeryDirtyBelow,
                 look = pet.look,
             )
         }

@@ -300,6 +300,6 @@ class VetPanel(
         if (pet.stats.happiness < 30f) issues += "il a besoin d'attention"
         if (pet.stats.poops > 0) issues += "${pet.stats.poops} crotte(s) à ramasser"
         diag.text = if (issues.isEmpty()) "✅ Diagnostic : en pleine forme !" else "📋 Diagnostic : " + issues.joinToString(", ")
-        healBtn.alpha = if (pet.stats.health < 90f) 1f else 0.45f
+        healBtn.alpha = if (pet.stats.health < GameRules.DEFAULT.healthyAbove) 1f else 0.45f
     }
 }
