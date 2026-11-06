@@ -1,7 +1,7 @@
 # 🐰 TamaCookie
 
 [![CI](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml/badge.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
-[![Couverture des tests](.github/badges/coverage.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
+[![Couverture des tests](https://raw.githubusercontent.com/FiveElements/tamacookie/badges/coverage.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
 [![Release](https://github.com/FiveElements/tamacookie/actions/workflows/release.yml/badge.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/release.yml)
 [![Dernière version](https://img.shields.io/github/v/release/FiveElements/tamacookie?label=version&logo=github)](https://github.com/FiveElements/tamacookie/releases/latest)
 [![Téléchargements](https://img.shields.io/github/downloads/FiveElements/tamacookie/total?label=t%C3%A9l%C3%A9chargements&logo=android&color=3DDC84)](https://github.com/FiveElements/tamacookie/releases)

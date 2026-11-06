@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Badge de couverture (SVG, style « flat » de shields.io) à partir d'un rapport JaCoCo XML.
 
-Aucun service externe : le SVG est écrit dans le dépôt (.github/badges/coverage.svg) et commité par la CI
-sur `main`. Taux = lignes couvertes / lignes (compteur LINE global du rapport).
+Aucun service externe : la CI publie le SVG sur la branche dédiée `badges` (main est protégée),
+lu par le README via raw.githubusercontent.com. Taux = lignes couvertes / lignes (compteur LINE global du rapport).
 
 Usage : coverage_badge.py <report.xml> <sortie.svg> [--summary <fichier>]
 Affiche le taux (ex. « 41.5 ») sur la sortie standard.

@@ -398,9 +398,10 @@ Principes :
   plugin ajouté ; `android.testCoverage.jacocoVersion = "0.8.13"` pour lire les classes des JDK récents). AGP
   exclut `R`, `BuildConfig`, `Manifest`. Rapport HTML + XML. CI : la tâche tourne avec les tests, le rapport est
   un artefact (`coverage-report`) et le taux va dans le résumé du job ; le job `coverage-badge` (push sur `main`
-  seulement, seul à avoir `contents: write`) régénère `.github/badges/coverage.svg` avec
-  `.github/scripts/coverage_badge.py` (taux de **lignes**, style « flat ») et le commite avec `[skip ci]`
-  (+ `paths-ignore` sur `.github/badges/**`). Pas de `cicirello/jacoco-badge-generator` : il ne lit que le CSV
+  seulement, seul à avoir `contents: write`) régénère le SVG avec
+  `.github/scripts/coverage_badge.py` (taux de **lignes**, style « flat ») et le pousse (force, un seul commit)
+  sur la branche orpheline **`badges`** : `main` est protégée (statut `build` requis), le bot ne peut pas y
+  pousser. Le README lit `raw.githubusercontent.com/.../badges/coverage.svg`. La CI ne tourne pas sur `badges`. Pas de `cicirello/jacoco-badge-generator` : il ne lit que le CSV
   de JaCoCo, qu'AGP ne produit pas. Mesure de départ (7f49e65) : **41,5 % des lignes** (43,1 % des
   instructions, 38,9 % des branches) ; à 0 % : `BunnyService`, `MainActivity`, `PetMenu`, `AdoptActivity`,
   `TouchHandler`, `OverlayWindows`… (adaptateurs Android, attendus) ; `BunnyView` 0,8 %.
