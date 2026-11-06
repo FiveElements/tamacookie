@@ -21,9 +21,11 @@ import kotlin.math.roundToInt
  * Fenêtres en surimpression : paramètres, ajout / retrait sûrs, bulle de dialogue,
  * bouton 🏠 (dock) et placement des panneaux.
  */
-class OverlayWindows(private val svc: BunnyService) {
-    val wm: WindowManager = svc.getSystemService(WindowManager::class.java)
-    private val d get() = svc.d
+class OverlayWindows(private val ctx: PetCtx) {
+    val wm: WindowManager = ctx.context.getSystemService(WindowManager::class.java)
+    private val arena get() = ctx.arena
+    private val d get() = arena.d
+    private val pet: Pet get() = ctx.pet
 
     fun params(w: Int, h: Int, touchable: Boolean): WindowManager.LayoutParams {
         var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -62,7 +64,7 @@ class OverlayWindows(private val svc: BunnyService) {
 
     /** Largeur d'un panneau : [dp] souhaités, réduite pour tenir dans un écran étroit. */
     fun panelWidth(dp: Float): Int =
-        min(dp * d, svc.screenW - 2 * Tuning.PANEL_SCREEN_MARGIN_DP * d).toInt().coerceAtLeast(1)
+        min(dp * d, arena.screenW - 2 * Tuning.PANEL_SCREEN_MARGIN_DP * d).toInt().coerceAtLeast(1)
 
     /** Paramètres d'un panneau tactile de largeur [w] ; [watchOutside] = fermé par un toucher à l'extérieur. */
     fun panelParams(w: Int, watchOutside: Boolean): WindowManager.LayoutParams {
@@ -79,14 +81,14 @@ class OverlayWindows(private val svc: BunnyService) {
     /** x d'un panneau de largeur [w], borné dans l'écran (jamais de plage vide). */
     fun clampPanelX(x: Float, w: Int): Int {
         val lo = Tuning.PANEL_EDGE_PX
-        val hi = (svc.screenW - w - Tuning.PANEL_EDGE_PX).toInt().coerceAtLeast(lo)
+        val hi = (arena.screenW - w - Tuning.PANEL_EDGE_PX).toInt().coerceAtLeast(lo)
         return x.roundToInt().coerceIn(lo, hi)
     }
 
     /** y d'un panneau de hauteur [h], borné entre le haut de l'écran et le sol. */
     fun clampPanelY(y: Float, h: Int): Int {
-        val lo = svc.topY.toInt()
-        val hi = (svc.groundY - h).toInt().coerceAtLeast(lo)
+        val lo = arena.topY.toInt()
+        val hi = (arena.groundY - h).toInt().coerceAtLeast(lo)
         return y.roundToInt().coerceIn(lo, hi)
     }
 
@@ -102,14 +104,14 @@ class OverlayWindows(private val svc: BunnyService) {
     private var bubbleH = 0
 
     fun createBubble() {
-        bubble = SpeechBubble(svc)
+        bubble = SpeechBubble(ctx.context)
         bubbleLp = params(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, touchable = false)
         bubbleLp.alpha = 0.8f
     }
 
     fun say(text: String, seconds: Float) {
         val b = bubble ?: return
-        if (svc.hidden || svc.bunnyAway) return
+        if (ctx.hidden || ctx.bunnyAway) return
         b.text.text = text
         b.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         bubbleW = b.measuredWidth; bubbleH = b.measuredHeight
@@ -120,11 +122,11 @@ class OverlayWindows(private val svc: BunnyService) {
     }
 
     private fun positionBubble() {
-        val headTop = if (svc.act == Act.SLEEP) 70 * d else 112 * d
+        val headTop = if (pet.body.act == Act.SLEEP) 70 * d else 112 * d
         val lo = (4 * d).toInt()
-        val hi = (svc.screenW - bubbleW - 4 * d).toInt().coerceAtLeast(lo)
-        bubbleLp.x = (svc.fx + svc.pages.bunnyShift - bubbleW / 2f).roundToInt().coerceIn(lo, hi)
-        bubbleLp.y = (svc.fy - headTop - bubbleH).roundToInt().coerceAtLeast(svc.topY.toInt())
+        val hi = (arena.screenW - bubbleW - 4 * d).toInt().coerceAtLeast(lo)
+        bubbleLp.x = (pet.body.fx + ctx.pages.bunnyShift - bubbleW / 2f).roundToInt().coerceIn(lo, hi)
+        bubbleLp.y = (pet.body.fy - headTop - bubbleH).roundToInt().coerceAtLeast(arena.topY.toInt())
     }
 
     fun updateBubble(dt: Float) {
@@ -154,7 +156,7 @@ class OverlayWindows(private val svc: BunnyService) {
     @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
     fun createDock(onTap: () -> Unit) {
         val size = (Tuning.DOCK_SIZE_DP * d).toInt()
-        dock = TextView(svc).apply {
+        dock = TextView(ctx.context).apply {
             text = DOCK_HOME
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             gravity = Gravity.CENTER
@@ -166,7 +168,7 @@ class OverlayWindows(private val svc: BunnyService) {
         }
         dockLp = params(size, size, touchable = true)
         reloadDockPosition()
-        val slop = ViewConfiguration.get(svc).scaledTouchSlop.toFloat()
+        val slop = ViewConfiguration.get(ctx.context).scaledTouchSlop.toFloat()
         var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var moved = false
         dock.setOnTouchListener { v, ev ->
             when (ev.actionMasked) {
@@ -184,11 +186,11 @@ class OverlayWindows(private val svc: BunnyService) {
                     v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
                     if (moved) {
                         // se colle au bord le plus proche
-                        val snapX = if (dockLp.x + size / 2f < svc.screenW / 2) 4 * d else svc.screenW - size - 4 * d
+                        val snapX = if (dockLp.x + size / 2f < arena.screenW / 2) 4 * d else arena.screenW - size - 4 * d
                         placeDock(snapX, dockLp.y.toFloat())
-                        Prefs.of(svc).edit()
-                            .putFloat(Prefs.DOCK_FX, dockLp.x / svc.screenW)
-                            .putFloat(Prefs.DOCK_FY, dockLp.y / svc.groundY).apply()
+                        ctx.prefs.edit()
+                            .putFloat(Prefs.DOCK_FX, dockLp.x / arena.screenW)
+                            .putFloat(Prefs.DOCK_FY, dockLp.y / arena.groundY).apply()
                     } else if (ev.actionMasked == MotionEvent.ACTION_UP) {
                         v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         onTap()
@@ -203,14 +205,14 @@ class OverlayWindows(private val svc: BunnyService) {
     /** Replace le dock d'après la position sauvegardée (fractions de l'écran). */
     fun reloadDockPosition() {
         if (!::dockLp.isInitialized) return
-        val prefs = Prefs.of(svc)
-        placeDock(prefs.getFloat(Prefs.DOCK_FX, 1f) * svc.screenW, prefs.getFloat(Prefs.DOCK_FY, 0.42f) * svc.groundY)
+        val prefs = ctx.prefs
+        placeDock(prefs.getFloat(Prefs.DOCK_FX, 1f) * arena.screenW, prefs.getFloat(Prefs.DOCK_FY, 0.42f) * arena.groundY)
     }
 
     fun placeDock(x: Float, y: Float) {
         if (!::dockLp.isInitialized) return
-        dockLp.x = x.roundToInt().coerceIn(0, (svc.screenW - dockLp.width).toInt().coerceAtLeast(0))
-        dockLp.y = y.roundToInt().coerceIn(svc.topY.toInt(), (svc.groundY - dockLp.height).toInt().coerceAtLeast(svc.topY.toInt()))
+        dockLp.x = x.roundToInt().coerceIn(0, (arena.screenW - dockLp.width).toInt().coerceAtLeast(0))
+        dockLp.y = y.roundToInt().coerceIn(arena.topY.toInt(), (arena.groundY - dockLp.height).toInt().coerceAtLeast(arena.topY.toInt()))
         if (dockAdded) wm.updateViewLayout(dock, dockLp)
     }
 

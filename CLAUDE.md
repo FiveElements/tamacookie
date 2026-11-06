@@ -26,11 +26,12 @@ Code, commentaires, commits et UI sont **en français**.
 
 ## Architecture actuelle (point de départ, nov. 2026)
 
-Package unique `com.tamacookie`. Cœur pur et testé : `BunnyBrain` (décisions), `BunnyPhysics`, `ScrollMath`, `Tuning`.
+Package unique `com.tamacookie`. Cœur pur et testé : `BunnyBrain` (décisions), `BunnyPhysics`, `ScrollMath`, `Tuning`,
+et depuis l'étape 2 `Pet`/`World`/`BunnyActor`/`Clock` ; les contrôleurs reçoivent `PetCtx` (faux hôte : `FakePetCtx`).
 Problèmes à résorber (audit) :
 - `BunnyService` (~1 270 l.) est un god-object : ~16 responsabilités, ~45 `internal var`.
 - `StationController`, `ToyController`, `MischiefController`, `PageTracker`, `OverlayWindows` reçoivent
-  `svc: BunnyService` et modifient ses champs ; ils s'appellent en cycle via `svc`.
+  `svc: BunnyService` et modifient ses champs ; ils s'appellent en cycle via `svc`.  → étape 2 : ils reçoivent `PetCtx` et agissent sur le `Pet`.
 - Le `when (act)` central de `updateBehavior` et les sous-ensembles de `Act` (BunnyBrain.kt) dispersent
   chaque fonctionnalité sur ~6 à 14 endroits.
 - Les vues sont de l'état de jeu (`bunny.pose`, `bunny.facing` écrits par 4 classes).
@@ -82,8 +83,8 @@ Principes :
 |---|---|---|
 | 0 | Corrections : reset(), course à l'adoption, scan/poll batterie, clés Prefs, receiver flag | ✅ |
 | 1 | Extractions de `BunnyService` : répliques (`Lines`/`Speech`), `PetNotifier`, `TouchHandler` ; `Palette` | ✅ |
-| 2 | `Pet` + `World` (un seul animal), `Body`/`BunnyActor`, `PetCtx`/`PetHost`, `Clock` ; faux hôte de test | ⏳ |
-| 3 | Fonctionnalités en plugins recevant `pet` : stations (occupant, capacité, `FloatingPanel`), jouets, bêtises, menu | |
+| 2 | `Pet` + `World` (un seul animal), `Body`/`BunnyActor`, `PetCtx`/`PetHost`, `Clock` ; faux hôte de test | ✅ |
+| 3 | Fonctionnalités en plugins recevant `pet` : stations (occupant, capacité, `FloatingPanel`), jouets, bêtises, menu | ⏳ |
 | 4 | `OverlayManager` unique + `RenderState` par entité | |
 | 5 | `PetStats` + `PetRules` + `PetRepository` versionné par `PetId`, look par ids stables (migration) | |
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | |
@@ -105,6 +106,39 @@ Principes :
   - `Palette` : littéraux `Int` (pas d'annotation `@ColorInt`, faute de dépendance androidx). Appliquée à
     `BunnyView`, `PropView`, `StationView`, `StatBar` ; les activités (`MainActivity`, `AdoptActivity`), les
     panneaux et `Look`/`Options` gardent `Color.parseColor` (hors boucle de rendu).
+
+- **Étape 2** (`BunnyService` 956 → 938 l., mais il ne contient plus d'état d'animal) :
+  - Nouveaux types (package `com.tamacookie`) : `Pet.kt` (`PetId`, `Origin.Resident`, `Identity`, `Body`, `Mind`, `Pet`),
+    `World.kt` (`Arena` = géométrie partagée, `World` = `pets` + `props`), `BunnyActor.kt` (marcher, se tourner,
+    sauter, `surfaceY`), `Clock.kt` (`Clock`, `AndroidClock`), `PetCtx.kt` (façade, implémentée par `BunnyService`).
+    Tests : `FakePetCtx` + `FakeClock` + `resetPlatforms()` (test/FakePetCtx.kt), `PetTest`, `BunnyActorTest`,
+    `MischiefControllerTest`, `PageTrackerTest`.
+  - L'ancienne interface `Body` (physique des objets) s'appelle désormais `PropBody`.
+  - `PetId.resident(bornAt)` : identifiant **dérivé de `bornAt`** (déjà sauvegardé), stable sans nouvelle clé de
+    prefs ; un vrai UUID persistant viendra avec `PetRepository` (étape 5). `Identity.name` lit `PetState.name`.
+  - `Body` possède `pose` et `facing` : `BunnyView.pose`/`facing` délèguent au `Body` branché (`bunny.body = pet.body`) ;
+    les aperçus (`MainActivity`, `AdoptActivity`) gardent leur propre `Body`. `walkPhase`, `airVy`, `eatProgress`,
+    `expr` restent copiés dans la vue par le service (→ `RenderState`, étape 4).
+  - `Mind.rnd` est **le même** `Random` que `PetCtx.rnd` (paroles, objets) tant qu'il n'y a qu'un animal.
+  - Restent dans le service (global ou fenêtre) : géométrie (`Arena`), cache des plateformes, `hidden`,
+    `bunnyAway`/`bunnyAdded` (fenêtre de l'animal → `OverlayManager` étape 4), boucle, minuteurs de notification.
+  - `props` appartient au `World` (`hasToy`/`hasFood`/`hasToyOrFood`/`currentToy`/`dropHeldToy`) ; `ToyController`
+    les gère toujours.
+  - Les `updateXxx` appelés par la machine à états reçoivent `pet` (`updateSquat(pet, dt)`…) ; ailleurs les
+    contrôleurs prennent `ctx.pet` (getter privé `pet`). Le dispatch central `when (act)` est inchangé (étape 3).
+  - `Clock` remplace `SystemClock`/`System.currentTimeMillis()` dans le service et les contrôleurs migrés.
+    Hors périmètre : `PetState`, `PetNotifier`, `ScreenSensorService`, activités.
+  - Appui long des stations : `s.view.postDelayed` au lieu du `Handler` du service (même fil principal).
+  - **Contrôleurs encore couplés** (accès `svc.` → 0 partout ; accès `ctx.` : `PageTracker` 22, `MischiefController` 75,
+    `ToyController` 93, `StationController` 111, `TouchHandler` 41, `OverlayWindows` 11) :
+    - `PageTracker`, `MischiefController` : uniquement `PetCtx` + `Platforms` (global) → testés en JVM.
+    - `ToyController`, `StationController` : `ctx.windows` / `ctx.context` (vues `PropView`/`StationView`, panneaux,
+      `WindowManager`) → intestables en JVM tant qu'il n'y a pas d'`OverlayManager` (étape 4).
+    - `TouchHandler` : reçoit en plus `StationController` et `MischiefController` (adaptateur d'entrée qui les pilote :
+      survol / dépôt, trouvé, caresse pendant une bêtise) ; gestes Android.
+    - `OverlayWindows` : adaptateur Android (lit la position de l'animal pour la bulle).
+    - `PetCtx` expose encore `pages` (le `PageTracker`) et des délégués vers les contrôleurs (`feed`, `startPlay`,
+      `busyInStation`, `endHiding`, `inStation`, `lastInteraction`) : à remplacer par des requêtes au monde à l'étape 3.
 
 Règles pour chaque étape : pas de big-bang, pas de nouvelle dépendance sans justification écrite,
 ajouter des tests JVM pour tout ce qui devient pur, mettre à jour ce fichier (colonne État + écarts).

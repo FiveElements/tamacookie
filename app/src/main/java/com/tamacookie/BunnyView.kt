@@ -34,9 +34,18 @@ class BunnyView(context: Context) : View(context) {
     )
 
     // --- Pilotage par le service ---
-    var pose = Pose.IDLE
+    /**
+     * Corps affiché : la posture et l'orientation sont de l'état de jeu, possédé par le [Body] de l'animal
+     * (le service y branche celui du résident ; les aperçus gardent leur propre corps). → RenderState à l'étape 4.
+     */
+    var body = Body()
+    var pose: Pose
+        get() = body.pose
+        set(v) { body.pose = v }
     var expr = Expr.NORMAL
-    var facing = 1f                 // 1 = droite, -1 = gauche
+    var facing: Float                // 1 = droite, -1 = gauche
+        get() = body.facing
+        set(v) { body.facing = v }
     var walkPhase = 0f              // 0..1, cycle de saut pendant la marche
     var airVy = 0f                  // vitesse verticale (px/s) pour l'étirement en l'air
     var eatProgress = 0f            // 0..1

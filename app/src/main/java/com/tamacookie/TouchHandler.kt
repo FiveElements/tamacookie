@@ -19,10 +19,17 @@ import kotlin.math.sign
  * Interactions tactiles avec le lapin : toucher (caresses, chatouilles, réveil),
  * glisser / lancer (dépôt dans une station), et menu de soins (double toucher / appui long).
  *
- * Reçoit encore le service (étape 1) : il lit / modifie le corps et l'activité du lapin.
- * À terme (étape 2) il passera par une façade étroite (`PetCtx`).
+ * Adaptateur d'entrée : passe par [PetCtx] pour l'animal, et reçoit explicitement les deux
+ * contrôleurs qu'il pilote ([StationController] : survol / dépôt / panneau ; [MischiefController] :
+ * trouvé, caresse pendant une bêtise, cache-cache depuis le menu). Reste lié à Android (gestes, vues).
  */
-class TouchHandler(private val svc: BunnyService) {
+class TouchHandler(
+    private val ctx: PetCtx,
+    private val stations: StationController,
+    private val mischief: MischiefController,
+) {
+    private val arena get() = ctx.arena
+    private val pet: Pet get() = ctx.pet
 
     private val tapTimes = ArrayDeque<Long>()
     private var menu: PetMenu? = null
@@ -41,13 +48,13 @@ class TouchHandler(private val svc: BunnyService) {
     // =====================================================================
     @SuppressLint("ClickableViewAccessibility")
     fun attach(bunny: BunnyView) {
-        val slop = ViewConfiguration.get(svc).scaledTouchSlop * 1.5f
-        val gd = GestureDetector(svc, object : GestureDetector.SimpleOnGestureListener() {
+        val slop = ViewConfiguration.get(ctx.context).scaledTouchSlop * 1.5f
+        val gd = GestureDetector(ctx.context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean { onPetTap(); return true }
             override fun onDoubleTap(e: MotionEvent): Boolean { toggleMenu(); return true }
             override fun onLongPress(e: MotionEvent) {
-                svc.bunny.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                ctx.haptic(pet, HapticFeedbackConstants.LONG_PRESS)
                 toggleMenu()
             }
         })
@@ -64,32 +71,32 @@ class TouchHandler(private val svc: BunnyService) {
                     downX = ev.rawX; downY = ev.rawY; lastRawX = ev.rawX
                     dragging = false
                     vt?.recycle(); vt = VelocityTracker.obtain()
-                    svc.requestFrames()
+                    ctx.requestFrames()
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!dragging && hypot(ev.rawX - downX, ev.rawY - downY) > slop) {
                         dragging = true
                         val cancel = MotionEvent.obtain(ev); cancel.action = MotionEvent.ACTION_CANCEL
                         gd.onTouchEvent(cancel); cancel.recycle()
-                        svc.pages.rebaseToActivePage()
-                        offX = downX - svc.fx; offY = downY - svc.fy
+                        ctx.pages.rebaseToActivePage()
+                        offX = downX - pet.body.fx; offY = downY - pet.body.fy
                         startDrag()
                     }
                     if (dragging) {
-                        val d = svc.d
-                        svc.fx = (ev.rawX - offX).coerceIn(0f, svc.screenW)
-                        svc.fy = min(ev.rawY - offY, svc.groundY).coerceAtLeast(svc.topY + 90 * d)
-                        if (abs(ev.rawX - lastRawX) > 2 * d) svc.bunny.facing = sign(ev.rawX - lastRawX)
+                        val d = arena.d
+                        pet.body.fx = (ev.rawX - offX).coerceIn(0f, arena.screenW)
+                        pet.body.fy = min(ev.rawY - offY, arena.groundY).coerceAtLeast(arena.topY + 90 * d)
+                        if (abs(ev.rawX - lastRawX) > 2 * d) pet.body.facing = sign(ev.rawX - lastRawX)
                         lastRawX = ev.rawX
-                        svc.stations.updateHover()
+                        stations.updateHover()
                     }
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     vt?.addMovement(e2)
                     if (dragging) {
                         vt?.computeCurrentVelocity(1000)
-                        val target = svc.stations.takeHover()
-                        if (target != null) svc.stations.enterStation(target)
+                        val target = stations.takeHover()
+                        if (target != null) stations.enterStation(target)
                         else release(vt?.xVelocity ?: 0f, vt?.yVelocity ?: 0f)
                         dragging = false
                         vt?.recycle(); vt = null
@@ -109,77 +116,76 @@ class TouchHandler(private val svc: BunnyService) {
     }
 
     private fun startDrag() {
-        val pet = svc.pet
-        if (svc.act == Act.PEEK) {
-            svc.mischief.endHiding()
-            pet.happiness = (pet.happiness + 15f).coerceAtMost(100f)
-            svc.say(Lines.FOUND_WHILE_DRAGGED, 1.5f)
-        } else if (svc.mischief.isHiding()) svc.mischief.endHiding()
+        val st = pet.stats
+        if (pet.body.act == Act.PEEK) {
+            ctx.endHiding()
+            st.happiness = (st.happiness + 15f).coerceAtMost(100f)
+            ctx.say(Lines.FOUND_WHILE_DRAGGED, 1.5f)
+        } else if (pet.isHiding) ctx.endHiding()
         closeMenu()
-        svc.platform = null
-        svc.phys.airLandY = null
-        if (svc.stations.inStation != null) svc.stations.leaveStation(hopOut = false)
-        if (pet.sleeping) { pet.sleeping = false; pet.happiness = (pet.happiness - 3f).coerceAtLeast(0f) }
-        svc.toys.dropHeldToy()
-        svc.mischief.noteInteraction()
-        svc.setAct(Act.DRAGGED)
-        svc.speech.sayOneOf(Lines.DRAGGED, 1.8f)
-        svc.bunny.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        pet.body.platform = null
+        pet.body.phys.airLandY = null
+        if (ctx.inStation != null) stations.leaveStation(hopOut = false)
+        if (st.sleeping) { st.sleeping = false; st.happiness = (st.happiness - 3f).coerceAtLeast(0f) }
+        ctx.world.dropHeldToy()
+        ctx.noteInteraction()
+        pet.setAct(Act.DRAGGED)
+        ctx.speech.sayOneOf(Lines.DRAGGED, 1.8f)
+        ctx.haptic(pet, HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     private fun release(vxPx: Float, vyPx: Float) {
-        val phys = svc.phys
+        val phys = pet.body.phys
         phys.release(vxPx, vyPx)
-        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * svc.d) svc.speech.sayOneOf(Lines.THROWN, 1.6f)
-        svc.afterAir = Act.IDLE
-        svc.setAct(Act.AIR)
+        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * arena.d) ctx.speech.sayOneOf(Lines.THROWN, 1.6f)
+        pet.body.afterAir = Act.IDLE
+        pet.setAct(Act.AIR)
     }
 
     private fun onPetTap() {
-        val now = System.currentTimeMillis()
-        val pet = svc.pet
-        val bunny = svc.bunny
-        bunny.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        svc.mischief.noteInteraction()
-        when (svc.act) {
-            Act.PEEK -> { svc.mischief.foundBunny(); return }
+        val now = ctx.clock.wallMs()
+        val st = pet.stats
+        ctx.haptic(pet, HapticFeedbackConstants.CONFIRM)
+        ctx.noteInteraction()
+        when (pet.body.act) {
+            Act.PEEK -> { mischief.foundBunny(); return }
             Act.HIDE_RUN -> return
-            Act.SQUAT -> { svc.mischief.onSquatPetted(); return }
+            Act.SQUAT -> { mischief.onSquatPetted(); return }
             Act.CAGED -> {
-                pet.pet()
-                bunny.emit(PType.HEART, 1)
-                svc.speech.sayOneOf(Lines.PETTED_IN_CAGE, 2f)
+                st.pet()
+                ctx.emit(pet, PType.HEART, 1)
+                ctx.speech.sayOneOf(Lines.PETTED_IN_CAGE, 2f)
                 return
             }
-            Act.BATH, Act.VET -> { bunny.emit(PType.HEART, 1); return }
+            Act.BATH, Act.VET -> { ctx.emit(pet, PType.HEART, 1); return }
             else -> {}
         }
-        if (svc.act == Act.SLEEP || pet.sleeping) {
-            pet.sleeping = false
-            pet.happiness = (pet.happiness - 3f).coerceAtLeast(0f)
-            svc.express(Expr.ANGRY, 2.5f)
-            svc.speech.sayOneOf(Lines.WOKEN_BY_TAP)
-            svc.setActOrAfterAir(Act.IDLE, 3f)
+        if (pet.body.act == Act.SLEEP || st.sleeping) {
+            st.sleeping = false
+            st.happiness = (st.happiness - 3f).coerceAtLeast(0f)
+            pet.express(Expr.ANGRY, 2.5f)
+            ctx.speech.sayOneOf(Lines.WOKEN_BY_TAP)
+            pet.setActOrAfterAir(Act.IDLE, 3f)
             return
         }
         tapTimes.addLast(now)
         while (tapTimes.isNotEmpty() && now - tapTimes.first() > Tuning.TAP_WINDOW_MS) tapTimes.removeFirst()
         if (tapTimes.size >= Tuning.TICKLE_TAPS) {
             tapTimes.clear()
-            svc.express(Expr.HAPPY, 1.5f)
-            svc.speech.sayOneOf(Lines.TICKLED)
-            val fx = svc.fx; val screenW = svc.screenW
-            svc.targetX = if (fx > screenW / 2) fx - screenW * 0.35f else fx + screenW * 0.35f
-            svc.setActOrAfterAir(Act.WALK)
+            pet.express(Expr.HAPPY, 1.5f)
+            ctx.speech.sayOneOf(Lines.TICKLED)
+            val fx = pet.body.fx; val screenW = arena.screenW
+            pet.body.targetX = if (fx > screenW / 2) fx - screenW * 0.35f else fx + screenW * 0.35f
+            pet.setActOrAfterAir(Act.WALK)
             return
         }
-        pet.pet()
-        bunny.emit(PType.HEART, 2 + svc.rnd.nextInt(3))
-        svc.express(Expr.HAPPY, 1.6f)
-        if (svc.rnd.nextFloat() < 0.45f) svc.speech.sayOneOf(Lines.PETTED, 2f)
-        val act = svc.act
+        st.pet()
+        ctx.emit(pet, PType.HEART, 2 + ctx.rnd.nextInt(3))
+        pet.express(Expr.HAPPY, 1.6f)
+        if (ctx.rnd.nextFloat() < 0.45f) ctx.speech.sayOneOf(Lines.PETTED, 2f)
+        val act = pet.body.act
         if (act == Act.IDLE || act == Act.WALK || act == Act.SIT) {
-            if (svc.rnd.nextFloat() < 0.35f) svc.jump(-560 * svc.d, 0f, then = Act.IDLE) else svc.setAct(Act.IDLE, 2.5f)
+            if (ctx.rnd.nextFloat() < 0.35f) ctx.actor.jump(pet, -560 * arena.d, 0f, then = Act.IDLE) else pet.setAct(Act.IDLE, 2.5f)
         }
     }
 
@@ -189,24 +195,24 @@ class TouchHandler(private val svc: BunnyService) {
     @SuppressLint("ClickableViewAccessibility")
     private fun toggleMenu() {
         if (menu != null) { closeMenu(); return }
-        if (System.currentTimeMillis() - lastMenuClose < Tuning.MENU_REOPEN_GUARD_MS) return
-        val windows = svc.windows
-        val d = svc.d
+        if (ctx.clock.wallMs() - lastMenuClose < Tuning.MENU_REOPEN_GUARD_MS) return
+        val windows = ctx.windows
+        val d = arena.d
         lateinit var m: PetMenu
-        m = PetMenu(svc, svc.pet) { a ->
+        m = PetMenu(ctx.context, pet.stats) { a ->
             // Sécurité : si ce panneau n'est plus le menu courant, on le retire quand même
             if (menu !== m) { windows.safeRemove(m); if (a != PetMenu.Action.CLOSE) onMenuAction(a) }
             else onMenuAction(a)
         }
-        svc.mischief.noteInteraction()
+        ctx.noteInteraction()
         val w = windows.panelWidth(Tuning.MENU_W_DP)
         val lp = windows.panelParams(w, watchOutside = true)
         val mh = windows.measurePanel(m, w)
         // position à l'écran du lapin (il peut être décalé par le défilement du bureau)
-        val sx = svc.fx + svc.pages.bunnyShift
+        val sx = pet.body.fx + ctx.pages.bunnyShift
         lp.x = windows.clampPanelX(sx - w / 2f, w)
-        var y = (svc.fy - 125 * d - mh).roundToInt()
-        if (y < svc.topY + 8 * d) y = (svc.topY + 8 * d).roundToInt()
+        var y = (pet.body.fy - 125 * d - mh).roundToInt()
+        if (y < arena.topY + 8 * d) y = (arena.topY + 8 * d).roundToInt()
         lp.y = y
         m.setOnTouchListener { _, ev ->
             if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) {
@@ -217,34 +223,34 @@ class TouchHandler(private val svc: BunnyService) {
         m.alpha = 0f; m.scaleX = 0.9f; m.scaleY = 0.9f
         m.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start()
         menu = m
-        if (svc.act == Act.WALK) svc.setAct(Act.IDLE, 6f)
+        if (pet.body.act == Act.WALK) pet.setAct(Act.IDLE, 6f)
     }
 
     fun closeMenu() {
         menu?.let {
-            svc.windows.safeRemove(it)
-            lastMenuClose = System.currentTimeMillis()
+            ctx.windows.safeRemove(it)
+            lastMenuClose = ctx.clock.wallMs()
         }
         menu = null
     }
 
     private fun onMenuAction(a: PetMenu.Action) {
-        val pet = svc.pet
+        val st = pet.stats
         when (a) {
-            PetMenu.Action.STATIONS -> { closeMenu(); svc.stations.toggleStationsPanel() }
-            PetMenu.Action.HIDE_SEEK -> { closeMenu(); svc.mischief.startHideSeek(fromMenu = true) }
+            PetMenu.Action.STATIONS -> { closeMenu(); stations.toggleStationsPanel() }
+            PetMenu.Action.HIDE_SEEK -> { closeMenu(); mischief.startHideSeek(fromMenu = true) }
             PetMenu.Action.SLEEP -> {
                 closeMenu()
-                if (pet.sleeping) {
-                    pet.sleeping = false; pet.save()
-                    svc.express(Expr.SLEEPY, 2f)
-                    svc.say(Lines.GETTING_UP)
-                    svc.setActOrAfterAir(Act.IDLE, 3f)
-                } else if (pet.energy > 92f) {
-                    svc.speech.sayOneOf(Lines.NOT_TIRED)
-                } else svc.startSleep()
+                if (st.sleeping) {
+                    st.sleeping = false; st.save()
+                    pet.express(Expr.SLEEPY, 2f)
+                    ctx.say(Lines.GETTING_UP)
+                    pet.setActOrAfterAir(Act.IDLE, 3f)
+                } else if (st.energy > 92f) {
+                    ctx.speech.sayOneOf(Lines.NOT_TIRED)
+                } else ctx.startSleep(pet)
             }
-            PetMenu.Action.HIDE -> { closeMenu(); svc.hide() }
+            PetMenu.Action.HIDE -> { closeMenu(); ctx.hide() }
             PetMenu.Action.CLOSE -> closeMenu()
         }
     }

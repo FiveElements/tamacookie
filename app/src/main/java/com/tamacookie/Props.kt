@@ -145,7 +145,7 @@ class PropView(context: Context, val kind: Kind) : View(context) {
 }
 
 /** Objet flottant + sa fenêtre et sa petite physique. */
-class Prop(val view: PropView, val lp: WindowManager.LayoutParams) : Body {
+class Prop(val view: PropView, val lp: WindowManager.LayoutParams) : PropBody {
     override var x = 0f
     override var y = 0f
     override var vx = 0f
