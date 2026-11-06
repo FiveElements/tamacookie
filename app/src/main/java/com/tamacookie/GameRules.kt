@@ -117,6 +117,12 @@ data class GameRules(
     /** … de la salade si sa santé est sous ce seuil, une fraise si son bonheur est sous [chestTreatJoyBelow]. */
     val chestLettuceHealthBelow: Float = 60f,
     val chestTreatJoyBelow: Float = 40f,
+
+    // --- Bien-être numérique (évolution 4c : jamais de jauge touchée, seulement des répliques) ---
+    /** Minutes d'affilée dans la même application avant qu'il propose une pause (il bâille, s'étire). */
+    val breakSuggestAfterMin: Int = 30,
+    /** Minutes d'affilée avant qu'il boude (jusqu'à un changement d'app ou une caresse). */
+    val breakSulkAfterMin: Int = 45,
 ) {
     companion object {
         val DEFAULT = GameRules()

@@ -22,6 +22,8 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.wellbeing.WellbeingCoach
+import com.tamacookie.feature.wellbeing.WellbeingTracker
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
@@ -82,6 +84,14 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Thème saisonnier (réglage `Prefs.SEASONAL`, relu à `ACTION_RELOAD`). */
     private val seasonal = SeasonalTheme(clock)
     override val season: Season get() = seasonal.current()
+    /** Lanceurs vus au premier plan (le bien-être ne les compte pas). */
+    private val homePkgs = HashSet<String>()
+    /** Bien-être numérique (réglage `Prefs.WELLBEING`, coupé par défaut ; évolution 4c). */
+    private val wellbeing = WellbeingTracker(
+        clock,
+        exempt = { it == packageName || it in homePkgs || it == screen.snapshot.launcherPkg },
+        transient = { it == "com.android.systemui" },
+    )
     /** Aléatoire du résident (et, avant l'étape 7, de tout le service) ; chaque compagnon a le sien. */
     private val residentRnd = Random(System.nanoTime())
     /** Aléatoire de l'animal courant. */
@@ -218,6 +228,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         for (p in world.pets.values) dropIn(p)
         mischief.loadLevel()
         loadSeasonal()
+        loadWellbeing()
 
         // La fenêtre du lapin est ajoutée AVANT startForeground : sur Android 15+, une fenêtre
         // en surimpression visible autorise le passage au premier plan (redémarrage START_STICKY).
@@ -421,7 +432,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             ACTION_TOGGLE -> if (hidden) show() else hide()
             ACTION_STOP -> { stop(this); return START_NOT_STICKY }
             // Réglages changés (niveau de bêtises)
-            ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); showNewLook() }
+            ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); loadWellbeing(); showNewLook() }
             PetCommands.ACTION_SET_NAME -> {
                 val n = Adoption.cleanName(intent.getStringExtra(PetCommands.EXTRA_NAME)) ?: return START_STICKY
                 resident.rename(n)
@@ -476,7 +487,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             when (i.action) {
-                Intent.ACTION_SCREEN_OFF -> { awake = false; stopLoop(); handler.removeCallbacks(appPoll); saveAll() }
+                Intent.ACTION_SCREEN_OFF -> {
+                    awake = false; stopLoop(); handler.removeCallbacks(appPoll); saveAll()
+                    wellbeing.reset()   // écran éteint : la séance est finie (sans réplique)
+                }
                 // Écran allumé mais verrouillé : rien à animer derrière l'écran de verrouillage
                 Intent.ACTION_SCREEN_ON -> if (!isLocked()) wakeUp(greet = false)
                 Intent.ACTION_USER_PRESENT -> wakeUp(greet = true)
@@ -514,6 +528,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     private fun loadSeasonal() { seasonal.enabled = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT) }
 
+    private fun loadWellbeing() { wellbeing.enabled = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT) }
+
     /** La vue de [p] (créée à sa première apparition, avec l'écouteur des gestes). */
     private fun ensurePetWindow(p: Pet): PetWindow = petWindows.getOrPut(p.id) {
         val v = PetView(this, p.species)
@@ -542,6 +558,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun hide() {
         if (hidden) return
         hidden = true
+        wellbeing.reset()
         removeAllWindows()
         stopLoop()
         updateNotification(force = true)
@@ -821,14 +838,36 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             if (awake && !hidden) {
                 try {
                     watcher.poll()?.let { app ->
+                        if (app.isHome) homePkgs += app.pkg
                         for (p in shown.toList()) world.asPet(p) { behavior.onAppChanged(p, app) }
                     }
+                    checkWellbeing()
                 } catch (e: Exception) {
                     Log.w(TAG, "poll", e)
                 }
             }
             handler.postDelayed(this, 1500)
         }
+    }
+
+    /** Bien-être (évolution 4c) : le résident propose une pause, boude, se réjouit d'un changement d'app. */
+    private fun checkWellbeing() {
+        if (!wellbeing.enabled) return
+        val p = resident
+        val cue = wellbeing.observe(watcher.lastSeen)
+        world.asPet(p) {
+            if (cue != null) WellbeingCoach.react(this, p, cue)
+            WellbeingCoach.maintain(this, p, wellbeing.sulking)
+        }
+    }
+
+    /** Une caresse du résident met fin à sa bouderie (bien-être) ; sinon, le chemin commun de [PetCtx.on]. */
+    override fun on(pet: Pet, event: PetEvent): PetRules.Result {
+        val r = super.on(pet, event)
+        if (event == PetEvent.Petted && ready && pet === resident) {
+            wellbeing.onPetted()?.let { cue -> world.asPet(pet) { WellbeingCoach.react(this, pet, cue) } }
+        }
+        return r
     }
 
     // =====================================================================

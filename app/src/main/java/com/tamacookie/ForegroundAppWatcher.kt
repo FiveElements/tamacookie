@@ -18,10 +18,18 @@ class ForegroundAppWatcher(
     private var current: String? = null
     val currentPkg: String? get() = current
 
+    /**
+     * Dernière app vue au premier plan, **y compris** les ignorées (notre app, le volet) — null avant la
+     * première réponse de [source]. Lue par le bien-être numérique (évolution 4c), sans effet sur [poll].
+     */
+    var lastSeen: String? = null
+        private set
+
     /** Retourne la nouvelle app si elle a changé depuis le dernier appel, sinon null. */
     fun poll(): AppInfo? {
         if (!awake()) return null
         val pkg = source.foreground() ?: return null
+        lastSeen = pkg
         if (pkg == current || pkg in ignored) return null
         current = pkg
         return describe(pkg)

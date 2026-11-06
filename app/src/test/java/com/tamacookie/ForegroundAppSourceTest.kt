@@ -79,4 +79,23 @@ class ForegroundAppSourceTest {
         awake = true
         assertEquals("com.android.chrome", watcher.poll()!!.pkg)
     }
+
+    @Test
+    fun `lastSeen - derniere app vue, ignorees comprises, sans changer poll`() {
+        assertNull(watcher.lastSeen)
+        screen.update { copy(connected = true, foregroundPkg = "com.android.chrome") }
+        watcher.poll()
+        assertEquals("com.android.chrome", watcher.lastSeen)
+        screen.update { copy(foregroundPkg = "com.tamacookie") }
+        assertNull(watcher.poll())
+        assertEquals("com.tamacookie", watcher.lastSeen)
+        assertEquals("com.android.chrome", watcher.currentPkg)
+        screen.update { copy(foregroundPkg = null) }
+        watcher.poll()
+        assertEquals("com.tamacookie", watcher.lastSeen)            // pas de réponse : gardée
+        awake = false
+        screen.update { copy(foregroundPkg = "launcher") }
+        watcher.poll()
+        assertEquals("com.tamacookie", watcher.lastSeen)            // écran éteint : rien relevé
+    }
 }
