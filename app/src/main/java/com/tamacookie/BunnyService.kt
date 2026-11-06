@@ -26,6 +26,7 @@ import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
 import com.tamacookie.persist.Pets
+import com.tamacookie.social.SocialSystem
 import com.tamacookie.species.Species
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -115,6 +116,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private lateinit var toys: ToyController
     private lateinit var mischief: MischiefController
     private lateinit var behavior: PetBehavior
+    private lateinit var social: SocialSystem
     private val handler = Handler(Looper.getMainLooper())
     /**
      * Paroles : bulle de l'animal courant (si les fenêtres existent) + reprise de la boucle. Une seule bulle
@@ -199,6 +201,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         stations.registerActs(acts)
         mischief = MischiefController(this)
         mischief.registerActs(acts)
+        social = SocialSystem(this)
+        social.registerActs(acts)
         behavior = PetBehavior(this, behaviorHooks)
         touch = TouchHandler(this, windows, this, stations, mischief)
         val entities = EntityWindows(this, windows, world, toys, stations) { s, ev ->
@@ -667,6 +671,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             behavior.checkPlatform(p)
             behavior.update(p, dt)
         }
+        social.update(dt)
         stations.tickChest(dt)
         for (p in pets) world.asPet(p) { stations.checkChestBump() }
 
@@ -719,6 +724,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         override fun seekAttention(p: Pet) = mischief.maybeSeekAttention()
         override fun startPageWander(p: Pet) { pages.startPageWander() }
         override fun hour() = hourNow()
+        override fun nearest(p: Pet) = social.nearest(p)
+        override fun socialize(p: Pet, other: Neighbor) = social.tryStart(p, other)
     }
 
     override fun startSleep(pet: Pet) = world.asPet(pet) {

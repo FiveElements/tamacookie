@@ -43,7 +43,7 @@ object Rabbit : Species {
             walkSpeedFactor = 0.7f, sleepEnergyBelow = 30f, nightSleepEnergyBelow = 75f, napEnergyBelow = 60f,
         )
         Personality.CURIOUS -> BehaviorMods(pageWanderChance = 0.12f, platformChance = 0.6f)
-        Personality.CUDDLY -> BehaviorMods(attentionFactor = 0.6f)
+        Personality.CUDDLY -> BehaviorMods(attentionFactor = 0.6f, socialChance = 0.4f)
     }
 
     override fun behavior(p: Personality): BehaviorMods = mods.getValue(p)

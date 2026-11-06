@@ -12,7 +12,7 @@ import kotlin.math.sign
  * (étape 7) : la boucle l'appelle **pour chaque animal affiché**, avec lui pour animal courant
  * (`World.asPet`) ; les activités d'une fonctionnalité passent avant par [PetCtx.acts].
  *
- * Ce qui touche d'autres domaines (coffre, bêtises, pages) arrive par [Hooks].
+ * Ce qui touche d'autres domaines (coffre, bêtises, pages, autres animaux) arrive par [Hooks].
  */
 class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
 
@@ -29,6 +29,10 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
         fun startPageWander(p: Pet)
         /** Heure locale 0..23. */
         fun hour(): Int
+        /** Ce qu'il perçoit des autres animaux (null = seul) : `SocialSystem.nearest`. */
+        fun nearest(p: Pet): Neighbor? = null
+        /** Il va vers [other] (interaction sociale) ; false = rien n'a commencé. */
+        fun socialize(p: Pet, other: Neighbor): Boolean = false
     }
 
     private val arena get() = ctx.arena
@@ -139,12 +143,14 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
             hasToyOrFood = ctx.world.hasToyOrFood(),
             nowMs = ctx.clock.wallMs(),
             lastSelfServeMs = hooks.lastSelfServe,
+            nearest = hooks.nearest(p),
         )
         when (val dec = p.mind.brain.decide(input) { hooks.seekAttention(p) }) {
             Decision.Sleep -> ctx.startSleep(p)
             Decision.AttentionSought -> {}
             Decision.GoToChest -> { hooks.goToChest(p, input.nowMs); p.setAct(Act.GOTO_CHEST) }
             Decision.PageWander -> hooks.startPageWander(p)
+            is Decision.Socialize -> if (!hooks.socialize(p, dec.other)) p.setAct(Act.IDLE, 2f + rnd.nextFloat() * 3f)
             is Decision.JumpDown -> actor.jumpTo(p, dec.targetX, arena.groundY, Act.IDLE)
             is Decision.JumpToPlatform -> {
                 b.facing = sign(dec.target.centerX - b.fx)

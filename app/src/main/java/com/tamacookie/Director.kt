@@ -85,8 +85,24 @@ class Director(private val world: World) {
         return best
     }
 
-    /** [p] a perdu [food] au profit d'un autre : il n'y retourne pas (jusqu'à la prochaine nourriture). */
-    fun loseFood(p: Pet, food: Prop) { lostFood[p.id] = food.id }
+    /** Un différend tranché : [loser] a perdu la nourriture au profit de [winner] (mis en scène par `SocialSystem`). */
+    data class Dispute(val loser: PetId, val winner: PetId)
+    private val disputes = ArrayList<Dispute>()
+
+    /**
+     * [p] a perdu [food] au profit de [winner] : il n'y retourne pas (jusqu'à la prochaine nourriture), et le
+     * différend est noté pour [takeDisputes].
+     */
+    fun loseFood(p: Pet, food: Prop, winner: Pet? = null) {
+        lostFood[p.id] = food.id
+        if (winner != null) disputes += Dispute(p.id, winner.id)
+    }
+
+    /** Les différends tranchés depuis le dernier appel (la file est vidée). */
+    fun takeDisputes(): List<Dispute> {
+        if (disputes.isEmpty()) return emptyList()
+        return disputes.toList().also { disputes.clear() }
+    }
 
     /** [p] peut courir vers la nourriture posée (il ne l'a pas déjà perdue). */
     fun mayChaseFood(p: Pet): Boolean {

@@ -2,6 +2,7 @@ package com.tamacookie
 
 import com.tamacookie.feature.mischief.MischiefState
 import com.tamacookie.feature.toy.Food
+import com.tamacookie.social.Engagement
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.persist.PetRecord
 import com.tamacookie.species.Species
@@ -123,6 +124,8 @@ class Mind(val rnd: Random, species: Species = Species.DEFAULT) {
     var lastTravelAt = 0L
     /** État de sa bêtise en cours (une seule à la fois dans le monde : `Director`). */
     val mischief = MischiefState()
+    /** Interaction en cours avec un autre animal ([Act.SOCIAL], `SocialSystem`), null = aucune. */
+    var social: Engagement? = null
 
     fun express(e: Expr, seconds: Float) { exprOverride = e; exprTimer = seconds }
 

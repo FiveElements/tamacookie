@@ -60,7 +60,7 @@ class SpeciesTest {
         assertEquals(BehaviorMods(walkSpeedFactor = 0.7f, sleepEnergyBelow = 30f, nightSleepEnergyBelow = 75f,
             napEnergyBelow = 60f), Rabbit.behavior(Personality.LAZY))
         assertEquals(BehaviorMods(pageWanderChance = 0.12f, platformChance = 0.6f), Rabbit.behavior(Personality.CURIOUS))
-        assertEquals(BehaviorMods(attentionFactor = 0.6f), Rabbit.behavior(Personality.CUDDLY))
+        assertEquals(BehaviorMods(attentionFactor = 0.6f, socialChance = 0.4f), Rabbit.behavior(Personality.CUDDLY))
         assertEquals(35f, none.playSeconds); assertEquals(0.06f, none.pageWanderChance)
         assertSame(RabbitLines, Rabbit.lines)
     }

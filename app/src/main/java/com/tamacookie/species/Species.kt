@@ -91,4 +91,6 @@ data class BehaviorMods(
     val napChance: Float = 0.12f,
     /** Au coffre, probabilité de prendre à manger même sans faim (0 = jamais). */
     val chestGreedChance: Float = 0f,
+    /** Probabilité d'aller voir un autre animal proche quand il choisit quoi faire. */
+    val socialChance: Float = 0.25f,
 )

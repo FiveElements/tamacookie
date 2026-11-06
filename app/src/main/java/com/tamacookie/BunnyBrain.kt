@@ -13,11 +13,16 @@ enum class Act {
      * du comportement de la station occupée (`StationBehavior`), via `ActRegistry`.
      */
     IN_STATION,
-    SQUAT, KNOCK, HIDE_RUN, HIDDEN, PEEK, PAGE_OUT, GOTO_CHEST;
+    SQUAT, KNOCK, HIDE_RUN, HIDDEN, PEEK, PAGE_OUT, GOTO_CHEST,
+    /**
+     * Avec un autre animal (suivre, câlin, dispute…) : l'update et les propriétés sont celles de l'interaction
+     * en cours (`SocialInteraction`), via `ActRegistry`.
+     */
+    SOCIAL;
 
     companion object {
         /** En mouvement : animation fluide (~60 i/s). */
-        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK)
+        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL)
         /** Immobile et endormi : animation très économe (~12 i/s). Dans une station : `ActHandler.slowFrames`. */
         val SLOW: Set<Act> = EnumSet.of(SLEEP)
         /** Il ne suit pas le défilement des pages (il est tenu, ou caché). */
@@ -66,7 +71,12 @@ data class BrainInput(
     val nowMs: Long = 0L,
     /** Dernière fois qu'il s'est servi seul dans le coffre. */
     val lastSelfServeMs: Long = 0L,
+    /** L'animal le plus proche sur sa page (null = il est seul) : perception sociale. */
+    val nearest: Neighbor? = null,
 )
+
+/** Ce qu'un animal perçoit d'un autre : qui, ce qu'il fait, à quelle distance (px, horizontale). */
+data class Neighbor(val id: PetId, val act: Act, val distance: Float)
 
 /** Ce que le lapin décide de faire ensuite ; le service l'exécute. */
 sealed class Decision {
@@ -75,6 +85,8 @@ sealed class Decision {
     object AttentionSought : Decision()
     object GoToChest : Decision()
     object PageWander : Decision()
+    /** Il va vers [other] (une interaction sociale : suivre, câlin…). */
+    data class Socialize(val other: Neighbor) : Decision()
     /** Redescend de son icône vers le sol en [targetX]. */
     data class JumpDown(val targetX: Float) : Decision()
     /** Saute sur l'icône [index] de [BrainInput.platforms]. */
@@ -103,6 +115,12 @@ class BunnyBrain(private val rnd: Random, private val species: Species = Species
         if (!s.elsewhere && wantsChest(s.nowMs, s.lastSelfServeMs, s.hasToyOrFood, s.chestVisible, s.satiety, s.happiness, s.energy)) {
             return Decision.GoToChest
         }
+        // Un autre animal tranquille, pas trop loin : il va le voir (seulement s'il n'est pas seul : un
+        // animal seul ne tire pas ce sort, ses décisions sont celles d'avant l'étape 7)
+        val n = s.nearest
+        if (n != null && !s.elsewhere && n.act in Act.FREE && n.distance < SOCIAL_RANGE_DP * s.density &&
+            rnd.nextFloat() < species.behavior(s.personality).socialChance
+        ) return Decision.Socialize(n)
         if (!s.elsewhere && s.platform == null &&
             rnd.nextFloat() < species.behavior(s.personality).pageWanderChance && s.canPageWander
         ) return Decision.PageWander
@@ -191,6 +209,9 @@ class BunnyBrain(private val rnd: Random, private val species: Species = Species
     }
 
     companion object {
+        /** Distance (dp) en deçà de laquelle il peut aller voir un autre animal. */
+        const val SOCIAL_RANGE_DP = 600f
+
         fun isNight(hour: Int) = hour >= 22 || hour < 7
 
         /** Temps sans interaction avant qu'il cherche l'attention, selon le niveau de bêtises et le caractère. */

@@ -108,7 +108,9 @@ class DirectorTest {
         ctx.said.clear(); ctx.speakers.clear()
         ctx.world.asPet(a) { ctx.acts.handlerFor(a)!!.update(a, 0.05f) }
         assertEquals(Act.IDLE, a.act)                           // il renonce…
-        assertEquals(listOf(a.id), ctx.speakers)                // … en râlant
+        // … et le différend est noté pour le système social (qui met la dispute en scène)
+        assertEquals(listOf(Director.Dispute(a.id, b.id)), dir.takeDisputes())
+        assertTrue(dir.takeDisputes().isEmpty())
         assertFalse(dir.mayChaseFood(a))
         assertTrue(dir.mayChaseFood(b))
         // le gagnant mange
