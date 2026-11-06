@@ -20,19 +20,6 @@ enum class Personality(val label: String, val emoji: String, val desc: String) {
     CUDDLY("Câlin", "💕", "Réclame des caresses, très affectueux"),
 }
 
-enum class Toy(val label: String, val emoji: String) {
-    BALL("Balle", "🎾"),
-    BALLOON("Ballon", "🎈"),
-    FRISBEE("Frisbee", "🥏"),
-    PLUSH("Doudou", "🧸"),
-}
-
-enum class Food(val label: String, val emoji: String, val satiety: Float, val happiness: Float, val health: Float, val color: String) {
-    CARROT("Carotte", "🥕", 30f, 4f, 0f, "#F28C28"),
-    LETTUCE("Salade", "🥬", 20f, 2f, 6f, "#7BC96F"),
-    STRAWBERRY("Fraise", "🍓", 10f, 12f, 0f, "#E5484D"),
-}
-
 object Options {
     val furs = listOf(
         "Neige" to "#FFFBF5", "Crème" to "#F5E2C4", "Caramel" to "#DDA463",

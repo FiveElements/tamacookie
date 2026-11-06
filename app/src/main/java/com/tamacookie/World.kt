@@ -54,8 +54,8 @@ class World {
 
     fun currentToy(): Prop? = props.firstOrNull { it.toy != null }
     fun hasToy(): Boolean = props.any { it.toy != null }
-    fun hasFood(): Boolean = props.any { it.view.kind.isFood }
-    fun hasToyOrFood(): Boolean = props.any { it.toy != null || it.view.kind.isFood }
+    fun hasFood(): Boolean = props.any { it.food != null }
+    fun hasToyOrFood(): Boolean = props.any { it.toy != null || it.food != null }
 
     /** L'animal est attrapé par l'utilisateur : il lâche son jouet. */
     fun dropHeldToy() {

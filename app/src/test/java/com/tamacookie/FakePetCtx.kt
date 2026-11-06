@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.view.MotionEvent
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.toy.Food
 import kotlin.random.Random
 
 /** Horloge de test, avancée à la main. */
@@ -49,8 +50,6 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     var dockShowsHiding = false
     var sleepRequests = 0
     var hideRequests = 0
-    var fed = ArrayList<Food>()
-    var played = ArrayList<Toy>()
 
     // --- État piloté par le test ---
     override var hidden = false
@@ -74,8 +73,6 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override fun noteInteraction() { lastInteraction = clock.wallMs() }
     override fun endHiding() { dockShowsHiding = false }
     override fun startSleep(pet: Pet) { sleepRequests++; pet.stats.sleeping = true; pet.setActOrAfterAir(Act.SLEEP) }
-    override fun feed(food: Food, from: Station?) { fed += food }
-    override fun startPlay(toy: Toy, from: Station?) { played += toy }
 
     override fun requestFrames() {}
     override fun updateNotification(force: Boolean) { notifications++ }

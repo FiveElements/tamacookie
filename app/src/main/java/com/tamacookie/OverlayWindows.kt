@@ -49,6 +49,22 @@ class OverlayWindows(private val ctx: PetCtx) {
     fun update(v: View, lp: WindowManager.LayoutParams) = wm.updateViewLayout(v, lp)
 
     /**
+     * Fenêtre ancrée à une vue (app / page du bureau) : ajoutée, déplacée ou retirée selon [off]
+     * ([PageTracker.visibleOffset] ; NaN = vue pas affichée). [cx] = centre horizontal sur sa vue.
+     * Renvoie si elle est affichée (à ranger dans son `shown` / `attached`).
+     */
+    fun placeAnchored(v: View, lp: WindowManager.LayoutParams, cx: Float, off: Float, shown: Boolean): Boolean {
+        if (off.isNaN()) {
+            if (shown) safeRemove(v)
+            return false
+        }
+        val x = (cx - lp.width / 2f + off).roundToInt()
+        if (!shown) { lp.x = x; add(v, lp) }
+        else if (lp.x != x) { lp.x = x; update(v, lp) }
+        return true
+    }
+
+    /**
      * Retire une fenêtre sans dépendre de isAttachedToWindow (qui ne passe à true
      * qu'après la première frame : un retrait trop rapide laissait une fenêtre orpheline).
      */

@@ -57,6 +57,8 @@ class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     var facing = 1f
     /** 0..1 : cycle de sautillement pendant la marche. */
     var walkPhase = 0f
+    /** 0..1 : avancement du repas en cours (`Act.EAT`), lu par la vue. */
+    var eatProgress = 0f
 
     /** Icône / bouton sous ses pattes, null = le sol. */
     var platform: Box? = null

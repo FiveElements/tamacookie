@@ -30,6 +30,7 @@ import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel
+import com.tamacookie.feature.toy.Food
 import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.max
@@ -166,9 +167,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         watcher = ForegroundAppWatcher(this)
         windows = OverlayWindows(this)
         pages = PageTracker(this)
-        stations = StationController(this)
-        acts.register(Act.IN_STATION, stations::handlerFor)
         toys = ToyController(this)
+        toys.registerActs(acts)
+        stations = StationController(this, toys)
+        stations.registerActs(acts)
         mischief = MischiefController(this)
         touch = TouchHandler(this, stations, mischief)
 
@@ -557,6 +559,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         bunny.veryDirty = st.cleanliness < 20f
         bunny.expr = p.mind.exprOverride ?: moodExpr(st)
         bunny.walkPhase = p.body.walkPhase
+        bunny.eatProgress = p.body.eatProgress
         bunny.update(dt)
         placeBunny()
         windows.updateBubble(dt)
@@ -630,20 +633,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                     p.setAct(Act.IDLE, 3f)
                 }
             }
-            Act.EAT -> {
-                b.pose = Pose.EAT
-                bunny.eatProgress = b.actTime / 3f
-                if (b.actTime >= 3f) {
-                    bunny.eatProgress = 0f
-                    st.feed(toys.eatingFood)
-                    emit(p, PType.HEART, 3)
-                    p.express(Expr.HAPPY, 2f)
-                    speech.sayOneOf(Lines.ATE)
-                    p.setAct(Act.IDLE, 3f)
-                }
-            }
-            Act.GOTO_FOOD -> toys.updateGoToFood(p, dt)
-            Act.PLAY -> toys.updatePlay(p, dt)
             Act.TRAVEL_OUT -> {
                 if (actor.walkToward(p, b.targetX, Tuning.TRAVEL_OUT_DP * d, dt, clamp = false)) {
                     // Il "passe" dans l'application suivante : réapparaît de l'autre côté
@@ -664,7 +653,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                     }
                 }
             }
-            Act.GOTO_CHEST -> stations.updateGoToChest(p, dt)
             Act.PAGE_OUT -> pages.updatePageOut(p, dt)
             Act.SIT -> {
                 b.pose = Pose.SIT
@@ -688,11 +676,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                     actor.jump(p, -420 * d, 0f, then = Act.DANCE)
                 }
             }
-            // Station introuvable (ne devrait pas arriver) : il ne reste pas figé
-            Act.IN_STATION -> p.setAct(Act.IDLE, 2f)
             Act.SQUAT -> mischief.updateSquat(p, dt)
             Act.HIDE_RUN, Act.HIDDEN, Act.PEEK -> mischief.updateHide(p, dt)
             Act.KNOCK -> mischief.updateKnock(p, dt)
+            // Activité d'une fonctionnalité sans gestionnaire (station introuvable…) : il ne reste pas figé
+            else -> p.setAct(Act.IDLE, 2f)
         }
     }
 
@@ -932,10 +920,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun noteInteraction() = mischief.noteInteraction()
 
     override fun endHiding() = mischief.endHiding()
-
-    override fun feed(food: Food, from: Station?) = toys.feed(food, from)
-
-    override fun startPlay(toy: Toy, from: Station?) = toys.startPlay(toy, from)
 
     override fun setDockHiding(hiding: Boolean) = windows.setDockHiding(hiding)
 }

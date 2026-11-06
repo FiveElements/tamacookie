@@ -8,9 +8,12 @@ import android.view.ViewConfiguration
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActHandler
+import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.station.StationBehavior
 import com.tamacookie.feature.station.StationCtx
 import com.tamacookie.feature.station.StationKind
+import com.tamacookie.feature.toy.Food
+import com.tamacookie.feature.toy.Toy
 import java.util.EnumMap
 import kotlin.math.hypot
 import kotlin.math.max
@@ -24,7 +27,7 @@ import kotlin.math.roundToInt
  * la sortie ; ce qui est propre à chaque station est dans son [StationBehavior] (`feature/station/`).
  * Qui occupe quelle station est dans le monde ([World.station], [World.stationOf]).
  */
-class StationController(private val ctx: PetCtx) {
+class StationController(private val ctx: PetCtx, private val toys: ToyController) {
     private val stations = EnumMap<StationKind, Station>(StationKind::class.java)
     /** Toutes les stations, dans l'ordre de [StationKind] (parcours sans allocation). */
     private lateinit var all: Array<Station>
@@ -96,8 +99,19 @@ class StationController(private val ctx: PetCtx) {
 
     private val handlers: Array<ActHandler> = Array(StationKind.entries.size) { InStation(StationKind.entries[it].behavior) }
 
-    /** Gestionnaire de [Act.IN_STATION] (enregistré dans [com.tamacookie.feature.ActRegistry] par le service). */
+    /** Gestionnaire de [Act.IN_STATION] : le comportement de la station occupée. */
     fun handlerFor(p: Pet): ActHandler? = ctx.world.stationOf(p)?.let { handlers[it.ordinal] }
+
+    /** [Act.GOTO_CHEST] : il va se servir dans le coffre. */
+    private val goingToChest = object : ActHandler {
+        override fun update(pet: Pet, dt: Float) = updateGoToChest(pet, dt)
+    }
+
+    /** Dans une station, aller au coffre : la boucle et le toucher délèguent à ce contrôleur. */
+    fun registerActs(acts: ActRegistry) {
+        acts.register(Act.IN_STATION, ::handlerFor)
+        acts.register(Act.GOTO_CHEST) { goingToChest }
+    }
 
     /** Station qui garde [p] avec elle (la cage) : il la suit d'une vue à l'autre. */
     fun holdingStation(p: Pet): StationKind? = ctx.world.stationOf(p)?.takeIf { it.behavior.holdsPet }
@@ -161,17 +175,12 @@ class StationController(private val ctx: PetCtx) {
         val pages = ctx.pages
         for (s in all) {
             val off = pages.visibleOffset(s.anchor)
-            if (!off.isNaN()) {
-                val x = (s.cx - s.lp.width / 2f + off).roundToInt()
-                if (!s.shown) {
-                    s.lp.x = x
-                    ctx.windows.add(s.view, s.lp); s.shown = true
-                    if (off == 0f) { s.view.alpha = 0f; s.view.animate().alpha(1f).setDuration(160).start() } else s.view.alpha = 1f
-                } else if (s.lp.x != x) {
-                    s.lp.x = x; ctx.windows.update(s.view, s.lp)
-                }
-            } else if (s.shown) {
-                ctx.windows.safeRemove(s.view); s.shown = false; s.view.highlight = false
+            val was = s.shown
+            s.shown = ctx.windows.placeAnchored(s.view, s.lp, s.cx, off, was)
+            if (s.shown && !was) {
+                if (off == 0f) { s.view.alpha = 0f; s.view.animate().alpha(1f).setDuration(160).start() } else s.view.alpha = 1f
+            } else if (was && !s.shown) {
+                s.view.highlight = false
             }
         }
     }
@@ -387,8 +396,8 @@ class StationController(private val ctx: PetCtx) {
         ctx.closeMenu()
         s.view.open = true
         val panel = ChestPanel(ctx.context, pet.stats,
-            onFood = { f -> closeChest(); ctx.feed(f, from = s) },
-            onToy = { t -> closeChest(); ctx.startPlay(t, from = s) },
+            onFood = { f -> closeChest(); toys.feed(f, from = s) },
+            onToy = { t -> closeChest(); toys.startPlay(t, from = s) },
             onClose = { closeChest() })
         chestOf = s
         chestPanel.open(panel) { closeChest() }
@@ -409,7 +418,7 @@ class StationController(private val ctx: PetCtx) {
     }
 
     /** Act.GOTO_CHEST : il se place à côté du coffre et saute dedans pour se servir. */
-    fun updateGoToChest(pet: Pet, dt: Float) {
+    private fun updateGoToChest(pet: Pet, dt: Float) {
         val s = visibleChest()
         if (s == null || ctx.world.hasToyOrFood()) { pet.setAct(Act.IDLE, 2f); return }
         val cx = s.lp.x + s.lp.width / 2f - ctx.pages.bunnyShift
@@ -475,10 +484,10 @@ class StationController(private val ctx: PetCtx) {
                 rnd.nextFloat() < 0.7f -> Food.CARROT
                 else -> Food.STRAWBERRY
             }
-            ctx.feed(f, from = s)
+            toys.feed(f, from = s)
         } else {
             val t = if (rnd.nextFloat() < 0.5f) st.favoriteToy else Toy.values()[rnd.nextInt(Toy.values().size)]
-            ctx.startPlay(t, from = s)
+            toys.startPlay(t, from = s)
         }
         ctx.lastInteraction = keep
     }

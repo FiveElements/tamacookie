@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.view.MotionEvent
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.toy.Food
 import kotlin.random.Random
 
 /**
@@ -65,8 +66,6 @@ interface PetCtx {
     }
     fun endHiding()
     fun startSleep(pet: Pet)
-    fun feed(food: Food = Food.CARROT, from: Station? = null)
-    fun startPlay(toy: Toy, from: Station? = null)
 
     // --- Boucle, notification, menu ---
     fun requestFrames()

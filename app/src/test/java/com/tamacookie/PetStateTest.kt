@@ -1,6 +1,8 @@
 package com.tamacookie
 
 import com.tamacookie.feature.station.StationKind
+import com.tamacookie.feature.toy.Food
+import com.tamacookie.feature.toy.Toy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

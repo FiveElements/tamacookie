@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.feature.station.StationKind
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -14,6 +13,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.tamacookie.feature.station.StationKind
+import com.tamacookie.feature.toy.Food
+import com.tamacookie.feature.toy.Toy
 
 /** Jauge horizontale arrondie. */
 @SuppressLint("ViewConstructor")
