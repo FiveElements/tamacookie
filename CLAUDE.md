@@ -46,6 +46,9 @@ les animaux ne sont lus / écrits que par `PetRepository` (`persist/` : schéma 
 Depuis l'étape 6, l'écran des autres applications n'est connu que par le port `ScreenSensor` (`PetCtx.screen` :
 `ScreenSnapshot` immuable + `UserSignal` sans perte ; faux : `FakeScreenSensor`) et l'app au premier plan par
 `ForegroundAppSource` ; `TamaApp`/`AppGraph` (DI manuelle) relient le service d'accessibilité à `BunnyService`.
+Depuis l'étape 7, plusieurs animaux vivent ensemble : l'espèce est un plugin (`species/`, lapin = `species/rabbit/`),
+chaque animal affiché passe dans la boucle (`PetBehavior`) avec **lui pour animal courant** (`World.asPet` →
+`PetCtx.pet`), `Director` arbitre ce qui est unique à l'écran et `social/` porte les interactions à deux.
 Problèmes à résorber (audit) :
 - `BunnyService` (~1 270 l.) est un god-object : ~16 responsabilités, ~45 `internal var`.
 - `StationController`, `ToyController`, `MischiefController`, `PageTracker`, `OverlayWindows` reçoivent
@@ -109,7 +112,8 @@ Principes :
 | 4 | `OverlayManager` unique + `RenderState` par entité | ✅ |
 | 5 | `PetStats` + `PetRules` + `PetRepository` versionné par `PetId`, look par ids stables (migration) | ✅ |
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
-| 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ⏳ |
+| 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ✅ |
+| — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins | ⏳ |
 | 8 | Module `:core` (JVM pur), detekt, chaînes dans `strings.xml`, accessibilité | |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
 
@@ -464,6 +468,104 @@ Principes :
     avec et sans accessibilité (UsageStats), écran éteint puis rallumé, service d'accessibilité désactivé pendant
     que le lapin tourne.
 
+- **Étape 7** (multi-animal ; `BunnyService` 992 → 857 l. ; `BunnyView` 563 l. → `PetView` 127 + `RabbitRenderer`
+  488) — 6 commits (Species ; boucle par animal ; Director ; SocialSystem ; adoption + UI ; ce fichier) :
+  - **`Species`** (`species/Species.kt`, plugin) : `id` (sauvegardé : `rabbit`), `label`, `emoji`, `SpeciesSpec`
+    (fenêtre, pieds, haut de la tête pour la bulle, vitesses de marche / voyage / page / cache-cache — ex-`Tuning.BUNNY_*`,
+    `WALK_*`, `LAZY_SPEED_FACTOR`, `TRAVEL_*`, `PAGE_OUT_DP`, `HIDE_RUN_DP`), `behavior(Personality) → BehaviorMods`
+    (influence du caractère sur le **comportement** : vitesse, durée de partie, seuil d'attention, exploration, saut sur
+    les icônes, sommeil / sieste, gourmandise au coffre, envie d'aller voir un autre animal — ex-littéraux de
+    `BunnyBrain`, `ToyController`, `StationController`, du service : mêmes valeurs et **même consommation du
+    `Random`**, `BunnyBrainTest` inchangé), `accepts(StationKind)` / `accepts(Toy)` (glisser, entrée, partie),
+    `lines: SpeciesLines` (ex-`Lines` → `RabbitLines`), `renderer(density): PetRenderer`. Registre
+    `Species.ALL` / `byId` / `of` (inconnue → défaut) ; `Pet.species` résolu une fois par `Species.of(identity.species)` ;
+    `PetSnapshot.SPECIES_KNOWN` = le registre. `Identity.RABBIT` a disparu (`Rabbit.ID`).
+  - **Rendu** : `PetView` (générique : état, `AmbientAnimator`, particules, hit-test délégué) + `PetRenderer` ;
+    `RabbitRenderer` = le dessin de l'ancien `BunnyView` (pinceaux, apparence, posture, visage), sorti tel quel.
+    `BunnyRenderState` → `PetRenderState` ; `Pose` / `Expr` / `PType` au premier niveau (`PetRenderState.kt`).
+    **Noms historiques gardés** (renommer coûte plus que ça n'apporte, ils servent à toutes les espèces) :
+    `BunnyService`, `BunnyBrain`, `BunnyPhysics`, `BunnyActor`, `PageTracker.bunny*`, `Arena.bw/bh`.
+    La fenêtre d'un animal a le gabarit de l'espèce **par défaut** (`Arena.bw/bh` : une seule espèce aujourd'hui).
+  - **Ce qui reste « lapin » hors de `species/rabbit/`** : des répliques de fonctionnalités (carottes, « lapin » dans
+    quelques textes de stations / jouets / menu / notification), les textes de l'écran principal et de l'adoption, le
+    nom du canal de notification — du **contenu** (→ `strings.xml` à l'étape 8), pas du comportement.
+  - **Animal courant** (`World.current`, `World.asPet(p) { … }`, `PetCtx.pet`) : la boucle, le toucher, le menu, les
+    commandes l'installent ; les fonctionnalités voient l'animal dont on s'occupe sans changer de signature, et
+    `PetCtx.rnd` (= `Mind.rnd` de l'animal courant), la bulle (`say`), la page (`PageTracker.bunnyPage` /
+    `bunnyShift` / `returnAt` = `Body.page` / `pageShift` / `pageReturnAt`) et `bunnyAway` / `setBunnyAway` /
+    `placeBunny` (raccourcis de `isAway` / `setAway` / `place(pet)`) sont les siens. Le résident garde **le même**
+    `Random` qu'avant (`residentRnd`) ; chaque compagnon a le sien. `World.residentId` (explicite) ; `World.remove`.
+  - **Boucle par animal** : `PetBehavior` (pur) = l'ancien `when` de `updateBehavior` + `decideNext`,
+    `checkPlatform`, vol, atterrissage, bavardage, danse, `onAppChanged`, avec des `Hooks` (coffre, bêtises, page
+    voisine, heure, social). `BunnyService.update` : chaque animal **affiché** (`World.shown`, résident en tête, au
+    plus `Tuning.MAX_PETS_SHOWN = 3`) passe dans la boucle ; avec un seul animal, **même ordre et mêmes tirages**
+    qu'avant (`MultiPetTest` : les décisions du résident sont identiques avec ou sans compagnon). Les autres
+    « dorment hors écran » : jauges (`Elapsed`) seulement, ni fenêtre ni crotte. Jauges, sauvegarde, rotation,
+    écran éteint : **tous** les animaux. Crottes : `Prop.owner` (ramassée = jauges de son auteur, qui remercie).
+    Coffre : `tickChest` une fois par image, `checkChestBump` par animal (`chestPopFor`). Cadence : rapide si un
+    animal bouge, lente si tous dorment ; suspension si aucun n'est visible.
+  - **Fenêtres par animal** : `petWindows` / `awayPets` / `viewOwner` (la vue du résident est réutilisée à
+    l'adoption) ; `TouchHandler.attach(view, petOf)` : un écouteur par fenêtre, le geste agit sur **l'animal
+    touché**, le menu sur l'animal pour lequel il a été ouvert (`menuPet`, `closeMenuOf`) ; la cage transmet ses
+    touchers à son occupant (`StationController.occupantOf`, `TouchHandler.forward`).
+  - **`MischiefState` dans `Mind.mischief`** (comme prévu en 3b) ; `MischiefController.endHiding(p)` ; `hidingView`
+    = celui d'un animal quelconque ; l'animal qui réagit aux clics / frappes est l'auteur de la bêtise en cours,
+    sinon le premier affiché libre (un seul animal : comme avant).
+  - **`Director`** (pur, `PetCtx.director`) : tout est **déduit du monde** (activités, occupation, objets) plutôt que
+    réservé — rien à libérer, rien qui fuie quand un animal part. Bêtises : `mischiefOwner` / `mayStartMischief`
+    (vérifié **avant** tout tirage : un refus ne consomme pas d'aléatoire), cache-cache du menu refusé si un autre
+    joue ; coffre : `mayUseChest` (le cerveau ne le voit pas s'il est pris) ; stations de capacité 1 : déjà gardées
+    par `Occupancy.canEnter` ; nourriture : `foodWinner` (le plus proche, puis le plus affamé, puis l'ordre du
+    monde), le perdant renonce (`loseFood` / `mayChaseFood`, jusqu'à la prochaine) et le différend est noté
+    (`takeDisputes`) ; bulles : `BubbleQueue` (une réplique à l'écran à la fois ; un animal remplace toujours la
+    sienne ; un autre attend, ou passe devant s'il est plus prioritaire — `SpeechPriority` LOW / NORMAL / HIGH,
+    `Speech.at(p) { … }` : HIGH pour les gestes, le menu et les commandes, LOW pour le bavardage et le social ;
+    3 en attente, LOW abandonnée après 5 s ; la bulle interrompue est cachée) ; notifications : `title`
+    (« Cookie se promène · +1 compagnon »), `statusLine` (jauges du résident + humeur de chaque compagnon), `alerts`
+    (une alerte qui réunit les animaux qui viennent de basculer). Un seul animal : textes et alertes d'avant.
+  - **`SocialSystem`** (`social/`, pur) : `nearest(p)` → `BrainInput.nearest: Neighbor(id, act, distance)` (même
+    page, ni caché, ni ailleurs, ni dans une station) ; `Decision.Socialize`, tirée **seulement** si un autre animal
+    tranquille est à moins de `SOCIAL_RANGE_DP` (`BehaviorMods.socialChance` 0,25, câlin 0,4) — un animal seul
+    ne tire rien de plus. `SocialInteraction` (plugin : `chance`, `canStart`, `start`, `update`, `observe`,
+    `travel`), `Engagement` dans `Mind.social`, `Act.SOCIAL` (dans `MOVING`) via `ActRegistry` ; cascade avec le
+    `Random` de l'initiateur. Interactions : `HugSocial` (câlin mutuel : approche, face à face, cœurs),
+    `FollowSocial` (il suit le meneur, qui n'est pas engagé), `PlayBallSocial` (déclenchée par le monde : deux
+    animaux en `PLAY` avec la balle — ce que fait déjà la boucle — se font des passes), `CarrotDispute` (mise en
+    scène du différend tranché par le `Director`). Une caresse, un glisser, un voyage interrompent l'engagement.
+    Pas de « faire visiter » (il viendra avec l'échange Bluetooth).
+  - **Adoption d'un compagnon** : `PetStore.addCompanion` / `companions`, `PetRepository.adoptCompanion` (toujours
+    un nouvel animal, plafond `Tuning.MAX_PETS = 6`, jamais sans résident) / `removeCompanion` (jamais le
+    résident) ; `PetCommands.ACTION_ADOPT_COMPANION` / `ACTION_REMOVE_PET` (service lancé ; sinon repository).
+    Le service fait tomber le compagnon du ciel ; au départ d'un compagnon : cache-cache, station, menu, bulle,
+    crottes et fenêtre nettoyés, et un animal qui dormait hors écran prend la place. Un **nouveau lapin** remplace
+    toujours le résident et **garde les compagnons**. `AdoptActivity` : `EXTRA_COMPANION` (« Adopte un compagnon »,
+    nom et apparence au hasard) et « …ou l'adopter comme compagnon » à côté de « Adopter ! ». `MainActivity` :
+    « Tes animaux » (nom, rôle, jauges, « dort hors écran »), « Retirer », « Adopter un compagnon ».
+  - **Persistance** : schéma v1 inchangé (la liste `pets` existait), aucune clé renommée, **aucune migration** ;
+    chaque animal est sauvegardé par son `PetId`, le résident reste celui de `resident`.
+  - **Reste propre au résident, volontairement** : l'accueil, « te revoilà », « me revoilà » après « Montrer », le
+    renommage (`ACTION_SET_NAME`) et la personnalisation, « Nourrir » de la notification (`ACTION_FEED` nourrit le
+    résident ; les autres accourent et le `Director` tranche), le titre de la notification (les compagnons y sont
+    résumés) — ce sont des réponses de « l'animal du téléphone ». Les panneaux véto / coffre / 🏠 restent uniques
+    (un à la fois, pour l'animal concerné). `replaceResident` retire tous les objets (les crottes des compagnons
+    reviennent aussitôt). La fenêtre a le gabarit de l'espèce par défaut.
+  - Coût IPC : ≤ 1 `updateViewLayout` par fenêtre déplacée et par image (inchangé) ; avec 3 animaux qui marchent,
+    3 fenêtres d'animal (+ une bulle à la fois) ; le plafond d'affichage borne ce coût.
+  - Tests : `SpeciesTest` (registre, exhaustivité, valeurs du lapin), `MultiPetTest` (animal courant, plafond,
+    `Random` / bulle / page / fenêtre / crottes / bêtise par animal, boucle à deux, voyage), `DirectorTest` (une
+    bêtise sans tirage, coffre, station de capacité 1 à deux animaux, nourriture, bulles, notifications),
+    `SocialSystemTest` (perception, cerveau seul inchangé, cascade seedée, suivre, câlin, interruption, dispute,
+    passes, boucle à deux déterministe), `PetRepositoryTest` (compagnons). `FakePetCtx` : `first`, `addPet`,
+    `speakers`, `away`, `placed`, `director`. 376 → 424 tests ; couverture **44,3 → 48,3 % des lignes** (46,0 →
+    49,0 % des instructions, 45,0 → 47,7 % des branches) ; `Director` 98 %, `SocialSystem` 98 %, interactions
+    100 %, `PetBehavior` 65 %.
+  - **À vérifier sur tablette** : un seul animal = comportement d'avant (balade, sauts, sommeil, voyage, bêtises,
+    stations, bulle, notification) ; adopter un compagnon (service lancé puis arrêté), le retirer ; deux lapins qui
+    se suivent, se font un câlin, des passes à la balle, se disputent une carotte ; quatrième animal « dort hors
+    écran » (plafond de 3) puis prend la place d'un compagnon retiré ; la baignoire avec deux animaux (un seul
+    dedans) ; un seul au coffre ; une seule bulle à la fois ; toucher / menu / glisser du **bon** animal ; cage et
+    changement de page avec deux animaux ; nouveau lapin qui garde les compagnons.
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -471,9 +573,9 @@ Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
 | Clé | Type | Contenu |
 |---|---|---|
 | `schema_version` | Int | `1` (absent = schéma 0 : animal dans le fichier `"pet"`) |
-| `pets` | String | ids des animaux séparés par `,`, ordre d'arrivée |
-| `resident` | String | id de l'animal qui vit sur ce téléphone |
-| `pet.<id>.name` / `.species` | String | nom (≤ 16), espèce (`rabbit`) |
+| `pets` | String | ids des animaux séparés par `,`, ordre d'arrivée (résident et compagnons) |
+| `resident` | String | id de l'animal qui vit sur ce téléphone (les autres de `pets` sont ses compagnons) |
+| `pet.<id>.name` / `.species` | String | nom (≤ 16), espèce (`Species.id` : `rabbit`) |
 | `pet.<id>.bornAt` / `.lastUpdate` | Long | naissance, dernière sauvegarde (ms, heure murale) |
 | `pet.<id>.adopted` | Boolean | écran d'adoption validé |
 | `pet.<id>.personality` / `.favoriteToy` | String | nom d'enum `Personality` / `Toy` |
@@ -500,8 +602,9 @@ Rien d'autre : panneau 🏠, survol/dépôt, toucher, cadence, voyage, sommeil, 
 suivent. Avant 3a il fallait toucher ~10 endroits (enum + `when` du dessin, `positionInStation`, `enterStation`,
 `leaveStation`, `busyInStation`, tap, `Act` + `SLOW`/`BUSY_FOR_TRAVEL`, `updateBehavior`, `onAppChanged`,
 `startSleep`, `onPetTap`, noms du menu). Seules exceptions : une station avec **son propre panneau** (ajouter une
-méthode à `StationCtx` et le `FloatingPanel` dans `StationController`) ; plusieurs animaux **dans** la station
-demandent l'étape 7 (multi-animal).
+méthode à `StationCtx` et le `FloatingPanel` dans `StationController`). Plusieurs animaux : `capacity` suffit (chacun
+s'assoit à `seat` ; pour deux places distinctes, décaler selon le rang de l'occupant) ; une espèce peut la refuser
+(`Species.accepts`).
 
 ### Ajouter un jouet (ex. : le cerf-volant)
 
@@ -563,10 +666,44 @@ fin de `PetMigrations.ALL`, `SCHEMA_VERSION` + 1, et un test à partir d'un fich
 1. `Personality` (`Personality.kt`) : ajouter **à la fin** `SHY("Peureux", "🙈", "…", mapOf(StatMod.HAPPINESS_LOSS
    to 1.1f))` — le nom d'enum est sauvegardé et échangé (`PetSnapshot`) : ne plus le changer.
 2. `PersonalityTest` : sa ligne dans la table `expected` (le test d'exhaustivité l'exige).
-3. Comportement propre (hors jauges) : là où il agit (`BunnyBrain.attentionThresholdMs`, `ToyController`…), en
-   attendant `Species` / le cerveau par animal (étape 7). L'écran d'adoption la propose tout seul.
+3. Comportement propre (hors jauges) : sa ligne dans `behavior()` de chaque espèce (`Rabbit.modsFor` : un champ de
+   `BehaviorMods`, ou un nouveau champ lu là où il agit) — le `when` exhaustif l'exige. L'écran d'adoption la propose
+   tout seul.
 
 Un pair qui envoie un caractère inconnu (version plus récente) le voit remplacé par `CUDDLY` (`PetSnapshot.decode`).
+
+### Ajouter une espèce (ex. : le hamster)
+
+1. `species/hamster/Hamster.kt` : `object Hamster : Species` — `id` (« hamster » : **sauvegardé et échangé**, ne plus
+   le changer), `label`, `emoji`, `spec` (`SpeciesSpec` : gabarit de fenêtre, pieds, haut de la tête, vitesses),
+   `behavior(p)` (un `BehaviorMods` par `Personality`, `when` exhaustif), `accepts(k)` / `accepts(t)` si certaines
+   stations / jouets ne lui conviennent pas, `lines` et `renderer(density)`.
+2. `species/hamster/HamsterLines.kt` : `object HamsterLines : SpeciesLines` (le compilateur liste ce qui manque) ;
+   `species/hamster/HamsterRenderer.kt` : `class HamsterRenderer(d: Float) : PetRenderer` (`draw` du corps pour
+   chaque `Pose` / `Expr`, `onState` pour l'apparence, `hitTest`) ; ses couleurs dans `Palette`.
+3. `Species.ALL` (`species/Species.kt`) : l'ajouter **après** le lapin (le premier est l'espèce par défaut des
+   anciennes sauvegardes). `SpeciesTest` le couvre (exhaustivité) ; `PetSnapshot` l'accepte tout seul.
+4. Pour le proposer : un choix d'espèce dans `AdoptActivity` (l'`Adoption` porte alors l'espèce jusqu'à
+   `Identity(species = …)`) — pas encore d'interface. Si son gabarit diffère du lapin : la fenêtre (`Arena.bw/bh`)
+   devient par animal (`ensurePetWindow` prend `p.species.spec`), et `BunnyActor` / `PageTracker` lisent la largeur
+   de l'animal.
+
+Boucle, cerveau, jauges, stations, jouets, bêtises, social, persistance suivent.
+
+### Ajouter une interaction sociale (ex. : jouer à chat)
+
+1. `social/TagSocial.kt` : `object TagSocial : SocialInteraction` — par le cerveau : `chance` (> 0), `canStart(ctx,
+   a, b)` (sans aléatoire), `start(sys, a, b)` qui engage les participants (`sys.engage(p, this, partner, durée,
+   leads)` : un seul pour une interaction « passive » comme suivre, les deux pour une interaction mutuelle) et
+   `update(sys, self, partner, e, dt)` (chaque image pour chaque engagé ; `false` = fini ; `partner == null` = parti
+   ou indisponible) ; ou par le monde : `observe(sys, a, b, dt)` (chaque paire affichée, sans engagement : les passes
+   à la balle). Répliques dans le fichier, dites par `sys.say(p, …)` (priorité basse) ; tirages avec `p.mind.rnd`.
+2. `Socials.ALL` (`social/SocialSystem.kt`) : l'insérer à sa place (ordre de la cascade).
+3. Si elle demande un arbitrage (une ressource unique) : une question au `Director` (déduite du monde), interrogée
+   dans `canStart` ; si c'est le `Director` qui la déclenche (dispute) : une file comme `takeDisputes`.
+
+`Act.SOCIAL`, `ActRegistry`, interruption (caresse, glisser, voyage), cadence et perception suivent. Tests : à côté de
+`SocialSystemTest`, avec un `FakePetCtx` + `addPet` et des `Random` seedés.
 
 Règles pour chaque étape : pas de big-bang, pas de nouvelle dépendance sans justification écrite,
 ajouter des tests JVM pour tout ce qui devient pur, mettre à jour ce fichier (colonne État + écarts).
