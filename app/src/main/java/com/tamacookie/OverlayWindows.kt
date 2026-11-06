@@ -1,10 +1,11 @@
 package com.tamacookie
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -18,14 +19,26 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Fenêtres en surimpression : paramètres, ajout / retrait sûrs, bulle de dialogue,
- * bouton 🏠 (dock) et placement des panneaux.
+ * Fenêtres Android du service autres que les entités : paramètres, bulles de dialogue (une par animal),
+ * bouton 🏠 (dock) et placement des panneaux. Tout ajout / déplacement / retrait passe par [overlay].
+ * Ne lit pas l'état du jeu : la position de chaque bulle lui est fournie par [bubbleAnchor].
  */
-class OverlayWindows(private val ctx: PetCtx) {
-    val wm: WindowManager = ctx.context.getSystemService(WindowManager::class.java)
-    private val arena get() = ctx.arena
+class OverlayWindows(
+    private val context: Context,
+    private val arena: Arena,
+    private val prefs: () -> SharedPreferences,
+    val overlay: OverlayManager,
+    private val bubbleAnchor: BubbleAnchor,
+) {
     private val d get() = arena.d
-    private val pet: Pet get() = ctx.pet
+
+    /** Où se place la bulle d'un animal : au-dessus de sa tête, en coordonnées écran. */
+    interface BubbleAnchor {
+        /** Centre horizontal de la tête. */
+        fun headX(pet: PetId): Float
+        /** Haut de la tête (la bulle se pose au-dessus). */
+        fun headTop(pet: PetId): Float
+    }
 
     fun params(w: Int, h: Int, touchable: Boolean): WindowManager.LayoutParams {
         var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -41,36 +54,6 @@ class OverlayWindows(private val ctx: PetCtx) {
             // Android 12+ : une fenêtre non tactile doit avoir une opacité <= 0.8
             // pour laisser passer les touchers vers l'application en dessous.
             if (!touchable) alpha = 0.8f
-        }
-    }
-
-    fun add(v: View, lp: WindowManager.LayoutParams) = wm.addView(v, lp)
-
-    fun update(v: View, lp: WindowManager.LayoutParams) = wm.updateViewLayout(v, lp)
-
-    /**
-     * Fenêtre ancrée à une vue (app / page du bureau) : ajoutée, déplacée ou retirée selon [off]
-     * ([PageTracker.visibleOffset] ; NaN = vue pas affichée). [cx] = centre horizontal sur sa vue.
-     * Renvoie si elle est affichée (à ranger dans son `shown` / `attached`).
-     */
-    fun placeAnchored(v: View, lp: WindowManager.LayoutParams, cx: Float, off: Float, shown: Boolean): Boolean {
-        if (off.isNaN()) {
-            if (shown) safeRemove(v)
-            return false
-        }
-        val x = (cx - lp.width / 2f + off).roundToInt()
-        if (!shown) { lp.x = x; add(v, lp) }
-        else if (lp.x != x) { lp.x = x; update(v, lp) }
-        return true
-    }
-
-    /**
-     * Retire une fenêtre sans dépendre de isAttachedToWindow (qui ne passe à true
-     * qu'après la première frame : un retrait trop rapide laissait une fenêtre orpheline).
-     */
-    fun safeRemove(v: View) {
-        try { wm.removeViewImmediate(v) } catch (e: Exception) {
-            Log.w("TamaCookie", "removeView", e)
         }
     }
 
@@ -109,55 +92,60 @@ class OverlayWindows(private val ctx: PetCtx) {
     }
 
     // ---------------------------------------------------------------------
-    //  Bulle de dialogue
+    //  Bulles de dialogue (une par animal, créée à sa première réplique)
     // ---------------------------------------------------------------------
-    private var bubble: SpeechBubble? = null
-    private lateinit var bubbleLp: WindowManager.LayoutParams
-    var bubbleShown = false
-        private set
-    private var bubbleTime = 0f
-    private var bubbleW = 0
-    private var bubbleH = 0
-
-    fun createBubble() {
-        bubble = SpeechBubble(ctx.context)
-        bubbleLp = params(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, touchable = false)
-        bubbleLp.alpha = 0.8f
+    private class Bubble(val id: WindowId, val view: SpeechBubble, val lp: WindowManager.LayoutParams) {
+        var time = 0f
+        var w = 0
+        var h = 0
     }
 
-    fun say(text: String, seconds: Float) {
-        val b = bubble ?: return
-        if (ctx.hidden || ctx.bunnyAway) return
-        b.text.text = text
-        b.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        bubbleW = b.measuredWidth; bubbleH = b.measuredHeight
-        bubbleTime = seconds
-        positionBubble()
-        if (!bubbleShown) { wm.addView(b, bubbleLp); bubbleShown = true }
-        else wm.updateViewLayout(b, bubbleLp)
+    private val bubbles = HashMap<PetId, Bubble>()
+
+    private fun bubbleOf(pet: PetId): Bubble = bubbles.getOrPut(pet) {
+        val lp = params(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, touchable = false)
+        lp.alpha = 0.8f
+        Bubble(WindowId.Bubble(pet), SpeechBubble(context), lp)
     }
 
-    private fun positionBubble() {
-        val headTop = if (pet.body.act == Act.SLEEP) 70 * d else 112 * d
+    /** Une bulle est affichée. */
+    val anyBubbleShown: Boolean get() = bubbles.values.any { overlay.isAttached(it.id) }
+
+    /** [pet] dit [text] pendant [seconds] s. */
+    fun say(pet: PetId, text: String, seconds: Float) {
+        val b = bubbleOf(pet)
+        b.view.text.text = text
+        b.view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        b.w = b.view.measuredWidth; b.h = b.view.measuredHeight
+        b.time = seconds
+        positionBubble(pet, b)
+        // Nouveau texte (nouvelle taille) : appliqué tout de suite
+        if (!overlay.isAttached(b.id)) overlay.attach(b.id, b.view, b.lp) else overlay.relayout(b.id)
+    }
+
+    private fun positionBubble(pet: PetId, b: Bubble) {
         val lo = (4 * d).toInt()
-        val hi = (arena.screenW - bubbleW - 4 * d).toInt().coerceAtLeast(lo)
-        bubbleLp.x = (pet.body.fx + ctx.pages.bunnyShift - bubbleW / 2f).roundToInt().coerceIn(lo, hi)
-        bubbleLp.y = (pet.body.fy - headTop - bubbleH).roundToInt().coerceAtLeast(arena.topY.toInt())
+        val hi = (arena.screenW - b.w - 4 * d).toInt().coerceAtLeast(lo)
+        b.lp.x = (bubbleAnchor.headX(pet) - b.w / 2f).roundToInt().coerceIn(lo, hi)
+        b.lp.y = (bubbleAnchor.headTop(pet) - b.h).roundToInt().coerceAtLeast(arena.topY.toInt())
     }
 
-    fun updateBubble(dt: Float) {
-        val b = bubble ?: return
-        if (!bubbleShown) return
-        bubbleTime -= dt
-        if (bubbleTime <= 0f) { hideBubble(); return }
-        val ox = bubbleLp.x; val oy = bubbleLp.y
-        positionBubble()
-        if (ox != bubbleLp.x || oy != bubbleLp.y) wm.updateViewLayout(b, bubbleLp)
+    /** Fait vieillir les bulles affichées et les garde au-dessus de leur animal (déplacement regroupé). */
+    fun updateBubbles(dt: Float) {
+        for ((pet, b) in bubbles) {
+            if (!overlay.isAttached(b.id)) continue
+            b.time -= dt
+            if (b.time <= 0f) { overlay.detach(b.id); continue }
+            val lo = (4 * d).toInt()
+            val hi = (arena.screenW - b.w - 4 * d).toInt().coerceAtLeast(lo)
+            val x = (bubbleAnchor.headX(pet) - b.w / 2f).roundToInt().coerceIn(lo, hi)
+            val y = (bubbleAnchor.headTop(pet) - b.h).roundToInt().coerceAtLeast(arena.topY.toInt())
+            overlay.move(b.id, x, y)
+        }
     }
 
-    fun hideBubble() {
-        val b = bubble ?: return
-        if (bubbleShown) { safeRemove(b); bubbleShown = false }
+    fun hideBubble(pet: PetId) {
+        bubbles[pet]?.let { overlay.detach(it.id) }
     }
 
     // ---------------------------------------------------------------------
@@ -165,14 +153,18 @@ class OverlayWindows(private val ctx: PetCtx) {
     // ---------------------------------------------------------------------
     lateinit var dock: TextView
         private set
-    lateinit var dockLp: WindowManager.LayoutParams
+    private lateinit var dockLp: WindowManager.LayoutParams
+    /** Position du dock (à jour même avant l'application regroupée du déplacement). */
+    var dockX = 0
         private set
-    private var dockAdded = false
+    var dockY = 0
+        private set
+    val dockSize: Int get() = dockLp.width
 
     @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
     fun createDock(onTap: () -> Unit) {
         val size = (Tuning.DOCK_SIZE_DP * d).toInt()
-        dock = TextView(ctx.context).apply {
+        dock = TextView(context).apply {
             text = DOCK_HOME
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             gravity = Gravity.CENTER
@@ -184,12 +176,12 @@ class OverlayWindows(private val ctx: PetCtx) {
         }
         dockLp = params(size, size, touchable = true)
         reloadDockPosition()
-        val slop = ViewConfiguration.get(ctx.context).scaledTouchSlop.toFloat()
+        val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
         var downX = 0f; var downY = 0f; var startX = 0; var startY = 0; var moved = false
         dock.setOnTouchListener { v, ev ->
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = ev.rawX; downY = ev.rawY; startX = dockLp.x; startY = dockLp.y; moved = false
+                    downX = ev.rawX; downY = ev.rawY; startX = dockX; startY = dockY; moved = false
                     v.animate().scaleX(0.9f).scaleY(0.9f).setDuration(80).start()
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -202,11 +194,11 @@ class OverlayWindows(private val ctx: PetCtx) {
                     v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
                     if (moved) {
                         // se colle au bord le plus proche
-                        val snapX = if (dockLp.x + size / 2f < arena.screenW / 2) 4 * d else arena.screenW - size - 4 * d
-                        placeDock(snapX, dockLp.y.toFloat())
-                        ctx.prefs.edit()
-                            .putFloat(Prefs.DOCK_FX, dockLp.x / arena.screenW)
-                            .putFloat(Prefs.DOCK_FY, dockLp.y / arena.groundY).apply()
+                        val snapX = if (dockX + size / 2f < arena.screenW / 2) 4 * d else arena.screenW - size - 4 * d
+                        placeDock(snapX, dockY.toFloat())
+                        prefs().edit()
+                            .putFloat(Prefs.DOCK_FX, dockX / arena.screenW)
+                            .putFloat(Prefs.DOCK_FY, dockY / arena.groundY).apply()
                     } else if (ev.actionMasked == MotionEvent.ACTION_UP) {
                         v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                         onTap()
@@ -221,24 +213,22 @@ class OverlayWindows(private val ctx: PetCtx) {
     /** Replace le dock d'après la position sauvegardée (fractions de l'écran). */
     fun reloadDockPosition() {
         if (!::dockLp.isInitialized) return
-        val prefs = ctx.prefs
+        val prefs = prefs()
         placeDock(prefs.getFloat(Prefs.DOCK_FX, 1f) * arena.screenW, prefs.getFloat(Prefs.DOCK_FY, 0.42f) * arena.groundY)
     }
 
     fun placeDock(x: Float, y: Float) {
         if (!::dockLp.isInitialized) return
-        dockLp.x = x.roundToInt().coerceIn(0, (arena.screenW - dockLp.width).toInt().coerceAtLeast(0))
-        dockLp.y = y.roundToInt().coerceIn(arena.topY.toInt(), (arena.groundY - dockLp.height).toInt().coerceAtLeast(arena.topY.toInt()))
-        if (dockAdded) wm.updateViewLayout(dock, dockLp)
+        dockX = x.roundToInt().coerceIn(0, (arena.screenW - dockLp.width).toInt().coerceAtLeast(0))
+        dockY = y.roundToInt().coerceIn(arena.topY.toInt(), (arena.groundY - dockLp.height).toInt().coerceAtLeast(arena.topY.toInt()))
+        // Fenêtre affichée : déplacement regroupé (lp mis à jour au flush) ; sinon position pour le prochain ajout
+        if (overlay.isAttached(WindowId.Dock)) overlay.move(WindowId.Dock, dockX, dockY) else { dockLp.x = dockX; dockLp.y = dockY }
     }
 
     fun addDock() {
-        if (dockAdded || !::dock.isInitialized) return
-        wm.addView(dock, dockLp); dockAdded = true
-    }
-
-    fun removeDock() {
-        if (dockAdded) { safeRemove(dock); dockAdded = false }
+        if (!::dock.isInitialized) return
+        dockLp.x = dockX; dockLp.y = dockY
+        overlay.attach(WindowId.Dock, dock, dockLp)
     }
 
     /** 🫣 pendant qu'il se cache, 🏠 sinon. */

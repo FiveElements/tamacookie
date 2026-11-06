@@ -24,7 +24,7 @@ object BalloonToy : ToySpec {
     private val FELL = arrayOf("Oh non, il a touché le sol !", "Raté ! On recommence ?")
 
     /** Centre du ballon (en haut de la fenêtre, la ficelle pend dessous). */
-    private fun centerY(p: Prop) = p.y - p.lp.height + p.lp.width / 2f
+    private fun centerY(p: Prop) = p.y - p.h + p.w / 2f
 
     override fun play(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
         val d = ctx.arena.d
@@ -47,7 +47,7 @@ object BalloonToy : ToySpec {
         val act = pet.body.act
         p.vx *= (1f - 0.9f * dt); p.vy *= (1f - 0.6f * dt)
         ctx.stepToy(pet, p, dt, 0.08f, 0.3f, 0.9f, 3f)
-        p.view.spin = sin(p.age * 1.7f) * 8f + p.vx / d * 0.03f
+        p.spin = sin(p.age * 1.7f) * 8f + p.vx / d * 0.03f
         // coup de tête
         val cy = centerY(p)
         if (hypot(p.x - fx, cy - (fy - 85 * d)) < 42 * d && p.vy > -100 * d && act != Act.DRAGGED && act != Act.SLEEP) {

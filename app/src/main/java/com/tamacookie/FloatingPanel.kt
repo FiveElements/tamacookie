@@ -5,7 +5,7 @@ import android.view.View
 import android.view.WindowManager
 
 /**
- * Un panneau flottant (fenêtre overlay) : vue + paramètres de fenêtre + placement.
+ * Un panneau flottant (fenêtre overlay [id]) : vue + paramètres de fenêtre + placement.
  * Remplace le trio « vue nullable + lp nullable + layoutX/closeX » répété pour chaque panneau.
  *
  * [widthDp] : largeur souhaitée (réduite sur un écran étroit) ; [watchOutside] : un toucher à
@@ -14,16 +14,19 @@ import android.view.WindowManager
  */
 class FloatingPanel<V : View>(
     private val windows: OverlayWindows,
+    private val id: WindowId,
     private val widthDp: Float,
     private val watchOutside: Boolean,
     private val place: (lp: WindowManager.LayoutParams, w: Int, h: Int) -> Unit,
 ) {
+    private val overlay get() = windows.overlay
+
     /** Le panneau affiché (null = fermé). */
     var view: V? = null
         private set
     private var lp: WindowManager.LayoutParams? = null
 
-    val isOpen: Boolean get() = view != null
+    val isOpen: Boolean get() = view != null && overlay.isAttached(id)
 
     /** Affiche [v] (le panneau déjà ouvert est d'abord retiré). */
     fun open(v: V, onOutside: (() -> Unit)? = null) {
@@ -34,20 +37,19 @@ class FloatingPanel<V : View>(
         }
         view = v; lp = p
         layout()
-        windows.add(v, p)
+        overlay.attach(id, v, p)
     }
 
     fun close() {
-        view?.let { windows.safeRemove(it) }
+        overlay.detach(id)
         view = null; lp = null
     }
 
     /** Nouvelle taille d'écran (ou station déplacée) : replace le panneau ouvert. */
     fun reposition() {
-        val v = view ?: return
-        val p = lp ?: return
+        if (!isOpen) return
         layout()
-        windows.update(v, p)
+        overlay.relayout(id)
     }
 
     private fun layout() {

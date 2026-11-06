@@ -1,6 +1,7 @@
 package com.tamacookie
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -24,9 +25,12 @@ import kotlin.math.sign
  * Adaptateur d'entrée : passe par [PetCtx] pour l'animal, et reçoit explicitement les deux
  * contrôleurs qu'il pilote ([StationController] : survol / dépôt / panneau ; [MischiefController] :
  * fin du cache-cache quand on l'attrape, cache-cache depuis le menu). La caresse pendant une activité
- * (station, bêtise) va à son gestionnaire ([PetCtx.acts]). Reste lié à Android (gestes, vues).
+ * (station, bêtise) va à son gestionnaire ([PetCtx.acts]). Reste lié à Android (gestes, vues) :
+ * reçoit le [context] et les [windows] (le menu est la fenêtre [WindowId.Menu]).
  */
 class TouchHandler(
+    private val context: Context,
+    private val windows: OverlayWindows,
     private val ctx: PetCtx,
     private val stations: StationController,
     private val mischief: MischiefController,
@@ -57,8 +61,8 @@ class TouchHandler(
     // =====================================================================
     @SuppressLint("ClickableViewAccessibility")
     fun attach(bunny: BunnyView) {
-        val slop = ViewConfiguration.get(ctx.context).scaledTouchSlop * 1.5f
-        val gd = GestureDetector(ctx.context, object : GestureDetector.SimpleOnGestureListener() {
+        val slop = ViewConfiguration.get(context).scaledTouchSlop * 1.5f
+        val gd = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean { onPetTap(); return true }
             override fun onDoubleTap(e: MotionEvent): Boolean { toggleMenu(); return true }
@@ -194,17 +198,15 @@ class TouchHandler(
     private fun toggleMenu() {
         if (menu != null) { closeMenu(); return }
         if (ctx.clock.wallMs() - lastMenuClose < Tuning.MENU_REOPEN_GUARD_MS) return
-        val windows = ctx.windows
         val d = arena.d
         lateinit var m: PetMenu
-        m = PetMenu(ctx.context, pet.stats, MenuEntries.ALL,
+        // Un seul menu à la fois (id [WindowId.Menu]) : un ancien panneau a déjà été retiré en ouvrant le nouveau
+        m = PetMenu(context, pet.stats, MenuEntries.ALL,
             onEntry = { e ->
-                // Sécurité : si ce panneau n'est plus le menu courant, on le retire quand même
-                if (menu !== m) windows.safeRemove(m)
                 closeMenu()
                 e.run(menuCtx, pet)
             },
-            onClose = { if (menu !== m) windows.safeRemove(m) else closeMenu() },
+            onClose = { if (menu === m) closeMenu() },
         )
         ctx.noteInteraction()
         val w = windows.panelWidth(Tuning.MENU_W_DP)
@@ -218,10 +220,10 @@ class TouchHandler(
         lp.y = y
         m.setOnTouchListener { _, ev ->
             if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-                if (menu === m) closeMenu() else windows.safeRemove(m); true
+                if (menu === m) closeMenu(); true
             } else false
         }
-        windows.add(m, lp)
+        windows.overlay.attach(WindowId.Menu, m, lp)
         m.alpha = 0f; m.scaleX = 0.9f; m.scaleY = 0.9f
         m.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start()
         menu = m
@@ -229,8 +231,8 @@ class TouchHandler(
     }
 
     fun closeMenu() {
-        menu?.let {
-            ctx.windows.safeRemove(it)
+        if (menu != null) {
+            windows.overlay.detach(WindowId.Menu)
             lastMenuClose = ctx.clock.wallMs()
         }
         menu = null

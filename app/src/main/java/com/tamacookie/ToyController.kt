@@ -1,8 +1,5 @@
 package com.tamacookie
 
-import android.annotation.SuppressLint
-import android.view.MotionEvent
-import android.view.VelocityTracker
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
@@ -17,23 +14,22 @@ import com.tamacookie.feature.toy.Toy
 import com.tamacookie.feature.toy.ToyCtx
 import com.tamacookie.feature.toy.ToySpec
 import kotlin.math.hypot
-import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /**
- * Objets posés à l'écran : nourriture, crottes et jouets — leurs **fenêtres**, la partie en cours et les
- * activités `GOTO_FOOD` / `EAT` / `PLAY` (enregistrées dans [ActRegistry] par [registerActs]).
- * Ce qui est propre à chaque objet (taille, lancer, dessin, jeu, physique, répliques) est dans son
- * spec (`feature/toy/` : [ToySpec], [FoodSpec], [Poop]).
+ * Objets posés à l'écran : nourriture, crottes et jouets — leur placement (fenêtres via [PetCtx.overlay]),
+ * la partie en cours et les activités `GOTO_FOOD` / `EAT` / `PLAY` (enregistrées dans [ActRegistry] par
+ * [registerActs]). Ce qui est propre à chaque objet (taille, lancer, dessin, jeu, physique, répliques) est
+ * dans son spec (`feature/toy/` : [ToySpec], [FoodSpec], [Poop]).
+ *
+ * Kotlin pur (testé en JVM) : les gestes sur les fenêtres des objets arrivent par [grab] / [drag] /
+ * [release] / [pickUp] (adaptateur `EntityWindows`).
  */
 class ToyController(private val ctx: PetCtx) {
     /** Objets posés : ils appartiennent au monde (partagés entre animaux). */
     private val props get() = ctx.world.props
 
     private var toyHeldByUser = false
-    /** Ce qu'il est en train de manger (Act.EAT). */
-    var eatingFood = Food.CARROT
-        private set
 
     private val arena get() = ctx.arena
     private val d get() = arena.d
@@ -73,44 +69,34 @@ class ToyController(private val ctx: PetCtx) {
     fun anyMoving(): Boolean = toyHeldByUser || props.any { !it.isPoop && !it.onGround }
 
     // =====================================================================
-    //  Fenêtres des objets
+    //  Objets et leurs fenêtres
     // =====================================================================
     fun addProp(spec: PropSpec): Prop {
-        val v = PropView(ctx.context, spec)
-        val lp = ctx.windows.params((spec.wDp * d).toInt(), (spec.hDp * d).toInt(), spec.touchable)
-        val p = Prop(v, lp)
+        val p = Prop(ctx.world.newPropId(), spec, (spec.wDp * d).toInt(), (spec.hDp * d).toInt())
         props.add(p)
-        if (!ctx.hidden) { placeProp(p, layout = false); ctx.windows.add(v, lp); p.attached = true }
+        if (!ctx.hidden) ctx.overlay.attach(p.windowId, p.left, p.top)
         ctx.requestFrames()
         return p
     }
 
     fun removeProp(p: Prop) {
-        if (p.attached) { ctx.windows.safeRemove(p.view); p.attached = false }
+        ctx.overlay.release(p.windowId)
         props.remove(p)
         // La fenêtre du jouet a disparu : l'utilisateur ne peut plus le tenir
         if (p.toy != null) toyHeldByUser = false
     }
 
-    fun placeProp(p: Prop, layout: Boolean = true) {
-        val nx = (p.x - p.lp.width / 2f).roundToInt()
-        val ny = (p.y - p.lp.height).roundToInt()
-        if (nx != p.lp.x || ny != p.lp.y) {
-            p.lp.x = nx; p.lp.y = ny
-            if (layout && p.attached) ctx.windows.update(p.view, p.lp)
-        }
-    }
+    /** Fenêtre de l'objet à sa position (regroupé : au plus un déplacement par image). */
+    fun placeProp(p: Prop) = ctx.overlay.move(p.windowId, p.left, p.top)
 
     /** Réaffiche les objets (après "Montrer") : tout sauf les crottes d'autres vues. */
     fun reattach() {
         val here = ctx.pages.currentView
-        for (p in props) if (!p.attached && (!p.isPoop || p.anchor == here)) {
-            placeProp(p, layout = false); ctx.windows.add(p.view, p.lp); p.attached = true
-        }
+        for (p in props) if (!p.isPoop || p.anchor == here) ctx.overlay.attach(p.windowId, p.left, p.top)
     }
 
-    fun detachAll() {
-        for (p in props) if (p.attached) { ctx.windows.safeRemove(p.view); p.attached = false }
+    /** Toutes les fenêtres ont été retirées (« Cacher ») : plus personne ne tient le jouet. */
+    fun onDetached() {
         toyHeldByUser = false
     }
 
@@ -129,9 +115,7 @@ class ToyController(private val ctx: PetCtx) {
             val p = props[i]
             if (!p.isPoop) continue
             if (p.anchor.isEmpty()) p.anchor = pages.currentView
-            val off = pages.visibleOffset(p.anchor)
-            if (!off.isNaN()) p.lp.y = (p.y - p.lp.height).roundToInt()
-            p.attached = ctx.windows.placeAnchored(p.view, p.lp, p.x, off, p.attached)
+            ctx.overlay.placeAnchored(p.windowId, p.x - p.w / 2f, p.top, pages.visibleOffset(p.anchor))
         }
     }
 
@@ -188,8 +172,7 @@ class ToyController(private val ctx: PetCtx) {
             pet.body.facing = sign(c.x - pet.body.fx).takeIf { it != 0f } ?: pet.body.facing
             pet.express(Expr.SURPRISED, 0.3f)
         } else if (ctx.actor.walkToward(pet, c.x, 130 * d, dt, stopDist = 26 * d)) {
-            eatingFood = c.food!!
-            ctx.showFood(pet, eatingFood)
+            pet.body.eatingFood = c.food!!
             removeProp(c)
             pet.setAct(Act.EAT, 3f)
         }
@@ -202,7 +185,7 @@ class ToyController(private val ctx: PetCtx) {
         b.eatProgress = b.actTime / 3f
         if (b.actTime >= 3f) {
             b.eatProgress = 0f
-            pet.stats.feed(eatingFood)
+            pet.stats.feed(b.eatingFood)
             ctx.emit(pet, PType.HEART, 3)
             pet.express(Expr.HAPPY, 2f)
             ctx.speech.sayOneOf(Lines.ATE)
@@ -218,13 +201,16 @@ class ToyController(private val ctx: PetCtx) {
         p.anchor = ctx.pages.bunnyView()
         p.x = x; p.y = arena.groundY
         placeProp(p)
-        p.view.setOnClickListener {
-            removeProp(p)
-            pet.stats.removePoop()
-            ctx.emit(pet, PType.SPARKLE, 4)
-            pet.express(Expr.HAPPY, 1.5f)
-            ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
-        }
+    }
+
+    /** On a touché une crotte : ramassée. */
+    fun pickUp(p: Prop) {
+        if (!p.isPoop || p !in props) return
+        removeProp(p)
+        pet.stats.removePoop()
+        ctx.emit(pet, PType.SPARKLE, 4)
+        pet.express(Expr.HAPPY, 1.5f)
+        ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
     }
 
     fun restorePoops() {
@@ -245,7 +231,7 @@ class ToyController(private val ctx: PetCtx) {
         toyHeldByUser = false
         val spec = toy.spec
         val p = addProp(spec)
-        if (spec.randomTint) p.view.tint = Options.accColor(rnd.nextInt(Options.accColors.size))
+        if (spec.randomTint) p.tint = Options.accColor(rnd.nextInt(Options.accColors.size))
         val fx = pet.body.fx; val fy = pet.body.fy; val facing = pet.body.facing
         val launch = spec.launch
         p.x = (fx + facing * 70 * d).coerceIn(arena.minX, arena.maxX)
@@ -253,7 +239,6 @@ class ToyController(private val ctx: PetCtx) {
         p.vx = facing * launch.vxDp * d; p.vy = launch.vyDp * d
         if (from != null) popFrom(p, from, maxVxDp = 700f, vyDp = launch.chestVyDp)
         placeProp(p)
-        setupToyTouch(p)
         pet.mind.playTime = 0f; tctx.holdTime = 0f; tctx.catchCooldown = 0f
         ctx.noteInteraction()
         val fav = toy == st.favoriteToy
@@ -282,49 +267,39 @@ class ToyController(private val ctx: PetCtx) {
         pet.setAct(Act.IDLE, 4f)
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupToyTouch(t: Prop) {
-        var vt: VelocityTracker? = null
-        t.view.setOnTouchListener { _, ev ->
-            val e2 = MotionEvent.obtain(ev); e2.setLocation(ev.rawX, ev.rawY)
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    toyHeldByUser = true
-                    ctx.noteInteraction()
-                    ctx.requestFrames()
-                    if (t.held) {
-                        t.held = false
-                        if (t.toy?.spec?.complainsWhenTaken == true) {
-                            pet.express(Expr.ANGRY, 1.2f)
-                            ctx.say(ctx.pick("Hé ! C'est à moi !", "Rends-le moi ! 😾", "Mon jouet !"), 1.6f)
-                        }
-                    }
-                    vt?.recycle()
-                    vt = VelocityTracker.obtain(); vt?.addMovement(e2)
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    vt?.addMovement(e2)
-                    t.x = ev.rawX; t.y = ev.rawY + t.view.height / 2f
-                    t.vx = 0f; t.vy = 0f; t.onGround = false
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    val max = Tuning.TOY_THROW_MAX_DP * d
-                    vt?.addMovement(e2)
-                    vt?.computeCurrentVelocity(1000)
-                    t.vx = (vt?.xVelocity ?: 0f).coerceIn(-max, max)
-                    t.vy = (vt?.yVelocity ?: 0f).coerceIn(-max, max)
-                    vt?.recycle(); vt = null
-                    toyHeldByUser = false
-                    t.onGround = false
-                    tctx.catchCooldown = 0.3f
-                    if (pet.body.act == Act.PLAY && hypot(t.vx, t.vy) > 1500 * d) ctx.say(ctx.pick("Waouh, quel lancer !", "J'y vais !"), 1.6f)
-                }
+    // =====================================================================
+    //  Gestes sur un jouet (reçus de sa fenêtre)
+    // =====================================================================
+    /** L'utilisateur attrape le jouet [t] (si l'animal le tenait, il proteste). */
+    fun grab(t: Prop) {
+        toyHeldByUser = true
+        ctx.noteInteraction()
+        ctx.requestFrames()
+        if (t.held) {
+            t.held = false
+            if (t.toy?.spec?.complainsWhenTaken == true) {
+                pet.express(Expr.ANGRY, 1.2f)
+                ctx.say(ctx.pick("Hé ! C'est à moi !", "Rends-le moi ! 😾", "Mon jouet !"), 1.6f)
             }
-            e2.recycle()
-            true
         }
     }
 
+    /** Le doigt déplace le jouet (coordonnées écran du doigt). */
+    fun drag(t: Prop, rawX: Float, rawY: Float) {
+        t.x = rawX; t.y = rawY + t.h / 2f
+        t.vx = 0f; t.vy = 0f; t.onGround = false
+    }
+
+    /** Le doigt lâche le jouet à la vitesse ([vx], [vy]) px/s (bornée). */
+    fun release(t: Prop, vx: Float, vy: Float) {
+        val max = Tuning.TOY_THROW_MAX_DP * d
+        t.vx = vx.coerceIn(-max, max)
+        t.vy = vy.coerceIn(-max, max)
+        toyHeldByUser = false
+        t.onGround = false
+        tctx.catchCooldown = 0.3f
+        if (pet.body.act == Act.PLAY && hypot(t.vx, t.vy) > 1500 * d) ctx.say(ctx.pick("Waouh, quel lancer !", "J'y vais !"), 1.6f)
+    }
 
     // =====================================================================
     //  Physique des objets (à chaque image)
@@ -338,21 +313,21 @@ class ToyController(private val ctx: PetCtx) {
         while (i >= 0) {
             val p = props[i--]
             p.age += dt
-            val spin0 = p.view.spin
+            val spin0 = p.spin
             when (val spec = p.spec) {
                 is ToySpec -> if (!toyHeldByUser) spec.step(tctx, pet, p, dt)
                 is FoodSpec -> {
                     if (!p.onGround) {
-                        p.view.spin += 200f * dt
-                        if (BunnyPhysics.stepFalling(p, dt, g, arena.minX, arena.maxX, groundY)) p.view.spin = spec.restSpin
+                        p.spin += 200f * dt
+                        if (BunnyPhysics.stepFalling(p, dt, g, arena.minX, arena.maxX, groundY)) p.spin = spec.restSpin
                     }
                     if (p.age > Tuning.FOOD_LIFETIME_S) { removeProp(p); continue }
                 }
                 else -> p.y = groundY            // crotte
             }
             // Le dessin ne dépend que de la rotation : on ne redessine que si elle a changé
-            if (p.view.spin != spin0) p.view.invalidate()
-            if (p.attached && !p.isPoop) placeProp(p)
+            if (p.spin != spin0) ctx.overlay.redraw(p.windowId)
+            if (!p.isPoop) placeProp(p)
         }
     }
 

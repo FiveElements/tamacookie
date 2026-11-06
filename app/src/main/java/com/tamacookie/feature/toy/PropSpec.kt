@@ -39,7 +39,7 @@ interface PropSpec {
     /** La nourriture qu'il représente (null = pas de la nourriture). */
     val food: Food? get() = null
 
-    /** Dessin ; rotation dans [PropView.spin], teinte dans [PropView.tint], pinceaux dans `v.pen`. */
+    /** Dessin de l'état du modèle ([Prop.spin], [Prop.tint], lus via `v.spin` / `v.tint`) ; pinceaux dans `v.pen`. */
     fun draw(c: Canvas, v: PropView, w: Float, h: Float)
 }
 
@@ -118,7 +118,7 @@ interface ToyCtx : PetCtx {
         val a = arena
         BunnyPhysics.stepProp(
             p, dt, pet.body.phys.gravity, gFactor, bounce, wallBounce, friction,
-            p.lp.width / 2f, p.lp.height.toFloat(), a.screenW, a.topY, a.groundY, Tuning.PROP_SETTLE_DP * a.d,
+            p.w / 2f, p.h.toFloat(), a.screenW, a.topY, a.groundY, Tuning.PROP_SETTLE_DP * a.d,
         )
     }
 }

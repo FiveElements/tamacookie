@@ -41,7 +41,7 @@ object BallToy : ToySpec {
 
     override fun step(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float) {
         ctx.stepToy(pet, p, dt, 1f, 0.62f, 0.8f, 2.2f)
-        p.view.spin += p.vx / ctx.arena.d * dt * 2.5f
+        p.spin += p.vx / ctx.arena.d * dt * 2.5f
     }
 
     override fun draw(c: Canvas, v: PropView, w: Float, h: Float) {

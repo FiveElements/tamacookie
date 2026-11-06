@@ -7,22 +7,30 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
-import android.view.WindowManager
 import com.tamacookie.feature.station.StationKind
 
+/** Fenêtre d'une station : affiche l'état de son [Station] (dessin porté par son comportement). */
 @SuppressLint("ViewConstructor")
-class StationView(context: Context, val kind: StationKind) : View(context) {
-    var highlight = false
-        set(v) { if (field != v) { field = v; animate().scaleX(if (v) 1.12f else 1f).scaleY(if (v) 1.12f else 1f).setDuration(120).start() } }
-    var occupied = false
-        set(v) { field = v; invalidate() }
+class StationView(context: Context, val station: Station) : View(context), Refreshable {
+    val kind: StationKind get() = station.kind
+    val occupied: Boolean get() = station.occupied
     /** Coffre ouvert (couvercle levé). */
-    var open = false
-        set(v) { field = v; invalidate() }
-    var t = 0f
+    val open: Boolean get() = station.open
+    val t: Float get() = station.t
+    /** Surlignage affiché (agrandissement animé quand le modèle change). */
+    private var highlighted = false
 
     /** Pinceaux partagés par les dessins des stations ([StationKind.behavior] `.draw`). */
     internal val pen = StationPen(resources.displayMetrics.density)
+
+    override fun refresh() {
+        val h = station.highlight
+        if (h != highlighted) {
+            highlighted = h
+            animate().scaleX(if (h) 1.12f else 1f).scaleY(if (h) 1.12f else 1f).setDuration(120).start()
+        }
+        invalidate()
+    }
 
     override fun onDraw(c: Canvas) {
         kind.behavior.draw(c, this, width.toFloat(), height.toFloat())
@@ -38,19 +46,4 @@ class StationPen(val d: Float) {
     }
     val r = RectF()
     val path = Path()
-}
-
-/** Une station flottante et sa fenêtre. */
-class Station(val kind: StationKind, val view: StationView, val lp: WindowManager.LayoutParams) {
-    val behavior get() = kind.behavior
-    var shown = false
-    /** Vue où la station est installée (null = rangée). */
-    var anchor: String? = null
-    /** Centre de la station en coordonnées écran. */
-    var cx = 0f
-    var cy = 0f
-    fun contains(x: Float, y: Float, slack: Float): Boolean =
-        x > cx - lp.width / 2f - slack && x < cx + lp.width / 2f + slack &&
-            y > cy - lp.height / 2f - slack && y < cy + lp.height / 2f + slack
-    val bottom: Float get() = cy + lp.height / 2f
 }

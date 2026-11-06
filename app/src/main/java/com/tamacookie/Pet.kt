@@ -2,6 +2,7 @@ package com.tamacookie
 
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.Pose
+import com.tamacookie.feature.toy.Food
 import kotlin.random.Random
 
 /** Identifiant stable d'un animal (clé du monde, et plus tard de la persistance et des échanges). */
@@ -57,8 +58,10 @@ class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     var facing = 1f
     /** 0..1 : cycle de sautillement pendant la marche. */
     var walkPhase = 0f
-    /** 0..1 : avancement du repas en cours (`Act.EAT`), lu par la vue. */
+    /** 0..1 : avancement du repas en cours (`Act.EAT`). */
     var eatProgress = 0f
+    /** Ce qu'il mange (ou a mangé en dernier) : ce qu'il a dans la bouche. */
+    var eatingFood = Food.CARROT
 
     /** Icône / bouton sous ses pattes, null = le sol. */
     var platform: Box? = null

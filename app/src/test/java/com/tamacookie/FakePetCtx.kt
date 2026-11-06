@@ -1,11 +1,8 @@
 package com.tamacookie
 
-import android.content.Context
 import android.content.SharedPreferences
-import android.view.MotionEvent
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActRegistry
-import com.tamacookie.feature.toy.Food
 import kotlin.random.Random
 
 /** Horloge de test, avancée à la main. */
@@ -19,7 +16,7 @@ class FakeClock(var uptime: Long = 1_000_000L, var wall: Long = 1_700_000_000_00
 /**
  * Faux hôte des contrôleurs (JVM pur) : un monde à un animal, une arène 1080 × 2000 px (densité 1),
  * une horloge et un aléatoire maîtrisés, et l'enregistrement de ce que les contrôleurs demandent
- * (répliques, effets, vibrations…). [context] et [windows] n'existent pas en test.
+ * (répliques, effets, vibrations…). Les fenêtres passent par un [FakeOverlayHost].
  */
 class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : PetCtx {
     override val world = World()
@@ -67,7 +64,6 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override fun emit(pet: Pet, type: PType, n: Int) { repeat(n) { emitted += type } }
     override fun haptic(pet: Pet, feedback: Int) {}
     override fun vibrate(pattern: LongArray) { vibrations += pattern }
-    override fun showFood(pet: Pet, food: Food) {}
 
     override var lastInteraction = clock.wallMs()
     override fun startSleep(pet: Pet) { sleepRequests++; pet.stats.sleeping = true; pet.setActOrAfterAir(Act.SLEEP) }
@@ -77,15 +73,12 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override fun closeMenu() { menuClosed++ }
     override fun hide() { hideRequests++; hidden = true }
 
+    override val overlay = FakeOverlayHost()
     override fun applyView() { appliedViews++ }
     override fun layoutAnchored() {}
     override fun setBunnyAway(away: Boolean, fadeIn: Boolean) { bunnyAway = away }
     override fun placeBunny() {}
-    override fun forwardTouch(ev: MotionEvent) = false
     override fun setDockHiding(hiding: Boolean) { dockShowsHiding = hiding }
-
-    override val context: Context get() = throw UnsupportedOperationException("pas de Context en test JVM")
-    override val windows: OverlayWindows get() = throw UnsupportedOperationException("pas de fenêtres en test JVM")
 }
 
 /** Remet l'état global des capteurs à zéro (il est partagé entre les tests). */

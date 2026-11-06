@@ -31,8 +31,12 @@ class World {
 
     /** Nourriture, crottes et jouets posés à l'écran (gérés par [ToyController]). */
     val props = ArrayList<Prop>()
+    private var lastPropId = 0
 
-    /** Qui occupe chaque station, dans l'ordre de [StationKind] (les fenêtres sont dans `StationController`). */
+    /** Identifiant d'un nouvel objet (clé de sa fenêtre : [WindowId.Prop]). */
+    fun newPropId(): Int = ++lastPropId
+
+    /** Qui occupe chaque station, dans l'ordre de [StationKind] (leur état affiché est dans `StationController`). */
     private val stations: Array<Occupancy> = Array(StationKind.entries.size) { Occupancy(StationKind.entries[it]) }
 
     fun add(pet: Pet) { pets[pet.id] = pet }

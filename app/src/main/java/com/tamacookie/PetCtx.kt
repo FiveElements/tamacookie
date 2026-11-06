@@ -1,11 +1,8 @@
 package com.tamacookie
 
-import android.content.Context
 import android.content.SharedPreferences
-import android.view.MotionEvent
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActRegistry
-import com.tamacookie.feature.toy.Food
 import kotlin.random.Random
 
 /**
@@ -43,12 +40,10 @@ interface PetCtx {
     fun say(text: String, seconds: Float = Speech.DEFAULT_SECONDS)
     fun pick(vararg s: String): String
 
-    // --- Effets visibles (passent par la vue tant qu'il n'y a pas de RenderState : étape 4) ---
+    // --- Effets ponctuels (particules, retour haptique) : envoyés au rendu de l'animal ---
     fun emit(pet: Pet, type: PType, n: Int = 1)
     fun haptic(pet: Pet, feedback: Int)
     fun vibrate(pattern: LongArray)
-    /** Ce qu'il a dans la bouche pendant qu'il mange. */
-    fun showFood(pet: Pet, food: Food)
 
     // --- Interactions entre fonctionnalités (questions au monde plutôt qu'appels de contrôleur) ---
     /** Dernière interaction de l'utilisateur (heure murale, ms) : les bêtises attendent qu'il l'oublie. */
@@ -72,17 +67,14 @@ interface PetCtx {
     fun closeMenu()
     fun hide()
 
-    // --- Fenêtres et vues (→ OverlayManager à l'étape 4) ---
+    // --- Fenêtres : toutes passent par [overlay] (ids par entité) ---
+    /** La seule autorité sur les fenêtres overlay (`OverlayManager` ; faux hôte en test). */
+    val overlay: OverlayHost
     fun applyView()
     fun layoutAnchored()
     /** Fenêtre de l'animal retirée (en cage sur une autre page, caché). */
     val bunnyAway: Boolean
     fun setBunnyAway(away: Boolean, fadeIn: Boolean = false)
     fun placeBunny()
-    /** Transmet un geste à la fenêtre de l'animal (la cage lui passe les touchers). */
-    fun forwardTouch(ev: MotionEvent): Boolean
     fun setDockHiding(hiding: Boolean)
-    /** Contexte Android (vues, panneaux) : couplage restant des contrôleurs qui créent des fenêtres. */
-    val context: Context
-    val windows: OverlayWindows
 }

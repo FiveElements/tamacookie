@@ -22,7 +22,6 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Choreographer
 import android.view.HapticFeedbackConstants
-import android.view.MotionEvent
 import android.view.WindowInsets
 import android.view.WindowManager
 import com.tamacookie.BunnyView.Expr
@@ -46,7 +45,8 @@ import kotlin.random.Random
  * et câblage des domaines. Possède le [World] (l'animal résident et les objets) et implémente
  * [PetCtx], la façade que reçoivent les contrôleurs :
  * [BunnyPhysics] (vol), [BunnyBrain] (décisions), [BunnyActor] (gestes), [PageTracker] (vues / pages du bureau),
- * [OverlayWindows] (fenêtres, bulle, dock), [StationController] (bain, véto, cage, coffre),
+ * [OverlayManager] (toutes les fenêtres, ids par entité), [OverlayWindows] (bulles, dock, panneaux),
+ * [StationController] (bain, véto, cage, coffre),
  * [ToyController] (jouets, nourriture, crottes), [MischiefController] (bêtises, cache-cache).
  */
 class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
@@ -86,11 +86,19 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private lateinit var resident: Pet
     override val pet: Pet get() = resident
 
+    // --- Fenêtres ---
+    private lateinit var wm: WindowManager
+    /** La seule autorité sur les fenêtres overlay. */
+    private lateinit var overlayManager: OverlayManager
+    override val overlay: OverlayHost get() = overlayManager
+    private lateinit var windows: OverlayWindows
+    /** Fenêtre de chaque animal (vue + paramètres). */
+    private class PetWindow(val id: WindowId, val view: BunnyView, val lp: WindowManager.LayoutParams)
+    private val petWindows = HashMap<PetId, PetWindow>()
+    /** Vue du résident (gestes, aperçu des effets). */
+    private val bunny: BunnyView get() = petWindows.getValue(resident.id).view
+
     // --- Domaines ---
-    private lateinit var bunny: BunnyView
-    private lateinit var bunnyLp: WindowManager.LayoutParams
-    override lateinit var windows: OverlayWindows
-        private set
     override lateinit var pages: PageTracker
         private set
     /** Activités prises en charge par une fonctionnalité (stations : [Act.IN_STATION]). */
@@ -102,7 +110,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Paroles : bulle (si les fenêtres existent) + reprise de la boucle. */
     override val speech = Speech(rnd) { text, seconds ->
         if (::windows.isInitialized) {
-            windows.say(text, seconds)
+            if (!hidden && !bunnyAway) windows.say(resident.id, text, seconds)
             requestFrames()
         }
     }
@@ -123,7 +131,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Invisible ici (en cage sur une autre page, ou caché) : sa fenêtre est retirée. */
     override var bunnyAway = false
         private set
-    private var bunnyAdded = false
 
     // --- Boucle ---
     private var looping = false
@@ -137,6 +144,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private var lastSaveWall = 0L
     private var notifTimer = 0f
     private var menuTimer = 0f
+    /** Nourriture dont la vue a la couleur (évite un parseColor à chaque image). */
+    private var shownFood = Food.CARROT
 
     // =====================================================================
     //  Cycle de vie
@@ -165,15 +174,21 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         resident = Pet.resident(PetState(this).load(), BunnyPhysics(d), rnd)
         world.add(resident)
         watcher = ForegroundAppWatcher(this)
-        windows = OverlayWindows(this)
+        wm = getSystemService(WindowManager::class.java)
+        overlayManager = OverlayManager(wm)
+        windows = OverlayWindows(this, arena, { prefs }, overlayManager, bubbleAnchor)
         pages = PageTracker(this)
         toys = ToyController(this)
         toys.registerActs(acts)
-        stations = StationController(this, toys)
+        stations = StationController(this, toys, StationPanelWindows(this, windows, arena))
         stations.registerActs(acts)
         mischief = MischiefController(this)
         mischief.registerActs(acts)
-        touch = TouchHandler(this, stations, mischief)
+        touch = TouchHandler(this, windows, this, stations, mischief)
+        val entities = EntityWindows(this, windows, world, toys, stations) { ev ->
+            touch.listener?.onTouch(bunny, ev) ?: false
+        }
+        overlayManager.factory = entities::create
 
         computeBounds()
         val b = resident.body
@@ -249,7 +264,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 mischief.loadLevel()
                 applyView()
                 bunny.look = st.look
-                bunny.emit(PType.SPARKLE, 6)
+                emit(resident, PType.SPARKLE, 6)
                 speech.sayOneOf(Lines.newLook(st.name))
                 requestFrames()
             }
@@ -322,30 +337,30 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     //  Fenêtres
     // =====================================================================
     private fun createWindows() {
-        bunny = BunnyView(this)
-        bunny.body = resident.body
-        bunny.look = resident.stats.look
-        bunnyLp = windows.params(arena.bw, arena.bh, touchable = true)
-        placeBunny()
-        windows.add(bunny, bunnyLp)
-        bunnyAdded = true
-        touch.attach(bunny)
+        val v = BunnyView(this)
+        v.body = resident.body
+        v.look = resident.stats.look
+        petWindows[resident.id] = PetWindow(WindowId.Pet(resident.id), v, windows.params(arena.bw, arena.bh, touchable = true))
+        attachPet(resident)
+        touch.attach(v)
         stations.create()
         windows.createDock { stations.toggleStationsPanel() }
-        windows.createBubble()
     }
 
+    /** Affiche la fenêtre de [p] à sa position. */
+    private fun attachPet(p: Pet, fadeIn: Boolean = false) {
+        val w = petWindows[p.id] ?: return
+        w.lp.x = petX(p); w.lp.y = petY(p)
+        overlayManager.attach(w.id, w.view, w.lp, fadeIn)
+    }
+
+    /** Retire toutes les fenêtres ; menu, panneaux et partie en cours sont fermés proprement. */
     private fun removeAllWindows() {
-        if (!::windows.isInitialized) return
+        if (!::overlayManager.isInitialized) return
         closeMenu()
-        windows.hideBubble()
-        if (::stations.isInitialized) {
-            stations.closePanels()
-            stations.detachAll()
-        }
-        if (bunnyAdded) { windows.safeRemove(bunny); bunnyAdded = false }
-        if (::toys.isInitialized) toys.detachAll()
-        windows.removeDock()
+        if (::stations.isInitialized) stations.closePanels()
+        overlayManager.detachAll()
+        if (::toys.isInitialized) toys.onDetached()
     }
 
     override fun hide() {
@@ -360,10 +375,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         if (!hidden) return
         hidden = false
         computeBounds()
-        placeBunny()
         bunnyAway = false
-        windows.add(bunny, bunnyLp)
-        bunnyAdded = true
+        attachPet(resident)
         toys.reattach()
         windows.addDock()
         layoutAnchored()
@@ -381,20 +394,19 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun setBunnyAway(away: Boolean, fadeIn: Boolean) {
         if (away == bunnyAway) return
         bunnyAway = away
+        val w = petWindows[resident.id] ?: return
         if (away) {
-            closeMenu(); windows.hideBubble()
-            if (bunnyAdded) { bunnyAdded = false; windows.safeRemove(bunny) }
+            closeMenu(); windows.hideBubble(resident.id)
+            overlayManager.detach(w.id)
         } else {
-            placeBunny()
-            windows.add(bunny, bunnyLp); bunnyAdded = true
-            if (fadeIn) { bunny.alpha = 0f; bunny.animate().alpha(1f).setDuration(160).start() }
+            attachPet(resident, fadeIn)
             requestFrames()
         }
     }
 
     @Suppress("DEPRECATION")
     private fun computeBounds() {
-        val m = windows.wm.currentWindowMetrics
+        val m = wm.currentWindowMetrics
         val b = m.bounds
         val ins = m.windowInsets.getInsetsIgnoringVisibility(
             WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
@@ -408,14 +420,26 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         resident.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
     }
 
+    /** Coin haut gauche de la fenêtre de [p] (ses pieds en bas au centre, décalage du défilement compris). */
+    private fun petX(p: Pet) = (p.body.fx - arena.bw / 2f + pages.bunnyShift).roundToInt()
+    private fun petY(p: Pet) = (p.body.fy - (arena.bh - arena.feetPad)).roundToInt()
+
     override fun placeBunny() {
-        val b = resident.body
-        val nx = (b.fx - arena.bw / 2f + pages.bunnyShift).roundToInt()
-        val ny = (b.fy - (arena.bh - arena.feetPad)).roundToInt()
-        if (nx != bunnyLp.x || ny != bunnyLp.y) {
-            bunnyLp.x = nx; bunnyLp.y = ny
-            // Boucle suspendue : il est hors de l'écran, inutile de déplacer la fenêtre (fait à la reprise)
-            if (bunnyAdded && !suspended) windows.update(bunny, bunnyLp)
+        // Boucle suspendue : il est hors de l'écran, inutile de déplacer la fenêtre (fait à la reprise)
+        if (suspended) return
+        val w = petWindows[resident.id] ?: return
+        overlay.move(w.id, petX(resident), petY(resident))
+    }
+
+    /** Position des bulles : au-dessus de la tête de chaque animal, à l'écran. */
+    private val bubbleAnchor = object : OverlayWindows.BubbleAnchor {
+        override fun headX(pet: PetId): Float {
+            val p = world.pets[pet] ?: return 0f
+            return p.body.fx + pages.bunnyShift
+        }
+        override fun headTop(pet: PetId): Float {
+            val p = world.pets[pet] ?: return 0f
+            return p.body.fy - (if (p.act == Act.SLEEP) 70 else 112) * arena.d
         }
     }
 
@@ -473,7 +497,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         suspended = false
         handler.removeCallbacks(suspendedTick)
         lastFrameNs = 0L
-        if (bunnyAdded) windows.update(bunny, bunnyLp)
+        placeBunny()
         Choreographer.getInstance().postFrameCallback(this)
     }
 
@@ -490,7 +514,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private fun canSuspend(): Boolean {
         val invisible = resident.act == Act.HIDDEN || bunnyAway || pages.bunnyOffscreen()
         if (!invisible) return false
-        return !touch.menuOpen && !windows.bubbleShown && !pages.scrollingRecently() &&
+        return !touch.menuOpen && !windows.anyBubbleShown && !pages.scrollingRecently() &&
             !world.hasToyOrFood() && !toys.anyMoving() && !stations.animating()
     }
 
@@ -561,9 +585,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         bunny.expr = p.mind.exprOverride ?: moodExpr(st)
         bunny.walkPhase = p.body.walkPhase
         bunny.eatProgress = p.body.eatProgress
+        if (p.body.eatingFood != shownFood) { shownFood = p.body.eatingFood; bunny.foodColor = Color.parseColor(shownFood.color) }
         bunny.update(dt)
         placeBunny()
-        windows.updateBubble(dt)
+        windows.updateBubbles(dt)
+        // Au plus un updateViewLayout par fenêtre et par image
+        overlayManager.flush()
 
         menuTimer += dt
         if (menuTimer > 1f) { menuTimer = 0f; touch.refreshMenu() }
@@ -818,9 +845,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     // =====================================================================
     override fun closeMenu() { if (::touch.isInitialized) touch.closeMenu() }
 
-    override fun forwardTouch(ev: MotionEvent): Boolean =
-        (if (::touch.isInitialized) touch.listener else null)?.onTouch(bunny, ev) ?: false
-
     // =====================================================================
     //  Paroles (répliques dans [Lines], tirage et bulle dans [Speech])
     // =====================================================================
@@ -891,18 +915,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     // =====================================================================
     //  PetCtx : le reste de la façade (délégations vers les domaines)
     // =====================================================================
-    override val context: Context get() = this
     override val prefs: SharedPreferences get() = Prefs.of(this)
 
     override fun appLabel(pkg: String): String? = try {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     } catch (_: Exception) { null }
 
-    override fun emit(pet: Pet, type: PType, n: Int) = bunny.emit(type, n)
+    override fun emit(pet: Pet, type: PType, n: Int) { petWindows[pet.id]?.view?.emit(type, n) }
 
-    override fun haptic(pet: Pet, feedback: Int) { bunny.performHapticFeedback(feedback) }
-
-    override fun showFood(pet: Pet, food: Food) { bunny.foodColor = Color.parseColor(food.color) }
+    override fun haptic(pet: Pet, feedback: Int) { petWindows[pet.id]?.view?.performHapticFeedback(feedback) }
 
     override fun vibrate(pattern: LongArray) {
         try {

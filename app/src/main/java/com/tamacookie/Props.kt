@@ -8,20 +8,18 @@ import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
-import com.tamacookie.feature.toy.Food
-import com.tamacookie.feature.toy.Poop
 import com.tamacookie.feature.toy.PropPen
 import com.tamacookie.feature.toy.PropSpec
-import com.tamacookie.feature.toy.Toy
 
-/** Petit objet flottant (nourriture, crotte, jouet) : son dessin est porté par son [spec]. */
+/** Fenêtre d'un objet posé : affiche l'état de son [Prop] (dessin porté par son spec). */
 @SuppressLint("ViewConstructor")
-class PropView(context: Context, val spec: PropSpec) : View(context) {
-    var spin = 0f
-    var tint = Palette.BALL
+class PropView(context: Context, val prop: Prop) : View(context) {
+    val spec: PropSpec get() = prop.spec
+    /** Rotation du dessin (lue dans le modèle). */
+    val spin: Float get() = prop.spin
+    val tint: Int get() = prop.tint
 
     /** Pinceaux partagés par les dessins des objets ([PropSpec.draw]). */
     internal val pen = PropPen(resources.displayMetrics.density)
@@ -29,23 +27,6 @@ class PropView(context: Context, val spec: PropSpec) : View(context) {
     override fun onDraw(c: Canvas) {
         spec.draw(c, this, width.toFloat(), height.toFloat())
     }
-}
-
-/** Objet flottant + sa fenêtre et sa petite physique. */
-class Prop(val view: PropView, val lp: WindowManager.LayoutParams) : PropBody {
-    override var x = 0f
-    override var y = 0f
-    override var vx = 0f
-    override var vy = 0f
-    override var onGround = false
-    var age = 0f
-    var attached = false
-    var held = false          // tenu par le lapin
-    var anchor = ""           // vue (app / page du bureau) où l'objet est posé
-    val spec: PropSpec get() = view.spec
-    val toy: Toy? get() = view.spec.toy
-    val food: Food? get() = view.spec.food
-    val isPoop: Boolean get() = view.spec === Poop
 }
 
 /** Bulle de dialogue (fenêtre non tactile). */

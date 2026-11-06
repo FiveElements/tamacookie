@@ -50,7 +50,7 @@ object FrisbeeToy : ToySpec {
         if (abs(tx - pet.body.fx) > 24 * d) ctx.actor.walkToward(pet, tx, 230 * d, dt, stopDist = 24 * d) else pet.body.pose = Pose.IDLE
         if (pet.body.act != Act.PLAY) return
         val dx = p.x - pet.body.fx
-        val h = pet.body.fy - (p.y - p.lp.height / 2f)
+        val h = pet.body.fy - (p.y - p.h / 2f)
         if (airborne && abs(dx) < 90 * d && h > 60 * d && h < 240 * d && pet.mind.kickCooldown <= 0f && !ctx.userHolds) {
             pet.mind.kickCooldown = 0.6f
             ctx.actor.jump(pet, BunnyPhysics.impulseForHeight(pet.body.phys.gravity, (h - 30 * d).coerceAtLeast(10 * d)), dx * 2.5f, then = Act.PLAY)
@@ -64,15 +64,15 @@ object FrisbeeToy : ToySpec {
         val mouthX = pet.body.fx + pet.body.facing * 18 * d
         if (p.held) {
             p.x = mouthX + pet.body.facing * 8 * d
-            p.y = fy - 52 * d + p.lp.height / 2f
+            p.y = fy - 52 * d + p.h / 2f
             p.vx = 0f; p.vy = 0f
         } else {
             val lift = (abs(p.vx) / (900 * d)).coerceAtMost(1f) * 0.85f
             p.vx *= (1f - 0.35f * dt)
             ctx.stepToy(pet, p, dt, 1f - lift, 0.15f, 0.6f, 5f)
-            if (!p.onGround) p.view.spin += 900f * dt
+            if (!p.onGround) p.spin += 900f * dt
             // attrapé ?
-            val cy = p.y - p.lp.height / 2f
+            val cy = p.y - p.h / 2f
             if (ctx.catchCooldown <= 0f && (act == Act.PLAY || act == Act.AIR) &&
                 hypot(p.x - mouthX, cy - (fy - 55 * d)) < 45 * d
             ) {

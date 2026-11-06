@@ -67,13 +67,13 @@ object PlushToy : ToySpec {
             val sleepingNow = act == Act.SLEEP
             p.x = fx + pet.body.facing * (if (sleepingNow) 30 else 16) * d
             p.y = fy - (if (sleepingNow) 0 else 6) * d
-            p.vx = 0f; p.vy = 0f; p.view.spin = if (sleepingNow) -70f else 0f
+            p.vx = 0f; p.vy = 0f; p.spin = if (sleepingNow) -70f else 0f
         } else {
             ctx.stepToy(pet, p, dt, 1f, 0.3f, 0.6f, 6f)
-            if (!p.onGround) p.view.spin += p.vx / d * dt * 3f + 120f * dt
-            else p.view.spin *= (1f - 6f * dt)
+            if (!p.onGround) p.spin += p.vx / d * dt * 3f + 120f * dt
+            else p.spin *= (1f - 6f * dt)
             if (ctx.catchCooldown <= 0f && act == Act.PLAY && !p.onGround &&
-                hypot(p.x - fx, (p.y - p.lp.height / 2f) - (fy - 40 * d)) < 40 * d
+                hypot(p.x - fx, (p.y - p.h / 2f) - (fy - 40 * d)) < 40 * d
             ) {
                 p.held = true; ctx.holdTime = 0f
                 ctx.hit(pet, Toy.PLUSH, 3f)
