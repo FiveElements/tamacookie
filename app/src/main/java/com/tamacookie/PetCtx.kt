@@ -28,6 +28,8 @@ interface PetCtx {
     val screen: ScreenSensor
     /** Quelle fonctionnalité prend en charge l'activité courante d'un animal (stations…). */
     val acts: ActRegistry
+    /** L'arbitre global entre animaux (une bêtise à la fois, le coffre, la nourriture, les bulles). */
+    val director: Director
 
     // --- Jauges et sauvegarde (l'hôte est la seule autorité sur l'état des animaux) ---
     /**

@@ -171,6 +171,12 @@ class ToyController(private val ctx: PetCtx) {
             pet.body.pose = Pose.IDLE
             pet.body.facing = sign(c.x - pet.body.fx).takeIf { it != 0f } ?: pet.body.facing
             pet.express(Expr.SURPRISED, 0.3f)
+        } else if (ctx.director.foodWinner(c).let { it != null && it !== pet }) {
+            // Un autre animal est plus près : l'arbitre lui donne la nourriture, celui-ci renonce
+            ctx.director.loseFood(pet, c)
+            pet.express(Expr.ANGRY, 1.6f)
+            ctx.speech.at(SpeechPriority.LOW) { ctx.say(ctx.speech.pickFrom(LOST_FOOD), 2f) }
+            pet.setAct(Act.IDLE, 2f)
         } else if (ctx.actor.walkToward(pet, c.x, 130 * d, dt, stopDist = 26 * d)) {
             pet.body.eatingFood = c.food!!
             removeProp(c)
@@ -343,5 +349,6 @@ class ToyController(private val ctx: PetCtx) {
     private companion object {
         val FULL = arrayOf("J'ai plus faim !", "Mon ventre va exploser !")
         val TOO_TIRED = arrayOf("Trop fatigué… 😴", "Plus tard, j'ai plus d'énergie")
+        val LOST_FOOD = arrayOf("Hé ! C'était pour moi !", "Pfff, il a été plus rapide 😤", "La prochaine est à moi !")
     }
 }

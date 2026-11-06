@@ -68,7 +68,7 @@ class TouchHandler(
     fun attach(bunny: PetView, petOf: () -> Pet?) {
         val slop = ViewConfiguration.get(context).scaledTouchSlop * 1.5f
         /** Le geste agit sur l'animal de cette fenêtre. */
-        fun touched(block: () -> Unit) { val p = petOf() ?: return; ctx.world.asPet(p, block) }
+        fun touched(block: () -> Unit) { val p = petOf() ?: return; ctx.speech.at(SpeechPriority.HIGH) { ctx.world.asPet(p, block) } }
         val gd = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean { touched { onPetTap() }; return true }
@@ -133,7 +133,7 @@ class TouchHandler(
         }
         val l = View.OnTouchListener { _, ev ->
             val p = petOf() ?: return@OnTouchListener false
-            ctx.world.asPet(p) { onTouch(ev) }
+            ctx.speech.at(SpeechPriority.HIGH) { ctx.world.asPet(p) { onTouch(ev) } }
         }
         listeners[bunny] = l
         bunny.setOnTouchListener(l)
@@ -217,7 +217,9 @@ class TouchHandler(
             onEntry = { e ->
                 closeMenu()
                 // l'animal a pu partir (compagnon retiré) : rien à faire
-                if (ctx.world.pets[target.id] === target) ctx.world.asPet(target) { e.run(menuCtx, target) }
+                if (ctx.world.pets[target.id] === target) {
+                    ctx.speech.at(SpeechPriority.HIGH) { ctx.world.asPet(target) { e.run(menuCtx, target) } }
+                }
             },
             onClose = { if (menu === m) closeMenu() },
         )

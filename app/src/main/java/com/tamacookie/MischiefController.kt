@@ -68,6 +68,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
     /** Appelé quand il choisit quoi faire : s'il est ignoré depuis longtemps, il fait une bêtise. */
     fun maybeSeekAttention(): Boolean {
         if (ctx.world.stationOf(pet) != null) return false
+        if (!ctx.director.mayStartMischief(pet)) return false          // un autre animal fait déjà une bêtise
         val now = ctx.clock.wallMs()
         val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.personality)
         if (!BunnyBrain.canSeekAttention(now, ctx.lastInteraction, cooldownUntil, thresholdMs)) return false
@@ -100,6 +101,8 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
      * préférence libre ([Act.FREE]) ; null = aucun (les signaux sont consommés sans réaction).
      */
     private fun reactingPet(): Pet? {
+        // Une bêtise en cours : c'est son auteur qui réagit (les autres n'en commencent pas une deuxième)
+        ctx.director.mischiefOwner()?.let { return it.takeIf { o -> ctx.world.isShown(o) && !o.stats.sleeping && ctx.world.stationOf(o) == null } }
         var first: Pet? = null
         for (q in ctx.world.shown(shownBuf)) {
             if (q.stats.sleeping || ctx.world.stationOf(q) != null) continue
@@ -136,7 +139,14 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
     }
 
     // --- Cache-cache (menu, changement de vue, dodo, glisser) ---
-    fun startHideSeek(fromMenu: Boolean): Boolean = HideSeekMischief.startFrom(mctx, pet, fromMenu)
+    fun startHideSeek(fromMenu: Boolean): Boolean {
+        val other = ctx.director.mischiefOwner()?.takeIf { it !== pet }
+        if (other != null) {
+            if (fromMenu) ctx.say("${other.name} fait déjà des bêtises… une à la fois ! 😅", 2.5f)
+            return false
+        }
+        return HideSeekMischief.startFrom(mctx, pet, fromMenu)
+    }
 
     /** Fin du cache-cache de [p] (attrapé, dodo…). */
     fun endHiding(p: Pet = pet) = ctx.world.asPet(p) { HideSeekMischief.end(mctx) }

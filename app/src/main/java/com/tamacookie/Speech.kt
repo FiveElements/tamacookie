@@ -19,6 +19,17 @@ class Speech(
 
     private val rnd: Random get() = rndOf()
 
+    /** Priorité des répliques en cours ([at]) : lue par l'hôte quand plusieurs animaux veulent parler. */
+    var priority = SpeechPriority.NORMAL
+        private set
+
+    /** Exécute [block] en parlant avec la priorité [p] (puis rétablit la précédente). */
+    fun <T> at(p: SpeechPriority, block: () -> T): T {
+        val prev = priority
+        priority = p
+        try { return block() } finally { priority = prev }
+    }
+
     fun say(text: String, seconds: Float = DEFAULT_SECONDS) = show(text, seconds)
 
     /** Dit une réplique tirée au hasard dans [lines]. */

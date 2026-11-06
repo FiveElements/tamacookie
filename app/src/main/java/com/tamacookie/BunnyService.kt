@@ -110,18 +110,30 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         private set
     /** Activités prises en charge par une fonctionnalité (stations : [Act.IN_STATION]). */
     override val acts = ActRegistry()
+    override val director = Director(world)
     private lateinit var stations: StationController
     private lateinit var toys: ToyController
     private lateinit var mischief: MischiefController
     private lateinit var behavior: PetBehavior
     private val handler = Handler(Looper.getMainLooper())
-    /** Paroles : bulle de l'animal courant (si les fenêtres existent) + reprise de la boucle. */
-    override val speech = Speech({ pet.mind.rnd }) { text, seconds ->
+    /**
+     * Paroles : bulle de l'animal courant (si les fenêtres existent) + reprise de la boucle. Une seule bulle
+     * à la fois quand plusieurs animaux parlent : l'arbitre ([Director.bubbles]) fait attendre les autres.
+     */
+    override val speech: Speech = Speech({ pet.mind.rnd }) { text, seconds ->
         if (::windows.isInitialized) {
             val p = pet
-            if (!hidden && !isAway(p) && world.isShown(p)) windows.say(p.id, text, seconds)
+            if (!hidden && !isAway(p) && world.isShown(p) &&
+                director.bubbles.request(Director.BubbleQueue.Line(p.id, text, seconds, speech.priority))
+            ) showBubble(p.id, text, seconds)
             requestFrames()
         }
+    }
+
+    /** Affiche la bulle de [id] ; celle d'un autre animal, interrompue, disparaît. */
+    private fun showBubble(id: PetId, text: String, seconds: Float) {
+        for (q in world.pets.keys) if (q != id) windows.hideBubble(q)
+        windows.say(id, text, seconds)
     }
     private lateinit var notifier: PetNotifier
     private lateinit var touch: TouchHandler
@@ -156,6 +168,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         notifier = PetNotifier(
             this,
             pet = { if (world.pets.isEmpty()) null else resident },
+            director = { director },
             hidden = { hidden },
             hiding = { ::mischief.isInitialized && mischief.hidingView != null },
         )
@@ -299,6 +312,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         stations.closePanels()
         toys.clear()
         windows.forgetBubble(old.id)
+        director.bubbles.forget(old.id)
         val w = petWindows.remove(old.id)
         if (w != null) overlayManager.release(w.id)
         awayPets.remove(old.id)
@@ -336,7 +350,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         false
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
+        speech.at(SpeechPriority.HIGH) { command(intent) }
+
+    /** Une commande (notification, activités) : réponse à l'utilisateur, ses répliques passent devant. */
+    private fun command(intent: Intent?): Int {
         if (!ready) {
             // Vues non initialisées (permission manquante, démarrage refusé…) : on ignore
             if (intent?.action == ACTION_STOP) stop(this)
@@ -496,7 +514,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         if (away) awayPets.add(pet.id) else awayPets.remove(pet.id)
         val w = petWindows[pet.id] ?: return
         if (away) {
-            touch.closeMenuOf(pet.id); windows.hideBubble(pet.id)
+            touch.closeMenuOf(pet.id); windows.hideBubble(pet.id); director.bubbles.forget(pet.id)
             overlayManager.detach(w.id)
         } else {
             attachPet(pet, fadeIn)
@@ -655,6 +673,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         // Rendu : chaque animal affiché reçoit son état de l'image
         for (p in pets) petWindows[p.id]?.view?.render(PetRenderState.of(p), dt)
         for (p in pets) place(p)
+        // Bulle suivante (plusieurs animaux) : celle qui attendait son tour
+        director.bubbles.tick(dt)?.let { l ->
+            val p = world.pets[l.pet]
+            if (p != null && !hidden && !isAway(p) && world.isShown(p)) showBubble(l.pet, l.text, l.seconds)
+        }
         windows.updateBubbles(dt)
         // Au plus un updateViewLayout par fenêtre et par image
         overlayManager.flush()
@@ -690,7 +713,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     /** Ce que le comportement demande aux autres domaines. */
     private val behaviorHooks = object : PetBehavior.Hooks {
-        override fun chestVisible(p: Pet) = stations.visibleChest() != null
+        override fun chestVisible(p: Pet) = stations.visibleChest() != null && director.mayUseChest(p)
         override val lastSelfServe: Long get() = stations.selfServeAt
         override fun goToChest(p: Pet, now: Long) { stations.selfServeAt = now }
         override fun seekAttention(p: Pet) = mischief.maybeSeekAttention()

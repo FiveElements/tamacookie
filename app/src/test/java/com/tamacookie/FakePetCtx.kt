@@ -32,6 +32,7 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override val pages: PageTracker by lazy { PageTracker(this) }
     override val screen = FakeScreenSensor()
     override val acts = ActRegistry()
+    override val director = Director(world)
 
     /** Le résident. */
     val first: Pet = testPet(BunnyPhysics(arena.d), Random(seed)).also {

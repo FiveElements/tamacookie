@@ -50,7 +50,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
                 b.pose = Pose.IDLE
                 b.fy = actor.surfaceY(p)
                 if (ctx.world.hasToy()) { p.setAct(Act.PLAY); return }
-                if (ctx.world.hasFood()) { p.setAct(Act.GOTO_FOOD); return }
+                if (ctx.world.hasFood() && ctx.director.mayChaseFood(p)) { p.setAct(Act.GOTO_FOOD); return }
                 m.chatterIn -= dt
                 if (m.chatterIn <= 0f) { m.chatterIn = 50f + rnd.nextFloat() * 80f; chatter(p) }
                 if (b.actTime > b.actDuration) decideNext(p)
@@ -229,7 +229,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
     }
 
     private fun chatter(p: Pet) {
-        ctx.say(speech.chatterLine(p.stats.mood, p.species.lines))
+        speech.at(SpeechPriority.LOW) { ctx.say(speech.chatterLine(p.stats.mood, p.species.lines)) }
         if (p.stats.mood == Mood.HAPPY && rnd.nextFloat() < 0.3f) startDance(p)
     }
 
