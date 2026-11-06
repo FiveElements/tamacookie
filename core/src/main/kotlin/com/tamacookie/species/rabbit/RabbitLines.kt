@@ -1,5 +1,6 @@
 package com.tamacookie.species.rabbit
 
+import com.tamacookie.AppCategory
 import com.tamacookie.Mood
 import com.tamacookie.Season
 import com.tamacookie.species.SpeciesLines
@@ -71,7 +72,7 @@ object RabbitLines : SpeciesLines {
 
     /**
      * Commentaires possibles à l'arrivée dans une app.
-     * [category] : `ApplicationInfo.CATEGORY_*` (constantes de compilation, utilisables en JVM).
+     * [category] : [AppCategory] (valeurs d'`ApplicationInfo.CATEGORY_*`).
      */
     override fun appComments(label: String, pkg: String, category: Int, isHome: Boolean): Array<String> {
         val p = pkg.lowercase()
@@ -80,25 +81,15 @@ object RabbitLines : SpeciesLines {
             "camera" in p -> arrayOf("Prends-moi en photo ! 📸", "Je fais mon plus beau sourire")
             "clock" in p || "alarm" in p -> arrayOf("Il est l'heure de… manger ?", "Tic tac 🕰️")
             "store" in p || "vending" in p -> arrayOf("On fait les boutiques ? 🛍️", "Tu m'achètes une carotte ?")
-            category == CATEGORY_GAME -> arrayOf("Un jeu ! Je peux jouer ? 🎮", "Vas-y, bats le record !")
-            category == CATEGORY_VIDEO -> arrayOf("Pop-corn ? 🍿 Je regarde avec toi", "Chut, ça commence !")
-            category == CATEGORY_AUDIO -> arrayOf("J'adore cette musique ♪", "On danse ? ♫")
-            category == CATEGORY_SOCIAL -> arrayOf("Dis bonjour de ma part sur $label !", "Qui t'écrit ? 👀")
-            category == CATEGORY_MAPS -> arrayOf("On part en voyage ? 🗺️", "Je peux venir ?")
-            category == CATEGORY_NEWS -> arrayOf("Quoi de neuf dans le monde ?", "Des nouvelles des lapins ?")
-            category == CATEGORY_IMAGE -> arrayOf("Montre-moi tes photos !", "Il y a des photos de moi ?")
-            category == CATEGORY_PRODUCTIVITY -> arrayOf("Courage pour le travail 💪", "Je ne dérange pas… promis")
+            category == AppCategory.GAME -> arrayOf("Un jeu ! Je peux jouer ? 🎮", "Vas-y, bats le record !")
+            category == AppCategory.VIDEO -> arrayOf("Pop-corn ? 🍿 Je regarde avec toi", "Chut, ça commence !")
+            category == AppCategory.AUDIO -> arrayOf("J'adore cette musique ♪", "On danse ? ♫")
+            category == AppCategory.SOCIAL -> arrayOf("Dis bonjour de ma part sur $label !", "Qui t'écrit ? 👀")
+            category == AppCategory.MAPS -> arrayOf("On part en voyage ? 🗺️", "Je peux venir ?")
+            category == AppCategory.NEWS -> arrayOf("Quoi de neuf dans le monde ?", "Des nouvelles des lapins ?")
+            category == AppCategory.IMAGE -> arrayOf("Montre-moi tes photos !", "Il y a des photos de moi ?")
+            category == AppCategory.PRODUCTIVITY -> arrayOf("Courage pour le travail 💪", "Je ne dérange pas… promis")
             else -> arrayOf("Coucou $label !", "Oh, $label ! On fait quoi ici ?", "Je visite $label 🐾", "C'est joli chez $label")
         }
     }
-
-    // Valeurs de android.content.pm.ApplicationInfo.CATEGORY_* (copiées pour rester en Kotlin pur)
-    private const val CATEGORY_GAME = 0
-    private const val CATEGORY_AUDIO = 1
-    private const val CATEGORY_VIDEO = 2
-    private const val CATEGORY_IMAGE = 3
-    private const val CATEGORY_SOCIAL = 4
-    private const val CATEGORY_NEWS = 5
-    private const val CATEGORY_MAPS = 6
-    private const val CATEGORY_PRODUCTIVITY = 7
 }

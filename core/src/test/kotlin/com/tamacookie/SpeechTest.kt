@@ -1,7 +1,6 @@
 package com.tamacookie
 
 import com.tamacookie.species.rabbit.RabbitLines
-import android.content.pm.ApplicationInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -55,9 +54,9 @@ class SpeechTest {
     }
 
     @Test fun appComments_prioriteAccueilPuisPaquetPuisCategorie() {
-        val home = RabbitLines.appComments("Accueil", "com.android.camera", ApplicationInfo.CATEGORY_GAME, isHome = true)
+        val home = RabbitLines.appComments("Accueil", "com.android.camera", AppCategory.GAME, isHome = true)
         assertTrue("De retour à la maison 🏠" in home)
-        val cam = RabbitLines.appComments("Photo", "com.Vendor.CAMERA2", ApplicationInfo.CATEGORY_GAME, isHome = false)
+        val cam = RabbitLines.appComments("Photo", "com.Vendor.CAMERA2", AppCategory.GAME, isHome = false)
         assertTrue("Prends-moi en photo ! 📸" in cam)
         assertTrue("Tic tac 🕰️" in RabbitLines.appComments("Horloge", "x.alarm", -1, false))
         assertTrue("Tu m'achètes une carotte ?" in RabbitLines.appComments("Play", "com.android.vending", -1, false))
@@ -65,15 +64,15 @@ class SpeechTest {
 
     @Test fun appComments_categoriesAndroid() {
         fun c(cat: Int) = RabbitLines.appComments("App", "com.example", cat, false)
-        assertTrue("Vas-y, bats le record !" in c(ApplicationInfo.CATEGORY_GAME))
-        assertTrue("On danse ? ♫" in c(ApplicationInfo.CATEGORY_AUDIO))
-        assertTrue("Chut, ça commence !" in c(ApplicationInfo.CATEGORY_VIDEO))
-        assertTrue("Montre-moi tes photos !" in c(ApplicationInfo.CATEGORY_IMAGE))
-        assertTrue("Dis bonjour de ma part sur App !" in c(ApplicationInfo.CATEGORY_SOCIAL))
-        assertTrue("Des nouvelles des lapins ?" in c(ApplicationInfo.CATEGORY_NEWS))
-        assertTrue("Je peux venir ?" in c(ApplicationInfo.CATEGORY_MAPS))
-        assertTrue("Courage pour le travail 💪" in c(ApplicationInfo.CATEGORY_PRODUCTIVITY))
-        assertTrue("Je visite App 🐾" in c(ApplicationInfo.CATEGORY_UNDEFINED))
+        assertTrue("Vas-y, bats le record !" in c(AppCategory.GAME))
+        assertTrue("On danse ? ♫" in c(AppCategory.AUDIO))
+        assertTrue("Chut, ça commence !" in c(AppCategory.VIDEO))
+        assertTrue("Montre-moi tes photos !" in c(AppCategory.IMAGE))
+        assertTrue("Dis bonjour de ma part sur App !" in c(AppCategory.SOCIAL))
+        assertTrue("Des nouvelles des lapins ?" in c(AppCategory.NEWS))
+        assertTrue("Je peux venir ?" in c(AppCategory.MAPS))
+        assertTrue("Courage pour le travail 💪" in c(AppCategory.PRODUCTIVITY))
+        assertTrue("Je visite App 🐾" in c(AppCategory.UNDEFINED))
     }
 
     @Test fun onPlatform_inclutLeLibelle() {

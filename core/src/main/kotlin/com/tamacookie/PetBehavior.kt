@@ -250,8 +250,8 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
         ctx.on(p, PetEvent.AppVisited)
         val comment = speech.appComment(app.label, app.pkg, app.category, app.isHome, p.species.lines)
         val then = when (app.category) {
-            CATEGORY_VIDEO -> Act.SIT
-            CATEGORY_AUDIO -> Act.DANCE
+            AppCategory.VIDEO -> Act.SIT
+            AppCategory.AUDIO -> Act.DANCE
             else -> Act.IDLE
         }
         val act = p.act
@@ -277,10 +277,6 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
     }
 
     private companion object {
-        // Valeurs de android.content.pm.ApplicationInfo.CATEGORY_* (copiées pour rester en Kotlin pur)
-        const val CATEGORY_AUDIO = 1
-        const val CATEGORY_VIDEO = 2
-
         /** Part du bavardage consacrée aux répliques de saison. */
         const val SEASON_LINE_CHANCE = 0.3f
     }

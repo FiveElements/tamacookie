@@ -17,7 +17,7 @@ import org.junit.Test
 /** Persistance des animaux : schéma 1, migration depuis le schéma 0 (version installée), lectures sans effet de bord. */
 class PetRepositoryTest {
 
-    private val clock = FakeClock(wall = 1_800_000_000_000L)
+    private val clock = RepoClock(wall = 1_800_000_000_000L)
     private var nextId = 0
     private val ids = { "uuid-${++nextId}" }
 
@@ -316,4 +316,11 @@ class PetRepositoryTest {
         assertEquals(listOf(c.id), repo.companions().map { it.id })
         assertNull(repo.load(old.id))
     }
+}
+
+/** Horloge de test avancée à la main (le `FakeClock` du cœur vit dans les tests de `:core`, invisibles ici). */
+private class RepoClock(var wall: Long) : Clock {
+    override fun uptimeMs() = wall
+    override fun wallMs() = wall
+    fun advance(ms: Long) { wall += ms }
 }
