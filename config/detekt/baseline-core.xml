@@ -89,7 +89,6 @@
     <ID>MaxLineLength:LookTest.kt:LookTest$assertEquals(listOf(Accessory.CROWN, Accessory.BANDANA, Accessory.BOW_TIE), Accessory.entries.drop(Accessory.LEGACY_COUNT))</ID>
     <ID>MaxLineLength:LookTest.kt:LookTest$val all: List&lt;List&lt;LookOption&gt;&gt; = listOf(Fur.entries, Ears.entries, EyeColor.entries, Pattern.entries, Accessory.entries, AccColor.entries)</ID>
     <ID>MaxLineLength:MenuEntry.kt:MenuEntries$/** Chanter : il chante (des notes) et danse s'il est libre ; endormi, c'est une berceuse (il ne se réveille pas). */</ID>
-    <ID>MaxLineLength:MenuEntry.kt:MenuEntries$private</ID>
     <ID>MaxLineLength:MenuEntryTest.kt:MenuEntryTest$for (e in MenuEntries.ALL.filter { !it.dynamic }) assertEquals("${e.emoji}\n${e.label}", e.text(FakePetCtx().pet.stats))</ID>
     <ID>MaxLineLength:MischiefController.kt:MischiefController$ctx.director.mischiefOwner()?.let { return it.takeIf { o -&gt; ctx.world.isShown(o) &amp;&amp; !o.stats.sleeping &amp;&amp; ctx.world.stationOf(o) == null } }</ID>
     <ID>MaxLineLength:MischiefTest.kt:MischiefTest$assertEquals</ID>
@@ -140,7 +139,6 @@
     <ID>MaxLineLength:SquatMischief.kt:SquatMischief$ctx.pick("Je m'installe ici ! 😼", "Tu ne m'as pas vu ? Et là ? 😏", "Coucou ! Je bloque ? 😇")</ID>
     <ID>MaxLineLength:SquatMischief.kt:SquatMischief$val</ID>
     <ID>MaxLineLength:StationBehavior.kt:StationBehavior$/** Il y entre ([announce] = il le dit ; faux à la restauration au démarrage). Son activité est déjà [com.tamacookie.Act.IN_STATION]. */</ID>
-    <ID>MaxLineLength:StationController.kt:StationController$ctx.say(ctx.pick("Bonk ! Oh, le coffre s'ouvre ! 🎁", "Oups, j'ai cogné le coffre !", "Sésame, ouvre-toi ! ✨"), 2f)</ID>
     <ID>MaxLineLength:StationController.kt:StationController$for (s in all) if (shown(s) &amp;&amp; pet.species.accepts(s.kind) &amp;&amp; ctx.world.station(s.kind).canEnter(pet.id) &amp;&amp; s.contains(hx, hy, 12 * d)) { found = s.kind; break }</ID>
     <ID>MaxLineLength:StationController.kt:StationController$if</ID>
     <ID>MaxLineLength:StationController.kt:StationController$prefs.getFloat(Prefs.stationFx(k), -1f).let { if (it &lt; 0) arena.screenW * (0.2f + 0.2f * (i % 4)) else it * arena.screenW }</ID>
@@ -148,7 +146,6 @@
     <ID>MaxLineLength:StationControllerTest.kt:FakeStationPanels$override</ID>
     <ID>MaxLineLength:Toy.kt:Food$/** La nourriture (le coffre, la notification « Nourrir »). Effets sur les jauges ici, dessin dans [spec] (`Foods.kt`). */</ID>
     <ID>MaxLineLength:ToyController.kt:ToyController$c.x = (pet.body.fx + (if (rnd.nextBoolean()) 1 else -1) * (90 + rnd.nextFloat() * 120) * d).coerceIn(arena.minX, arena.maxX)</ID>
-    <ID>MaxLineLength:ToyController.kt:ToyController$if (pet.body.act == Act.PLAY &amp;&amp; hypot(t.vx, t.vy) &gt; 1500 * d) ctx.say(ctx.pick("Waouh, quel lancer !", "J'y vais !"), 1.6f)</ID>
     <ID>MaxLineLength:ToySpecTest.kt:ToySpecTest$assertTrue(Food.HAY.satiety &gt; Food.APPLE.satiety &amp;&amp; Food.HAY.health &gt; 0f &amp;&amp; Food.HAY.happiness &lt; Food.APPLE.happiness)</ID>
     <ID>MaxLineLength:Tuning.kt:Tuning$/** Animaux d'un même téléphone au plus (résident + compagnons) ; au-delà de [MAX_PETS_SHOWN], ils dorment hors écran. */</ID>
     <ID>MaxLineLength:WindowLayerTest.kt:WindowLayerTest$/** Aucune fenêtre n'en recouvre une d'une couche supérieure qu'elle chevauche (tailles inconnues = chevauchement). */</ID>

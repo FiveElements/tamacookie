@@ -2,10 +2,12 @@ package com.tamacookie
 
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.station.ChestStation
 import com.tamacookie.feature.station.StationBehavior
 import com.tamacookie.feature.station.StationCtx
 import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.station.StationPanels
+import com.tamacookie.feature.station.VetStation
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
 import java.util.EnumMap
@@ -389,8 +391,7 @@ class StationController(
         val side = if (pet.body.fx < cx) -1f else 1f
         if (ctx.actor.walkToward(pet, cx + side * 110 * d, 140 * d, dt)) {
             pet.body.facing = -side
-            ctx.say(ctx.pick("Je vais me servir ! 😋", "Hop, au coffre !", "Il y a sûrement des carottes là-dedans…",
-                "Je sais où sont les jouets ! 🎁"), 1.8f)
+            ctx.say(ctx.pick(*pet.species.lines.GOING_TO_CHEST), 1.8f)
             ctx.actor.jumpTo(pet, cx, s.y + s.h * 0.6f, Act.IDLE)
         }
     }
@@ -432,11 +433,11 @@ class StationController(
         ctx.haptic(pet, Haptic.KEYBOARD_TAP)
         pet.express(Expr.SURPRISED, 1f)
         if (ctx.world.hasToyOrFood()) {
-            ctx.say(ctx.pick("Bonk ! 😵", "Aïe, le coffre !"), 1.5f)
+            ctx.say(ctx.pick(*ChestStation.BUMPED), 1.5f)
         } else {
             chestPop = s
             chestPopFor = pet.id
-            ctx.say(ctx.pick("Bonk ! Oh, le coffre s'ouvre ! 🎁", "Oups, j'ai cogné le coffre !", "Sésame, ouvre-toi ! ✨"), 2f)
+            ctx.say(ctx.pick(*ChestStation.BUMPED_OPEN), 2f)
         }
     }
 
@@ -470,12 +471,12 @@ class StationController(
         closeVetPanel()
         panels.openVet(pet, get(StationKind.VET),
             onHeal = {
-                if (pet.stats.health >= ctx.rules.healthyAbove) ctx.say("Il va très bien ! ✅")
+                if (pet.stats.health >= ctx.rules.healthyAbove) ctx.say(VetStation.HEALTHY)
                 else {
                     ctx.on(pet, PetEvent.Healed)
                     ctx.emit(pet, PType.SPARKLE, 6)
                     pet.express(Expr.SAD, 1.5f)
-                    ctx.say(ctx.pick("Aïe ! … merci docteur 💉", "Même pas mal ! (un peu)"))
+                    ctx.say(ctx.pick(*VetStation.HEALED))
                 }
                 panels.refreshVet()
             },

@@ -1,6 +1,7 @@
 package com.tamacookie
 
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.mischief.HideSeekMischief
 import kotlin.random.Random
 
 /**
@@ -74,7 +75,7 @@ interface PetCtx {
      * La réplique vient du comportement de la station ([com.tamacookie.feature.station.StationBehavior.busyLine]).
      */
     fun sayIfBusy(pet: Pet = this.pet): Boolean {
-        if (pet.isHiding) { say("Je joue à cache-cache ! 🫣"); return true }
+        if (pet.isHiding) { say(HideSeekMischief.BUSY_LINE); return true }
         val k = world.stationOf(pet) ?: return false
         say(k.behavior.busyLine(this))
         return true

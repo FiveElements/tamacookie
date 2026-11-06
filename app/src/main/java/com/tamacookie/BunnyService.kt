@@ -391,7 +391,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     /** Un compagnon rejoint le résident (commande [PetCommands.ACTION_ADOPT_COMPANION]) : il tombe du ciel. */
     private fun adoptCompanion(a: Adoption) {
-        if (world.pets.size >= Tuning.MAX_PETS) { say("On est déjà assez nombreux ici ! 🐾"); return }
+        if (world.pets.size >= Tuning.MAX_PETS) { say(CommonLines.HOUSE_FULL); return }
         val rec = a.copy(isNew = true).apply(null, repo::newPetId, clock.wallMs())
         repo.addCompanion(rec)
         val p = Pet.fromRecord(rec, BunnyPhysics(arena.d), newPetRandom(rec.id))
@@ -432,7 +432,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         repo.remove(id)
         // Un compagnon qui dormait hors écran prend la place libérée
         for (q in shown.toList()) if (q.id !in petWindows) { dropIn(q); showPet(q) }
-        say("Au revoir ${p.name} ! 👋")
+        say(CommonLines.goodbye(p.name))
         updateNotification(force = true)
         requestFrames()
     }

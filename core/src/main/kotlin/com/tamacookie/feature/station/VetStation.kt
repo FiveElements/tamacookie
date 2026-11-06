@@ -12,6 +12,12 @@ object VetStation : StationBehavior {
 
     override fun busyLine(ctx: PetCtx) = "Je suis chez le docteur !"
 
+    // Répliques du soin (bouton « Soigner » de la fiche, `StationController`)
+    /** « Soigner » alors qu'il est en bonne santé. */
+    const val HEALTHY = "Il va très bien ! ✅"
+    /** Vacciné. */
+    val HEALED = arrayOf("Aïe ! … merci docteur 💉", "Même pas mal ! (un peu)")
+
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
         ctx.openVetPanel(pet)
         if (announce) ctx.say(ctx.pick("Bonjour docteur… 😳", "J'ai peur des piqûres…", "Ça va être long ?"))
