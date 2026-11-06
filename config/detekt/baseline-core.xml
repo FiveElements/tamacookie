@@ -1,0 +1,204 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:BalloonToy.kt:BalloonToy$h &lt; 320 * d &amp;&amp; p.vy &gt; -60 * d &amp;&amp; pet.mind.kickCooldown &lt;= 0f &amp;&amp; !ctx.userHolds</ID>
+    <ID>ComplexCondition:BalloonToy.kt:BalloonToy$hypot(p.x - fx, cy - (fy - 85 * d)) &lt; 42 * d &amp;&amp; p.vy &gt; -100 * d &amp;&amp; act != Act.DRAGGED &amp;&amp; act != Act.SLEEP</ID>
+    <ID>ComplexCondition:BunnyBrain.kt:BunnyBrain$!s.elsewhere &amp;&amp; s.platform == null &amp;&amp; rnd.nextFloat() &lt; species.behavior(s.personality).pageWanderChance &amp;&amp; s.canPageWander</ID>
+    <ID>ComplexCondition:BunnyBrain.kt:BunnyBrain$n != null &amp;&amp; !s.elsewhere &amp;&amp; n.act in Act.FREE &amp;&amp; n.distance &lt; SOCIAL_RANGE_DP * s.density &amp;&amp; rnd.nextFloat() &lt; species.behavior(s.personality).socialChance</ID>
+    <ID>ComplexCondition:BunnyPhysics.kt:BunnyPhysics$prevY &lt;= p.top + Tuning.PLATFORM_TOP_TOLERANCE_PX &amp;&amp; y &gt;= p.top &amp;&amp; x &gt;= p.left + margin &amp;&amp; x &lt;= p.right - margin</ID>
+    <ID>ComplexCondition:Director.kt:Director.BubbleQueue$c == null || remaining &lt;= 0f || c.pet == l.pet || l.priority &gt; c.priority</ID>
+    <ID>ComplexCondition:FrisbeeToy.kt:FrisbeeToy$airborne &amp;&amp; abs(dx) &lt; 90 * d &amp;&amp; h &gt; 60 * d &amp;&amp; h &lt; 240 * d &amp;&amp; pet.mind.kickCooldown &lt;= 0f &amp;&amp; !ctx.userHolds</ID>
+    <ID>ComplexCondition:FrisbeeToy.kt:FrisbeeToy$ctx.catchCooldown &lt;= 0f &amp;&amp; (act == Act.PLAY || act == Act.AIR) &amp;&amp; hypot(p.x - mouthX, cy - (fy - 55 * d)) &lt; 45 * d</ID>
+    <ID>ComplexCondition:HugSocial.kt:HugSocial$partner == null || pe == null || pe.interaction !== this || pe.partner != self.id</ID>
+    <ID>ComplexCondition:OverlayHost.kt:WindowTable$aw &lt;= 0 || ah &lt;= 0 || bw &lt;= 0 || bh &lt;= 0</ID>
+    <ID>ComplexCondition:PageTracker.kt:PageTracker$bunnyPage &lt;= 0 || pet.body.act in Act.NO_PAGE_FOLLOW || pw &lt;= 0f || scrollShown.isNaN()</ID>
+    <ID>ComplexCondition:PageTracker.kt:PageTracker$page != null &amp;&amp; pkg == s.launcherPkg &amp;&amp; pw &gt; 0f &amp;&amp; !scrollShown.isNaN()</ID>
+    <ID>ComplexCondition:PetBehavior.kt:PetBehavior$ev.onPlatform &amp;&amp; !lbl.isNullOrBlank() &amp;&amp; next == Act.IDLE &amp;&amp; rnd.nextFloat() &lt; 0.35f</ID>
+    <ID>ComplexCondition:PlushToy.kt:PlushToy$ctx.catchCooldown &lt;= 0f &amp;&amp; act == Act.PLAY &amp;&amp; !p.onGround &amp;&amp; hypot(p.x - fx, (p.y - p.h / 2f) - (fy - 40 * d)) &lt; 40 * d</ID>
+    <ID>ComplexCondition:ScreenSensorHub.kt:ScreenSensorHub$pkg != null &amp;&amp; pkg == launcherPkg &amp;&amp; scrollY == 0 &amp;&amp; scrollX &gt;= 0 &amp;&amp; (deltaX != 0 || scrollX != scroll.x1)</ID>
+    <ID>ComplexCondition:SquatMischief.kt:SquatMischief$level == 2 &amp;&amp; r.width &lt; 600 * d &amp;&amp; r.height &lt; 300 * d &amp;&amp; r.top &gt; a.topY + 120 * d</ID>
+    <ID>ComplexCondition:StationController.kt:StationController$bx + hw &lt; l || bx - hw &gt; r || fy &lt; t + 10 * d || fy - 95 * d &gt; b</ID>
+    <ID>ComplexCondition:StationController.kt:StationController$shown(s) &amp;&amp; pet.species.accepts(s.kind) &amp;&amp; ctx.world.station(s.kind).canEnter(pet.id) &amp;&amp; s.contains(hx, hy, 12 * d)</ID>
+    <ID>CyclomaticComplexMethod:AmbientAnimator.kt:AmbientAnimator$fun update: Boolean</ID>
+    <ID>CyclomaticComplexMethod:BunnyBrain.kt:BunnyBrain$fun decide: Decision</ID>
+    <ID>CyclomaticComplexMethod:BunnyPhysics.kt:BunnyPhysics$fun stepAir: AirEvent</ID>
+    <ID>CyclomaticComplexMethod:HugSocial.kt:HugSocial$override fun update: Boolean</ID>
+    <ID>CyclomaticComplexMethod:PetBehavior.kt:PetBehavior$fun update</ID>
+    <ID>CyclomaticComplexMethod:PetRules.kt:PetRules$fun apply: Result</ID>
+    <ID>CyclomaticComplexMethod:PetRules.kt:PetRules$private fun elapsed: Result</ID>
+    <ID>CyclomaticComplexMethod:PetSnapshot.kt:PetSnapshot.Companion$fun decode: Decoded</ID>
+    <ID>CyclomaticComplexMethod:RabbitLines.kt:RabbitLines$override fun appComments: Array&lt;String&gt;</ID>
+    <ID>CyclomaticComplexMethod:ScreenScan.kt:ScreenScan$fun &lt;N&gt; walk: Walk</ID>
+    <ID>CyclomaticComplexMethod:ScreenSensorHub.kt:ScreenSensorHub$private fun ScreenSnapshot.settle: ScreenSnapshot</ID>
+    <ID>CyclomaticComplexMethod:SocialSystem.kt:SocialSystem$fun update</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:BunnyPhysicsTest.kt:BunnyPhysicsTest$(fx, fy, tx, ty)</ID>
+    <ID>LargeClass:BunnyPhysicsTest.kt:BunnyPhysicsTest</ID>
+    <ID>LongMethod:PetBehavior.kt:PetBehavior$fun update</ID>
+    <ID>LongMethod:PetRules.kt:PetRules$fun apply: Result</ID>
+    <ID>LoopWithTooManyJumpStatements:Director.kt:Director$for</ID>
+    <ID>LoopWithTooManyJumpStatements:FrameLoopTest.kt:FrameLoopTest.FakeScheduler$while</ID>
+    <ID>LoopWithTooManyJumpStatements:Mischief.kt:Mischiefs$for</ID>
+    <ID>LoopWithTooManyJumpStatements:MischiefController.kt:MischiefController$for</ID>
+    <ID>LoopWithTooManyJumpStatements:OverlayHost.kt:WindowTable$for</ID>
+    <ID>LoopWithTooManyJumpStatements:ScreenScan.kt:ScreenScan$while</ID>
+    <ID>LoopWithTooManyJumpStatements:SocialSystem.kt:SocialSystem$for</ID>
+    <ID>MaxLineLength:AmbientAnimator.kt:AmbientAnimator$rnd.nextFloat(-10f, 10f) * d</ID>
+    <ID>MaxLineLength:BowlStation.kt:BowlStation$pet.stats.satiety &lt; ctx.rules.bowlHungryBelow &amp;&amp; !pet.wouldRefuse(PetEvent.Fed(FOOD), ctx.clock.wallMs(), ctx.rules)</ID>
+    <ID>MaxLineLength:BunnyBrain.kt:Act.Companion$val</ID>
+    <ID>MaxLineLength:BunnyBrain.kt:BunnyBrain$if</ID>
+    <ID>MaxLineLength:BunnyBrain.kt:BunnyBrain$if (r &lt; 0.30f) return Decision.JumpDown((s.x + (rnd.nextFloat() * 2f - 1f) * 160 * d).coerceIn(s.minX, s.maxX))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals("$p $h h", Decision.Sleep, BunnyBrain(Scripted()).decide(input(energy = 0f, hour = h, personality = p)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.Hop(-1300f, -180f), BunnyBrain(scripted(0.9f, 0.6f)).decide(input(facing = -1f, density = 2f)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.JumpDown(660f), BunnyBrain(scripted(0f, 0.75f)).decide(input(platform = cur, density = 2f)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.JumpDown(MAX_X), BunnyBrain(scripted(0f, 0.99f)).decide(input(platform = icon(1000f), x = 1000f)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.JumpDown(MIN_X), BunnyBrain(scripted(0f, 0f)).decide(input(platform = icon(60f), x = 60f)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.JumpToPlatform(0, icon(1039f)), BunnyBrain(Zero).pickPlatform(input(platforms = listOf(icon(1039f)))))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.JumpToPlatform(0, icon(531f)), BunnyBrain(Zero).pickPlatform(input(platforms = listOf(icon(531f)))))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(Decision.TurnAround(3.5f), BunnyBrain(scripted(0.45f, 0.5f)).decide(s.copy(platforms = listOf(cur))))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(MAX_X, (BunnyBrain(scripted(0.9f, 0.2f, 0.999f)).decide(input(x = 1000f)) as Decision.Walk).targetX, EPS)</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(MIN_X, (BunnyBrain(scripted(0.9f, 0.2f, 0f)).decide(input(x = 100f)) as Decision.Walk).targetX, EPS)</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(retMax - 1, BunnyBrain(Scripted(ints = listOf(Tuning.PAGE_RETURN_RAND_MS - 1))).pageReturnDelayMs())</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertEquals(wMax - 1, BunnyBrain(Scripted(ints = listOf(Tuning.PAGE_WANDER_RAND_MS - 1))).pageWanderDurationMs())</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertFalse(BunnyBrain(Scripted()).wantsSleep(input(energy = 70f, hour = 23, personality = Personality.PLAYFUL)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertFalse(BunnyBrain(scripted(0.5f)).wantsSleep(input(energy = 30f, hour = 14, personality = Personality.LAZY)))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$assertTrue(BunnyBrain.attentionThresholdMs(1, Personality.PLAYFUL) &lt; BunnyBrain.attentionThresholdMs(0, Personality.PLAYFUL))</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$if (BunnyBrain(it).wantsSleep(input(energy = 50f, hour = 14, personality = Personality.PLAYFUL))) playfulSlept++</ID>
+    <ID>MaxLineLength:BunnyBrainTest.kt:BunnyBrainTest$val d = brain.decide(input(satiety = 10f, chestVisible = true, nowMs = 1_000_000L, canPageWander = true)) { true }</ID>
+    <ID>MaxLineLength:BunnyPhysics.kt:BunnyPhysics$/** Saut balistique pour atterrir précisément en (tx, ty), avec un sommet [apexRise] px au-dessus du plus haut des deux points. */</ID>
+    <ID>MaxLineLength:BunnyPhysicsTest.kt:BunnyPhysicsTest$private</ID>
+    <ID>MaxLineLength:CarrotDispute.kt:CarrotDispute$private val LOSER = arrayOf("Hé ! C'était pour moi !", "Pfff, trop rapide 😤", "La prochaine est à moi !", "C'est pas juste !")</ID>
+    <ID>MaxLineLength:ChewEdgeMischief.kt:ChewEdgeMischief$ctx.say(ctx.pick("Miam, le bord de l'écran ! 😋", "Croc croc… ça croustille !", "Il a un goût de pixel…"), 2.5f)</ID>
+    <ID>MaxLineLength:Clock.kt:Clock$/** Temps monotone depuis le démarrage (ms), pour les durées et le défilement (`SystemClock.uptimeMillis` sur Android). */</ID>
+    <ID>MaxLineLength:Director.kt:Director.BubbleQueue$val next = queue.maxWithOrNull(compareBy&lt;Line&gt; { it.priority }.thenByDescending { it.waited }) ?: return null</ID>
+    <ID>MaxLineLength:DirectorTest.kt:DirectorTest$assertEquals(NotifierTexts.alertText(a.name, a.stats.mood), dir.alerts { NotifierTexts.alertText(it.name, it.stats.mood) })</ID>
+    <ID>MaxLineLength:DirectorTest.kt:DirectorTest$assertNull(dir.alerts { NotifierTexts.alertText(it.name, it.stats.mood) })</ID>
+    <ID>MaxLineLength:FakePetCtx.kt:FakePetCtx$override fun setAway</ID>
+    <ID>MaxLineLength:FrameLoopTest.kt:FrameLoopTest$assertTrue("$pose à $fps i/s : ${h.redraws} redessins / ${h.steps}", h.redraws == h.steps &amp;&amp; h.steps &gt; 3 * fps * 3 / 4)</ID>
+    <ID>MaxLineLength:FrisbeeToy.kt:FrisbeeToy$ctx.actor.jump(pet, BunnyPhysics.impulseForHeight(pet.body.phys.gravity, (h - 30 * d).coerceAtLeast(10 * d)), dx * 2.5f, then = Act.PLAY)</ID>
+    <ID>MaxLineLength:FrisbeeToy.kt:FrisbeeToy$if</ID>
+    <ID>MaxLineLength:FrisbeeToy.kt:FrisbeeToy$if (abs(tx - pet.body.fx) &gt; 24 * d) ctx.actor.walkToward(pet, tx, 230 * d, dt, stopDist = 24 * d) else pet.body.pose = Pose.IDLE</ID>
+    <ID>MaxLineLength:GardenStation.kt:GardenStation$ctx.say(ctx.pick("Quel bonheur, l'herbe ! 🌿", "Un peu de terre… mais heureux !", "J'ai trouvé un trèfle !"))</ID>
+    <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$ctx.actor</ID>
+    <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$ctx.say(ctx.pick("Cache-cache ! Compte jusqu'à 10… 🙈", "Tu ne me trouveras jamais ! 🫣", "Attrape-moi si tu peux !"), 2.5f)</ID>
+    <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$if</ID>
+    <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$override</ID>
+    <ID>MaxLineLength:Look.kt:Look.Companion$accessory = if (accessory in 0 until Accessory.LEGACY_COUNT) Accessory.entries[accessory] else Accessory.NONE</ID>
+    <ID>MaxLineLength:Look.kt:Look.Companion$fun</ID>
+    <ID>MaxLineLength:LookTest.kt:LookTest$// hors bornes : comme avant l'évolution 4b (dernier pelage d'alors, pas d'accessoire), jamais une option ajoutée</ID>
+    <ID>MaxLineLength:LookTest.kt:LookTest$assertEquals(listOf(Accessory.CROWN, Accessory.BANDANA, Accessory.BOW_TIE), Accessory.entries.drop(Accessory.LEGACY_COUNT))</ID>
+    <ID>MaxLineLength:LookTest.kt:LookTest$val all: List&lt;List&lt;LookOption&gt;&gt; = listOf(Fur.entries, Ears.entries, EyeColor.entries, Pattern.entries, Accessory.entries, AccColor.entries)</ID>
+    <ID>MaxLineLength:MenuEntry.kt:MenuEntries$/** Chanter : il chante (des notes) et danse s'il est libre ; endormi, c'est une berceuse (il ne se réveille pas). */</ID>
+    <ID>MaxLineLength:MenuEntry.kt:MenuEntries$private</ID>
+    <ID>MaxLineLength:MenuEntryTest.kt:MenuEntryTest$for (e in MenuEntries.ALL.filter { !it.dynamic }) assertEquals("${e.emoji}\n${e.label}", e.text(FakePetCtx().pet.stats))</ID>
+    <ID>MaxLineLength:MischiefController.kt:MischiefController$ctx.director.mischiefOwner()?.let { return it.takeIf { o -&gt; ctx.world.isShown(o) &amp;&amp; !o.stats.sleeping &amp;&amp; ctx.world.stationOf(o) == null } }</ID>
+    <ID>MaxLineLength:MischiefTest.kt:MischiefTest$assertEquals</ID>
+    <ID>MaxLineLength:MischiefTest.kt:MischiefTest$assertEquals(BunnyBrain.attentionThresholdMs(1, Personality.PLAYFUL) / 2, BunnyBrain.attentionThresholdMs(1, Personality.PRANKSTER))</ID>
+    <ID>MaxLineLength:MischiefTest.kt:MischiefTest$for (m in Mischiefs.ALL) for (level in 0..2) assertEquals("$p $m", m.chance(level), m.chance(level, mods), 0f)</ID>
+    <ID>MaxLineLength:PageTracker.kt:PageTracker$if</ID>
+    <ID>MaxLineLength:PageTracker.kt:PageTracker$if (pw &lt;= 0f || bunnyPage &lt;= 0) { pet.body.fx = pet.body.fx.coerceIn(arena.minX, arena.maxX); pet.setAct(Act.IDLE, 2f); return }</ID>
+    <ID>MaxLineLength:PageTracker.kt:PageTracker$pet.body.targetX = (pet.body.fx + wanderDir * (150 + ctx.rnd.nextFloat() * 350) * d).coerceIn(arena.minX, arena.maxX)</ID>
+    <ID>MaxLineLength:PageTracker.kt:PageTracker$pet.body.targetX = if (fromLeft) w * (0.15f + ctx.rnd.nextFloat() * 0.3f) else w * (0.55f + ctx.rnd.nextFloat() * 0.3f)</ID>
+    <ID>MaxLineLength:Pet.kt:PetId$/** Identifiant stable d'un animal : UUID créé à l'adoption (ou à la migration), clé de la persistance et des échanges. */</ID>
+    <ID>MaxLineLength:PetBehavior.kt:PetBehavior$x = b.fx</ID>
+    <ID>MaxLineLength:PetRenderStateTest.kt:PetRenderStateTest$private</ID>
+    <ID>MaxLineLength:PetRules.kt:PetEvent$/** Ce qui fait évoluer les jauges. [savesNow] : l'hôte sauvegarde aussitôt (sinon à la prochaine sauvegarde périodique). */</ID>
+    <ID>MaxLineLength:PetRules.kt:PetRules$PetEvent.Healed -&gt; done(s.copy(health = s.health + r.healHealth, happiness = s.happiness - r.healJoyCost), r)</ID>
+    <ID>MaxLineLength:PetRules.kt:PetRules$val energy = s.energy + if (s.sleeping) r.energyGainAsleepPerH * hours else -r.energyLossPerH * hours * p.mod(StatMod.ENERGY_LOSS)</ID>
+    <ID>MaxLineLength:PetRules.kt:PetRules$val gain = (if (now - s.lastPetAt &lt; r.petCooldownMs) r.petJoyRepeated else r.petJoy) * p.mod(StatMod.PET_JOY)</ID>
+    <ID>MaxLineLength:PetRules.kt:PetRules$val health = s.health + if (neglect &gt; 0) -r.healthLossPerNeglectPerH * neglect * hours else r.healthGainPerH * hours</ID>
+    <ID>MaxLineLength:PetRulesTest.kt:PetRulesTest$assertEquals(40f + r.bedEnergyGainPerH * 2f, on(PetStats(energy = 40f, sleeping = true), PetEvent.Rested(2f)).stats.energy, eps)</ID>
+    <ID>MaxLineLength:PetRulesTest.kt:PetRulesTest$assertEquals(50f + 6f * 1.6f, on(PetStats(happiness = 50f), Petted, Traits(Personality.CUDDLY)).stats.happiness, eps)</ID>
+    <ID>MaxLineLength:PetRulesTest.kt:PetRulesTest$for (v in listOf(s.satiety, s.happiness, s.energy, s.cleanliness, s.health)) assertTrue("valeur $v", v in 0f..100f)</ID>
+    <ID>MaxLineLength:PetRulesTest.kt:PetRulesTest$h = mix(h, s.satiety, s.happiness, s.energy, s.cleanliness, s.health, s.sleeping, s.poops, s.poopAccumulator, s.visitedApps)</ID>
+    <ID>MaxLineLength:PetRulesTest.kt:PetRulesTest$private fun on</ID>
+    <ID>MaxLineLength:PetRulesTest.kt:PetRulesTest$val run = on(PetStats(energy = 50f, happiness = 50f, satiety = 50f), PetEvent.WheelRun, Traits(Personality.LAZY))</ID>
+    <ID>MaxLineLength:PetSnapshot.kt:PetSnapshot$fun put</ID>
+    <ID>MaxLineLength:PetSnapshot.kt:PetSnapshot.Companion$/** Nom reçu : caractères de contrôle → espaces, caractères de format (sens d'écriture…) retirés, espaces normalisés, tronqué ; vide → nom par défaut. */</ID>
+    <ID>MaxLineLength:PetSnapshot.kt:PetSnapshot.Companion$if (text.length &gt; MAX_BYTES || text.toByteArray(Charsets.UTF_8).size &gt; MAX_BYTES) return reject(Reason.TOO_LARGE)</ID>
+    <ID>MaxLineLength:PetStore.kt:PetRecord$/** Ce qui est sauvegardé d'un animal (Kotlin pur). [lastUpdate] : dernière sauvegarde, pour le rattrapage hors-ligne. */</ID>
+    <ID>MaxLineLength:PetStore.kt:PetStore.Companion$fun</ID>
+    <ID>MaxLineLength:PetTest.kt:PetTest$assertEquals(rec.copy(identity = rec.identity.copy(name = "Noisette")), a.toRecord().copy(lastUpdate = rec.lastUpdate))</ID>
+    <ID>MaxLineLength:PlushToy.kt:PlushToy$if (before &lt; 4f) pet.body.targetX = (pet.body.fx + (rnd.nextFloat() * 2f - 1f) * a.screenW * 0.3f).coerceIn(a.minX, a.maxX)</ID>
+    <ID>MaxLineLength:PlushToy.kt:PlushToy$if (pet.stats.energy &lt; ctx.rules.plushNapEnergyBelow) { ctx.say("Dodo avec mon doudou… 💤"); ctx.startSleep(pet); return }</ID>
+    <ID>MaxLineLength:PlushToy.kt:PlushToy$if (rnd.nextFloat() &lt; dt * 2.5f) { ctx.emit(pet, PType.HEART); ctx.on(pet, PetEvent.PlayHit(Toy.PLUSH, 0.6f)) }</ID>
+    <ID>MaxLineLength:Prefs.kt:Prefs$*</ID>
+    <ID>MaxLineLength:RabbitLines.kt:RabbitLines$Mood.HAPPY -&gt; arrayOf("La vie est belle ! ✨", "♪ La la la ♫", "Je t'aime bien 💕", "Tu fais quoi ?", "Il fait beau sur ton écran !")</ID>
+    <ID>MaxLineLength:RabbitLines.kt:RabbitLines$Season.CHRISTMAS -&gt; arrayOf("Joyeux Noël ! 🎄", "Il neige sur ton écran ! ❄️", "Le Père Noël aime les carottes ? 🎅")</ID>
+    <ID>MaxLineLength:RabbitLines.kt:RabbitLines$else -&gt; arrayOf("Coucou $label !", "Oh, $label ! On fait quoi ici ?", "Je visite $label 🐾", "C'est joli chez $label")</ID>
+    <ID>MaxLineLength:RabbitLines.kt:RabbitLines$override val PETTED = arrayOf("Hihi ! 💕", "Encore !", "J'adore les câlins", "Mmmh…", "Tu es gentil·le !", "*ronronne* (oui, les lapins aussi)")</ID>
+    <ID>MaxLineLength:RopeToy.kt:RopeToy$if (!p.onGround || ctx.catchCooldown &gt; 0f) { pet.body.pose = Pose.IDLE; ctx.actor.faceToward(pet, p.x); return }</ID>
+    <ID>MaxLineLength:ScreenScanTest.kt:ScreenScanTest$val w = walk(icon(100f, 600f, "x".repeat(50)), Node(Box(300f, 600f, 400f, 700f), desc = "Caché", clickable = true, visible = false))</ID>
+    <ID>MaxLineLength:ScreenSensorHub.kt:ScreenSensorHub$if (signals.size &gt;= MAX_SIGNALS) signals.removeAt(0)</ID>
+    <ID>MaxLineLength:SeasonTest.kt:SeasonTest$if (season == Season.NONE) assertEquals(0, lines.size) else assertTrue("${s.id} $season", lines.isNotEmpty())</ID>
+    <ID>MaxLineLength:SeasonTest.kt:SeasonTest$val clock = FakeClock(wall = ZonedDateTime.of(2026, 11, 30, 23, 59, 30, 0, ZoneOffset.UTC).toInstant().toEpochMilli())</ID>
+    <ID>MaxLineLength:SocialSystemTest.kt:SocialSystemTest$return c.first.mind.social?.interaction?.javaClass?.simpleName + "/" + b.mind.social?.interaction?.javaClass?.simpleName</ID>
+    <ID>MaxLineLength:SpeciesTest.kt:SpeciesTest$assertEquals(BehaviorMods(attentionFactor = 0.5f, mischiefChanceFactor = 1.5f), Rabbit.behavior(Personality.PRANKSTER))</ID>
+    <ID>MaxLineLength:SpeciesTest.kt:SpeciesTest$assertEquals(BehaviorMods(pageWanderChance = 0.12f, platformChance = 0.6f), Rabbit.behavior(Personality.CURIOUS))</ID>
+    <ID>MaxLineLength:SpeechTest.kt:SpeechTest$assertEquals("se cache… trouve-le sur une autre page ! 🫣", NotifierTexts.moodText(Mood.SICK, false, hiding = true))</ID>
+    <ID>MaxLineLength:SquatMischief.kt:SquatMischief$ctx.pick("C'est MON bouton maintenant 😼", "Tu voulais appuyer ici ? Trop tard ! 😜")</ID>
+    <ID>MaxLineLength:SquatMischief.kt:SquatMischief$ctx.pick("Je m'installe ici ! 😼", "Tu ne m'as pas vu ? Et là ? 😏", "Coucou ! Je bloque ? 😇")</ID>
+    <ID>MaxLineLength:SquatMischief.kt:SquatMischief$val</ID>
+    <ID>MaxLineLength:StationBehavior.kt:StationBehavior$/** Il y entre ([announce] = il le dit ; faux à la restauration au démarrage). Son activité est déjà [com.tamacookie.Act.IN_STATION]. */</ID>
+    <ID>MaxLineLength:StationController.kt:StationController$ctx.say(ctx.pick("Bonk ! Oh, le coffre s'ouvre ! 🎁", "Oups, j'ai cogné le coffre !", "Sésame, ouvre-toi ! ✨"), 2f)</ID>
+    <ID>MaxLineLength:StationController.kt:StationController$for (s in all) if (shown(s) &amp;&amp; pet.species.accepts(s.kind) &amp;&amp; ctx.world.station(s.kind).canEnter(pet.id) &amp;&amp; s.contains(hx, hy, 12 * d)) { found = s.kind; break }</ID>
+    <ID>MaxLineLength:StationController.kt:StationController$if</ID>
+    <ID>MaxLineLength:StationController.kt:StationController$prefs.getFloat(Prefs.stationFx(k), -1f).let { if (it &lt; 0) arena.screenW * (0.2f + 0.2f * (i % 4)) else it * arena.screenW }</ID>
+    <ID>MaxLineLength:StationController.kt:StationController$private val handlers: Array&lt;ActHandler&gt; = Array(StationKind.entries.size) { InStation(StationKind.entries[it].behavior) }</ID>
+    <ID>MaxLineLength:StationControllerTest.kt:FakeStationPanels$override</ID>
+    <ID>MaxLineLength:Toy.kt:Food$/** La nourriture (le coffre, la notification « Nourrir »). Effets sur les jauges ici, dessin dans [spec] (`Foods.kt`). */</ID>
+    <ID>MaxLineLength:ToyController.kt:ToyController$c.x = (pet.body.fx + (if (rnd.nextBoolean()) 1 else -1) * (90 + rnd.nextFloat() * 120) * d).coerceIn(arena.minX, arena.maxX)</ID>
+    <ID>MaxLineLength:ToyController.kt:ToyController$if (pet.body.act == Act.PLAY &amp;&amp; hypot(t.vx, t.vy) &gt; 1500 * d) ctx.say(ctx.pick("Waouh, quel lancer !", "J'y vais !"), 1.6f)</ID>
+    <ID>MaxLineLength:ToySpecTest.kt:ToySpecTest$assertTrue(Food.HAY.satiety &gt; Food.APPLE.satiety &amp;&amp; Food.HAY.health &gt; 0f &amp;&amp; Food.HAY.happiness &lt; Food.APPLE.happiness)</ID>
+    <ID>MaxLineLength:Tuning.kt:Tuning$/** Animaux d'un même téléphone au plus (résident + compagnons) ; au-delà de [MAX_PETS_SHOWN], ils dorment hors écran. */</ID>
+    <ID>MaxLineLength:WindowLayerTest.kt:WindowLayerTest$/** Aucune fenêtre n'en recouvre une d'une couche supérieure qu'elle chevauche (tailles inconnues = chevauchement). */</ID>
+    <ID>NestedBlockDepth:ScreenScan.kt:ScreenScan$fun &lt;N&gt; walk: Walk</ID>
+    <ID>ReturnCount:BunnyBrain.kt:BunnyBrain$fun decide: Decision</ID>
+    <ID>ReturnCount:BunnyBrain.kt:BunnyBrain$fun pickPlatform: Decision.JumpToPlatform?</ID>
+    <ID>ReturnCount:BunnyPhysics.kt:BunnyPhysics$fun stepAir: AirEvent</ID>
+    <ID>ReturnCount:Director.kt:Director.BubbleQueue$fun request: Boolean</ID>
+    <ID>ReturnCount:Director.kt:Director.BubbleQueue$fun tick: Line?</ID>
+    <ID>ReturnCount:HugSocial.kt:HugSocial$override fun update: Boolean</ID>
+    <ID>ReturnCount:MischiefController.kt:MischiefController$private fun reactingPet: Pet?</ID>
+    <ID>ReturnCount:OverlayHost.kt:WindowTable$private fun inverted: Int?</ID>
+    <ID>ReturnCount:PageTracker.kt:PageTracker$fun anchorOffset: Float</ID>
+    <ID>ReturnCount:PetBehavior.kt:PetBehavior$fun onAppChanged</ID>
+    <ID>ReturnCount:PetBehavior.kt:PetBehavior$fun update</ID>
+    <ID>ReturnCount:PetRules.kt:PetRules$fun apply: Result</ID>
+    <ID>ReturnCount:PetSnapshot.kt:PetSnapshot.Companion$fun decode: Decoded</ID>
+    <ID>ReturnCount:PlushToy.kt:PlushToy$override fun play</ID>
+    <ID>ReturnCount:SquatMischief.kt:SquatMischief$override fun react: Boolean</ID>
+    <ID>ReturnCount:StationController.kt:StationController$fun checkChestBump</ID>
+    <ID>ReturnCount:World.kt:World$fun isShown: Boolean</ID>
+    <ID>SwallowedException:OverlayHost.kt:WindowTable$ex: Exception</ID>
+    <ID>TooGenericExceptionCaught:FrameLoop.kt:FrameLoop$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:OverlayHost.kt:WindowTable$ex: Exception</ID>
+    <ID>TooManyFunctions:HideSeekMischief.kt:HideSeekMischief : Mischief</ID>
+    <ID>TooManyFunctions:OverlayHost.kt:WindowTable&lt;W : Any&gt; : OverlayHost</ID>
+    <ID>TooManyFunctions:PageTracker.kt:PageTracker</ID>
+    <ID>TooManyFunctions:PetCtx.kt:PetCtx</ID>
+    <ID>TooManyFunctions:ScreenSensorHub.kt:ScreenSensorHub : ScreenSensor</ID>
+    <ID>TooManyFunctions:StationController.kt:StationController</ID>
+    <ID>TooManyFunctions:ToyController.kt:ToyController</ID>
+    <ID>TooManyFunctions:World.kt:World</ID>
+    <ID>UnusedParameter:ToyController.kt:ToyController$dt: Float</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Menu --- val GETTING_UP: String</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Plateformes et chutes --- val PLATFORM_LOST: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Toucher, glisser, lancer --- val FOUND_WHILE_DRAGGED: String</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Vie quotidienne --- val POOPED: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Voyage d'application en application --- val FOLLOWING: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val ATE: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val DRAGGED: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val GOING_TO_SLEEP: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val HARD_LANDING_GROUND: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val HARD_LANDING_PLATFORM: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val NOT_TIRED: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val PETTED: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val SHOWN: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val THROWN: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val TICKLED: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val WELCOME_BACK: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val WOKEN_BY_TAP: Array&lt;String&gt;</ID>
+    <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$val WOKE_UP: Array&lt;String&gt;</ID>
+  </CurrentIssues>
+</SmellBaseline>

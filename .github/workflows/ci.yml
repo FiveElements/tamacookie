@@ -29,8 +29,22 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       # Deux modules : :core (Kotlin/JVM pur, `test` + `jacocoTestReport`) et :app (Android, AGP).
-      - name: Tests unitaires, couverture, lint et APK debug
-        run: ./gradlew --no-daemon :core:test :core:jacocoTestReport testDebugUnitTest createDebugUnitTestCoverageReport lintDebug assembleDebug
+      # `detekt` (les deux modules) échoue sur tout problème absent des baselines (config/detekt/).
+      # `--continue` : un échec de detekt n'empêche pas les tests, le lint et l'APK de tourner (et d'être rapportés).
+      - name: Tests unitaires, couverture, detekt, lint et APK debug
+        run: ./gradlew --no-daemon --continue :core:test :core:jacocoTestReport testDebugUnitTest createDebugUnitTestCoverageReport detekt lintDebug assembleDebug
+
+      # Rapports detekt (HTML, SARIF, XML, Markdown) par module, même en cas d'échec ; le SARIF part ensuite
+      # dans GitHub code scanning (job `detekt-sarif`).
+      - name: Rapports detekt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: detekt-reports
+          path: |
+            core/build/reports/detekt/
+            app/build/reports/detekt/
+          if-no-files-found: ignore
 
       # Un dossier par module dans l'artefact : coverage/core/ (jacocoTestReport.xml + html/), coverage/app/ (report.xml + html).
       - name: Rassembler les rapports de couverture
@@ -68,6 +82,39 @@ jobs:
         with:
           name: tamacookie-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+  # Envoi des résultats detekt à GitHub code scanning (onglet Security). Job à part : seul à avoir
+  # `security-events: write`. Tourne même si le build a échoué (c'est là que les alertes servent).
+  detekt-sarif:
+    name: detekt → code scanning
+    needs: build
+    # PR venue d'un fork : pas de jeton en écriture, on n'essaie pas.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: detekt-reports
+          path: detekt
+
+      # Chemins du SARIF relatifs à la racine du dépôt (%SRCROOT%) : rien à réécrire. Une catégorie par module.
+      - name: SARIF :core
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: detekt/core/build/reports/detekt/detekt.sarif
+          category: detekt-core
+
+      - name: SARIF :app
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        with:
+          sarif_file: detekt/app/build/reports/detekt/detekt.sarif
+          category: detekt-app
 
   # Badge de couverture sans service externe : SVG généré depuis le rapport JaCoCo et publié sur la branche `badges`.
   coverage-badge:

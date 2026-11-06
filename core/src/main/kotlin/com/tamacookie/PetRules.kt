@@ -189,8 +189,8 @@ object PetRules {
         if (hours <= 0f) return Result(s0)
         var s = s0
         val sleepFactor = if (s.sleeping) r.sleepSlowdown else 1f
-        var satiety = s.satiety - r.satietyLossPerH * hours * sleepFactor * p.mod(StatMod.SATIETY_LOSS)
-        var happiness = s.happiness - (if (s.poops > 0) r.happinessLossWithPoopPerH else r.happinessLossPerH) * hours *
+        val satiety = s.satiety - r.satietyLossPerH * hours * sleepFactor * p.mod(StatMod.SATIETY_LOSS)
+        val happiness = s.happiness - (if (s.poops > 0) r.happinessLossWithPoopPerH else r.happinessLossPerH) * hours *
             sleepFactor * p.mod(StatMod.HAPPINESS_LOSS) * (if (s.caged) r.cagedHappinessFactor else 1f)
         val cleanliness = s.cleanliness - (r.cleanlinessLossPerH + s.poops * r.cleanlinessLossPerPoopPerH) * hours
         val energy = s.energy + if (s.sleeping) r.energyGainAsleepPerH * hours else -r.energyLossPerH * hours * p.mod(StatMod.ENERGY_LOSS)

@@ -1,0 +1,45 @@
+# Configuration detekt de TamaCookie (étape 8b) — modules :core et :app.
+#
+# Base : règles par défaut de detekt (`buildUponDefaultConfig = true` dans build.gradle.kts) ; ce fichier ne
+# contient QUE les écarts au style du projet, chacun justifié. L'existant est figé dans les baselines
+# (config/detekt/baseline-core.xml, baseline-app.xml) : tout NOUVEAU problème fait échouer `./gradlew detekt`.
+# Valeurs par défaut complètes : `./gradlew :core:detektGenerateConfig` (dans un fichier temporaire).
+
+config:
+  validation: true
+
+complexity:
+  # Les tests et les faux (FakePetCtx, FakeStationCtx…) implémentent des ports entiers : beaucoup de petites
+  # fonctions par classe, c'est leur rôle. Le code de production reste soumis à la règle (le service et les
+  # contrôleurs sont dans la baseline, pas exclus : un nouveau dépassement doit se voir).
+  TooManyFunctions:
+    excludes: ['**/test/**']
+
+naming:
+  # Tests : phrases en français (`fun \`il marche vers la cible\`()`, accents, `_`) — convention du projet.
+  # (Déjà exclu par défaut ; rappelé ici pour qu'un changement de défaut ne le casse pas.)
+  FunctionNaming:
+    excludes: ['**/test/**']
+
+style:
+  # Longueur de ligne du projet : 120 (le défaut de detekt, fixé ici explicitement). Les lignes plus longues
+  # existantes (souvent des commentaires) sont dans la baseline.
+  MaxLineLength:
+    maxLineLength: 120
+  # Un jeu dessiné au Canvas : proportions des dessins (RabbitRenderer, *Drawer), physique des jouets,
+  # probabilités du cerveau… ~1 700 signalements, dont aucun n'aurait gagné à devenir une constante nommée.
+  # Les valeurs qui comptent sont déjà nommées (Tuning, GameRules, SpeciesSpec, BehaviorMods).
+  MagicNumber:
+    active: false
+  # Style du projet : les gardes en tête de fonction (`if (pet.asleep) return`) ne comptent pas.
+  ReturnCount:
+    excludeGuardClauses: true
+  # Inactive par défaut. Elle demande la résolution de types : sans effet sous `detekt` (la tâche de la CI),
+  # active sous `detektMain` / `detektTest` (audit manuel, voir CLAUDE.md).
+  UnusedImport:
+    active: true
+
+empty-blocks:
+  # Les faux des tests et les rappels Android imposés (`onInterrupt`, écouteurs) sont des `override` vides.
+  EmptyFunctionBlock:
+    ignoreOverridden: true

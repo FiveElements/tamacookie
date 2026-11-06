@@ -176,7 +176,7 @@ class StationController(
             ctx.setAway(p, false)
             k.behavior.onShownAgain(sctx, p, onScreen = off == 0f)
         }
-        pages.split(st.anchor ?: "").second?.let { pages.bunnyPage = it }
+        pages.split(st.anchor.orEmpty()).second?.let { pages.bunnyPage = it }
     }
 
     /** Animation des stations au décor animé (baignoire) et rafraîchissement du panneau véto. */

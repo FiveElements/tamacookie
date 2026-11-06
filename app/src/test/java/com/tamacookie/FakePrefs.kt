@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 
