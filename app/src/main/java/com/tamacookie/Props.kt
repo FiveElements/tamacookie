@@ -145,9 +145,12 @@ class PropView(context: Context, val kind: Kind) : View(context) {
 }
 
 /** Objet flottant + sa fenêtre et sa petite physique. */
-class Prop(val view: PropView, val lp: WindowManager.LayoutParams) {
-    var x = 0f; var y = 0f; var vx = 0f; var vy = 0f
-    var onGround = false
+class Prop(val view: PropView, val lp: WindowManager.LayoutParams) : Body {
+    override var x = 0f
+    override var y = 0f
+    override var vx = 0f
+    override var vy = 0f
+    override var onGround = false
     var age = 0f
     var attached = false
     var held = false          // tenu par le lapin
