@@ -11,9 +11,14 @@ import kotlin.random.Random
  * ce qui permet de tester les choix de répliques en JVM.
  */
 class Speech(
-    private val rnd: Random,
+    /** Aléatoire du tirage : celui de l'animal qui parle (relu à chaque tirage). */
+    private val rndOf: () -> Random,
     private val show: (text: String, seconds: Float) -> Unit,
 ) {
+    constructor(rnd: Random, show: (text: String, seconds: Float) -> Unit) : this({ rnd }, show)
+
+    private val rnd: Random get() = rndOf()
+
     fun say(text: String, seconds: Float = DEFAULT_SECONDS) = show(text, seconds)
 
     /** Dit une réplique tirée au hasard dans [lines]. */

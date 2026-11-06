@@ -60,7 +60,8 @@ class ToyController(private val ctx: PetCtx) {
         acts.register(Act.EAT) { eating }
     }
 
-    fun poopCount(): Int = props.count { it.isPoop }
+    /** Crottes à l'écran ([owner] : celles de cet animal ; null = toutes). */
+    fun poopCount(owner: PetId? = null): Int = props.count { it.isPoop && (owner == null || it.owner == owner) }
 
     /** Un objet bouge (en vol, tenu par l'utilisateur) : animation fluide. */
     fun anyMoving(): Boolean = toyHeldByUser || props.any { !it.isPoop && !it.onGround }
@@ -195,28 +196,37 @@ class ToyController(private val ctx: PetCtx) {
     // =====================================================================
     //  Crottes
     // =====================================================================
-    fun spawnPoop(x: Float) {
+    /** Une crotte de [owner] (l'animal courant : sa page) tombe en [x]. */
+    fun spawnPoop(x: Float, owner: Pet = pet) {
         val p = addProp(Poop)
+        p.owner = owner.id
         p.anchor = ctx.pages.bunnyView()
         p.x = x; p.y = arena.groundY
         placeProp(p)
     }
 
-    /** On a touché une crotte : ramassée. */
+    /** On a touché une crotte : ramassée (c'est son auteur qui remercie). */
     fun pickUp(p: Prop) {
         if (!p.isPoop || p !in props) return
         removeProp(p)
-        ctx.on(pet, PetEvent.PoopRemoved)
-        ctx.emit(pet, PType.SPARKLE, 4)
-        pet.express(Expr.HAPPY, 1.5f)
-        ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
-    }
-
-    fun restorePoops() {
-        repeat(pet.stats.poops) {
-            spawnPoop(arena.minX + ctx.rnd.nextFloat() * (arena.maxX - arena.minX))
+        val owner = p.owner?.let { ctx.world.pets[it] } ?: pet
+        ctx.world.asPet(owner) {
+            ctx.on(owner, PetEvent.PoopRemoved)
+            ctx.emit(owner, PType.SPARKLE, 4)
+            owner.express(Expr.HAPPY, 1.5f)
+            ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
         }
     }
+
+    /** Au démarrage (ou quand il apparaît) : les crottes sauvegardées de l'animal courant reviennent. */
+    fun restorePoops(owner: Pet = pet) {
+        repeat(owner.stats.poops - poopCount(owner.id)) {
+            spawnPoop(arena.minX + ctx.rnd.nextFloat() * (arena.maxX - arena.minX), owner)
+        }
+    }
+
+    /** L'animal [id] est parti : ses crottes disparaissent. */
+    fun removePoopsOf(id: PetId) { props.filter { it.isPoop && it.owner == id }.forEach(::removeProp) }
 
     // =====================================================================
     //  Jouets

@@ -4,8 +4,9 @@ import kotlin.math.abs
 
 /**
  * "Vues" (application, ou page du bureau) et défilement du bureau.
- * Chaque objet reste sur la vue où il est posé ; le lapin vit sur une page du bureau :
- * il défile avec elle, peut partir explorer la page voisine, et revient sur la page affichée.
+ * Chaque objet reste sur la vue où il est posé ; chaque animal vit sur une page du bureau (la sienne,
+ * dans son [Body]) : il défile avec elle, peut partir explorer la page voisine, et revient sur la page
+ * affichée. Les fonctions `bunny*` portent sur l'animal courant ([PetCtx.pet]).
  *
  * Ne dépend que de [PetCtx] (écran : [PetCtx.screen]) : testable avec `FakePetCtx`.
  */
@@ -21,13 +22,21 @@ class PageTracker(private val ctx: PetCtx) {
     var scrollShown = Float.NaN
         private set
 
-    /** Page du bureau où se trouve le lapin (0 = pas sur le bureau). */
-    var bunnyPage = 0
-    /** Décalage à l'écran du lapin quand sa page n'est pas (exactement) celle affichée. */
-    var bunnyShift = 0f
+    /** Page du bureau où se trouve l'animal courant (0 = pas sur le bureau) : [Body.page]. */
+    var bunnyPage: Int
+        get() = pet.body.page
+        set(v) { pet.body.page = v }
+    /** Décalage à l'écran de l'animal courant quand sa page n'est pas (exactement) celle affichée. */
+    var bunnyShift: Float
+        get() = pet.body.pageShift
+        set(v) { pet.body.pageShift = v }
     /** Quand il revient sur la page affichée (uptime ms), 0 = pas programmé. */
-    var returnAt = 0L
-    private var wanderDir = 1
+    var returnAt: Long
+        get() = pet.body.pageReturnAt
+        set(v) { pet.body.pageReturnAt = v }
+    private var wanderDir: Int
+        get() = pet.body.wanderDir
+        set(v) { pet.body.wanderDir = v }
 
     private var savedPageW = -1f
     private var pageWKey: String? = null

@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.feature.mischief.MischiefState
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.persist.PetRecord
@@ -77,6 +78,16 @@ class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     /** Version des plateformes ([PlatformSet.version]) déjà vérifiée pour la plateforme courante. */
     var platVersionSeen = -1
 
+    // --- Sa page du bureau ([PageTracker] : chaque animal a la sienne) ---
+    /** Page du bureau où il se trouve (0 = pas sur le bureau). */
+    var page = 0
+    /** Décalage à l'écran quand sa page n'est pas (exactement) celle affichée. */
+    var pageShift = 0f
+    /** Quand il revient sur la page affichée (uptime ms), 0 = pas programmé. */
+    var pageReturnAt = 0L
+    /** Sens de son exploration de la page voisine. */
+    var wanderDir = 1
+
     fun setAct(a: Act, duration: Float = 3f) {
         act = a; actTime = 0f; actDuration = duration
     }
@@ -110,6 +121,8 @@ class Mind(val rnd: Random, species: Species = Species.DEFAULT) {
     var travelThen = Act.IDLE
     /** Dernier voyage (heure murale, ms). */
     var lastTravelAt = 0L
+    /** État de sa bêtise en cours (une seule à la fois dans le monde : `Director`). */
+    val mischief = MischiefState()
 
     fun express(e: Expr, seconds: Float) { exprOverride = e; exprTimer = seconds }
 

@@ -72,6 +72,10 @@ object Tuning {
     /** Un défilement du bureau récent garde la boucle rapide. */
     const val SCROLL_ACTIVE_MS = 600L
 
+    // --- Plusieurs animaux ---
+    /** Animaux affichés en même temps (chaque fenêtre déplacée coûte un `updateViewLayout` par image). */
+    const val MAX_PETS_SHOWN = 3
+
     // --- Temps ---
     const val STATS_EVERY_MS = 10_000L
     const val SAVE_EVERY_MS = 60_000L

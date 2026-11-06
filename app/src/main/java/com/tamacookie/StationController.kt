@@ -44,6 +44,8 @@ class StationController(
     private var chestBumpCd = 0f
     private var chestLid = 0f
     private var chestPop: Station? = null
+    /** L'animal qui a percuté le coffre (l'objet sort quand il est retombé). */
+    private var chestPopFor: PetId? = null
     /** Dernière fois qu'il s'est servi seul dans le coffre. */
     var selfServeAt = 0L
 
@@ -164,12 +166,12 @@ class StationController(
         val vis = !off.isNaN()
         val raw = pages.anchorOffset(st.anchor)
         pages.bunnyShift = if (raw.isNaN()) 0f else raw
-        if (!vis && !ctx.bunnyAway) {
-            ctx.setBunnyAway(true)
-        } else if (vis && ctx.bunnyAway) {
+        if (!vis && !ctx.isAway(p)) {
+            ctx.setAway(p, true)
+        } else if (vis && ctx.isAway(p)) {
             positionInStation(p, k)
             // le lapin reste SOUS la station : ordre des couches garanti par l'OverlayHost (WindowLayer)
-            ctx.setBunnyAway(false)
+            ctx.setAway(p, false)
             k.behavior.onShownAgain(sctx, p, onScreen = off == 0f)
         }
         pages.split(st.anchor ?: "").second?.let { pages.bunnyPage = it }
@@ -191,8 +193,14 @@ class StationController(
     // =====================================================================
     //  Gestes sur une station (reçus de sa fenêtre) : appui long pour déplacer, tap
     // =====================================================================
-    /** L'animal courant est dedans : les touchers vont à lui (pour le sortir / le caresser). */
-    fun touchGoesToPet(s: Station): Boolean = ctx.world.station(s.kind).has(pet.id)
+    /** Un animal est dedans : les touchers vont à lui (pour le sortir / le caresser). */
+    fun touchGoesToPet(s: Station): Boolean = occupantOf(s) != null
+
+    /** L'animal (du monde) qui occupe [s], null = vide. */
+    fun occupantOf(s: Station): Pet? {
+        for (q in ctx.world.pets.values) if (ctx.world.station(s.kind).has(q.id)) return q
+        return null
+    }
 
     /** Déplacement au doigt (après l'appui long) : centre en ([cx], [cy]). */
     fun dragStation(s: Station, cx: Float, cy: Float) = placeStation(s, cx, cy)
@@ -237,7 +245,7 @@ class StationController(
         val s = get(k)
         val seat = k.behavior.seat
         p.body.fx = s.cx + seat.dxDp * d; p.body.fy = s.bottom - seat.aboveBottomDp * d
-        ctx.placeBunny()
+        ctx.place(p)
     }
 
     /** Nouvelle taille d'écran : l'animal reprend sa place dans sa station. */
@@ -384,18 +392,24 @@ class StationController(
         }
     }
 
-    /** Collision du lapin (en vol) avec le coffre. */
-    fun checkChestBump(dt: Float) {
+    /** Couvercle et délai entre deux chocs : une fois par image, avant [checkChestBump] de chaque animal. */
+    fun tickChest(dt: Float) {
         if (chestBumpCd > 0f) chestBumpCd -= dt
         if (chestLid > 0f) {
             chestLid -= dt
             if (chestLid <= 0f && !panels.chestOpen) setOpen(get(StationKind.CHEST), false)
         }
+    }
+
+    /** Collision de l'animal courant (en vol) avec le coffre. */
+    fun checkChestBump() {
+        val pet = pet
         val act = pet.body.act
-        // L'objet sort une fois le lapin retombé (pas en plein vol)
+        // L'objet sort une fois le lapin retombé (pas en plein vol) ; pendant ce temps, pas d'autre choc
         val pop = chestPop
         if (pop != null) {
-            if (act != Act.AIR && act != Act.DRAGGED) { chestPop = null; popFromChest(pop) }
+            if (chestPopFor != pet.id) return
+            if (act != Act.AIR && act != Act.DRAGGED) { chestPop = null; chestPopFor = null; popFromChest(pop) }
             return
         }
         if (act != Act.AIR || chestBumpCd > 0f) return
@@ -418,6 +432,7 @@ class StationController(
             ctx.say(ctx.pick("Bonk ! 😵", "Aïe, le coffre !"), 1.5f)
         } else {
             chestPop = s
+            chestPopFor = pet.id
             ctx.say(ctx.pick("Bonk ! Oh, le coffre s'ouvre ! 🎁", "Oups, j'ai cogné le coffre !", "Sésame, ouvre-toi ! ✨"), 2f)
         }
     }

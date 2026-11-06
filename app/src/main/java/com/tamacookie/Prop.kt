@@ -20,6 +20,8 @@ class Prop(val id: Int, val spec: PropSpec, val w: Int, val h: Int) : PropBody {
     var age = 0f
     var held = false          // tenu par le lapin
     var anchor = ""           // vue (app / page du bureau) où l'objet est posé
+    /** Crotte : l'animal qui l'a faite (ramassée = ses jauges), null = objet partagé. */
+    var owner: PetId? = null
     /** Rotation du dessin (degrés), animée par la physique de l'objet. */
     var spin = 0f
     /** Teinte (jouets à couleur aléatoire). */

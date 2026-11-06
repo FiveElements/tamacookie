@@ -13,9 +13,11 @@ class FakeClock(var uptime: Long = 1_000_000L, var wall: Long = 1_700_000_000_00
 }
 
 /**
- * Faux hôte des contrôleurs (JVM pur) : un monde à un animal, une arène 1080 × 2000 px (densité 1),
- * une horloge et un aléatoire maîtrisés, et l'enregistrement de ce que les contrôleurs demandent
- * (répliques, effets, vibrations…). Les fenêtres passent par un [FakeOverlayHost].
+ * Faux hôte des contrôleurs (JVM pur) : un monde avec un résident (d'autres par [addPet]), une arène
+ * 1080 × 2000 px (densité 1), une horloge et un aléatoire maîtrisés (un `Random` seedé par animal), et
+ * l'enregistrement de ce que les contrôleurs demandent (répliques — avec qui parle —, effets,
+ * vibrations…). Les fenêtres passent par un [FakeOverlayHost]. [pet] est l'animal courant
+ * ([World.current]), comme dans le service.
  */
 class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : PetCtx {
     override val world = World()
@@ -25,19 +27,31 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     }
     override val actor = BunnyActor(arena)
     override val clock = FakeClock()
-    override val rnd = Random(seed)
+    /** Aléatoire de l'animal courant (celui du résident : `Random(seed)`). */
+    override val rnd: Random get() = pet.mind.rnd
     override val pages: PageTracker by lazy { PageTracker(this) }
     override val screen = FakeScreenSensor()
     override val acts = ActRegistry()
 
-    override val pet: Pet = testPet(BunnyPhysics(arena.d), rnd).also {
+    /** Le résident. */
+    val first: Pet = testPet(BunnyPhysics(arena.d), Random(seed)).also {
         it.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
         it.body.fx = 500f; it.body.fy = arena.groundY
-        world.add(it)
+        world.add(it, resident = true)
     }
+
+    /** Ajoute un compagnon (son propre `Random` seedé) posé au sol en [x]. */
+    fun addPet(id: String, x: Float = 300f, seed: Int = id.hashCode(), traits: Traits = Traits()): Pet =
+        testPet(BunnyPhysics(arena.d), Random(seed), id = id, traits = traits).also {
+            it.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
+            it.body.fx = x; it.body.fy = arena.groundY
+            world.add(it)
+        }
 
     // --- Ce que les contrôleurs ont demandé ---
     val said = ArrayList<String>()
+    /** Qui a dit chaque réplique de [said] (l'animal courant au moment de parler). */
+    val speakers = ArrayList<PetId>()
     val emitted = ArrayList<PType>()
     val vibrations = ArrayList<LongArray>()
     var appliedViews = 0
@@ -53,9 +67,12 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override var hidden = false
     var foreground: String? = null
     val labels = HashMap<String, String>()
-    override var bunnyAway = false
+    /** Animaux dont la fenêtre est retirée. */
+    val away = HashSet<PetId>()
+    /** Animaux placés (`place`), dans l'ordre. */
+    val placed = ArrayList<PetId>()
 
-    override val speech = Speech(rnd) { text, _ -> said += text }
+    override val speech = Speech({ pet.mind.rnd }) { text, _ -> said += text; speakers += pet.id }
     override fun say(text: String, seconds: Float) = speech.say(text, seconds)
     override fun pick(vararg s: String) = speech.pick(*s)
 
@@ -78,7 +95,8 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override val overlay = FakeOverlayHost()
     override fun applyView() { appliedViews++ }
     override fun layoutAnchored() {}
-    override fun setBunnyAway(away: Boolean, fadeIn: Boolean) { bunnyAway = away }
-    override fun placeBunny() {}
+    override fun isAway(pet: Pet) = pet.id in away
+    override fun setAway(pet: Pet, away: Boolean, fadeIn: Boolean) { if (away) this.away += pet.id else this.away -= pet.id }
+    override fun place(pet: Pet) { placed += pet.id }
     override fun setDockHiding(hiding: Boolean) { dockShowsHiding = hiding }
 }
