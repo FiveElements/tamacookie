@@ -51,6 +51,34 @@ Chaque release fournit aussi un fichier `SHA256SUMS.txt` pour vérifier l'APK.
 
 Rien n'est collecté ni envoyé : tout reste sur l'appareil.
 
+### Autoriser l'affichage par-dessus les autres apps (obligatoire)
+
+Sans cette autorisation, le lapin ne peut pas apparaître : le bouton « Faire apparaître » de l'écran
+principal ouvre alors directement le bon réglage.
+
+1. Lance **TamaCookie** et touche **« Faire apparaître Cookie »** (ou la ligne ⚠️ *Afficher par-dessus
+   les autres apps*) : Android ouvre la page de l'autorisation.
+2. Active **« Autoriser l'affichage par-dessus d'autres applis »**.
+3. Reviens dans TamaCookie : la ligne passe à ✅ et le lapin peut sortir.
+
+Si la page ne s'ouvre pas, le réglage se trouve à la main :
+
+| Appareil | Chemin |
+|---|---|
+| Samsung (One UI) | Paramètres › Applications › ⋮ › **Accès spécial** › **Apparaître au-dessus** › TamaCookie |
+| Pixel / Android d'origine | Paramètres › Applis › **Accès spécial des applis** › **Superposition à d'autres applis** › TamaCookie |
+| Autres | Paramètres › Applications › TamaCookie › *Afficher par-dessus d'autres applis* (ou *Superposition*) |
+
+**Réglage grisé** (« paramètre restreint », APK installé hors du Play Store) : Paramètres › Applications ›
+TamaCookie › ⋮ (en haut à droite) › **Autoriser les paramètres restreints**, puis recommence. C'est la même
+démarche pour le service d'accessibilité.
+
+Par ADB (développement) :
+
+```bash
+adb shell appops set com.tamacookie SYSTEM_ALERT_WINDOW allow
+```
+
 ## 🛠️ Développement
 
 Prérequis : JDK 17+ et le SDK Android (API 34).
