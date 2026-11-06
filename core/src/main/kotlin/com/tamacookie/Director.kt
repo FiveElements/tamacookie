@@ -69,6 +69,26 @@ class Director(private val world: World) {
     }
 
     // =====================================================================
+    //  Chasseur de pubs : un seul animal appuie ([adHunt])
+    // =====================================================================
+    val adHunt = AdHunt(world)
+
+    /** Le bouton « Ignorer l'annonce » d'une publicité : un seul animal y va, le plus proche. */
+    class AdHunt(private val world: World) {
+        /** L'animal parti appuyer (en course, en plein saut vers le bouton, dessus), null = aucun. */
+        fun hunter(): Pet? = world.pets.values.firstOrNull { huntsAd(it) }
+
+        /**
+         * Qui part appuyer sur le bouton [target] : personne si un animal y est déjà ([hunter]) ; sinon, parmi
+         * ceux qui le peuvent ([eligible]), le plus proche (distance horizontale) ; à égalité, l'ordre du monde.
+         */
+        fun hunterFor(target: Box, eligible: (Pet) -> Boolean): Pet? {
+            if (hunter() != null) return null
+            return world.pets.values.filter(eligible).minByOrNull { abs(it.body.fx - target.centerX) }
+        }
+    }
+
+    // =====================================================================
     //  Nourriture : le plus proche l'emporte
     // =====================================================================
     /** Animal → nourriture ([Prop.id]) qu'il a perdue au profit d'un autre (il n'y retourne pas). */
@@ -224,6 +244,10 @@ class Director(private val world: World) {
     companion object {
         /** Station → activité « il y va de lui-même » ([mayHeadTo]). */
         private val GOING_TO = mapOf(StationKind.CHEST to Act.GOTO_CHEST, StationKind.BOWL to Act.GOTO_BOWL)
+
+        /** [p] chasse une pub : sur le bouton ou en route, y compris en plein saut vers lui. */
+        fun huntsAd(p: Pet): Boolean =
+            p.act == Act.SKIP_AD || (p.act == Act.AIR && p.body.afterAir == Act.SKIP_AD)
 
         /** Activités d'une bêtise (celles de [Mischiefs.ALL]). */
         val MISCHIEF_ACTS: Set<Act> = EnumSet.noneOf(Act::class.java).apply { for (m in Mischiefs.ALL) addAll(m.acts) }

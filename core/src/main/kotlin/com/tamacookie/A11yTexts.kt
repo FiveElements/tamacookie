@@ -63,6 +63,7 @@ object A11yTexts {
         for (a in listOf(Act.SQUAT, Act.KNOCK, Act.TEASE, Act.CHEW_EDGE)) put(a, "fait une bêtise")
         for (a in Act.HIDING) put(a, "se cache")
         put(Act.SOCIAL, "avec un autre animal")
+        put(Act.SKIP_AD, "passe la pub")
     }
 
     /** Ce qu'il fait ([ACTIVITIES]) ; null = au repos, en balade ou dans une station (on dit son humeur). */

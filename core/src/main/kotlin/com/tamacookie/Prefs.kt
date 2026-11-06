@@ -25,6 +25,9 @@ object Prefs {
     /** Bien-être numérique (pause proposée après un long moment dans la même app) : coupé par défaut. */
     const val WELLBEING = "wellbeing"
     const val WELLBEING_DEFAULT = false
+    /** Chasseur de pubs (il saute sur le bouton « Ignorer l'annonce » d'une publicité) : activé par défaut. */
+    const val AD_SKIP = "ad_skip"
+    const val AD_SKIP_DEFAULT = true
 
     /** Largeur apprise d'une page du bureau, par largeur d'écran (portrait / paysage). */
     fun pageWidth(screenW: Int) = "pageW2_$screenW"
