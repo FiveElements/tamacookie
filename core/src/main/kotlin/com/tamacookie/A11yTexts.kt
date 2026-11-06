@@ -154,7 +154,7 @@ object SpokenText {
 
     /** Emoji, symbole, ou ce qui les assemble (jointure, sélecteur de variante, touche, couleur de peau). */
     private fun isDecoration(cp: Int): Boolean {
-        if (cp in JOINERS || cp in VARIATION_SELECTORS || cp in SKIN_TONES) return true
+        if (cp in JOINERS || cp in VARIATION_SELECTORS || cp in EMOJI_BLOCKS) return true
         val t = Character.getType(cp)
         return t == Character.OTHER_SYMBOL.toInt() || t == Character.SURROGATE.toInt()
     }
@@ -162,7 +162,11 @@ object SpokenText {
     /** Jointure sans chasse (❤️‍🩹) et touche (1️⃣). */
     private val JOINERS = setOf(0x200D, 0x20E3)
     private val VARIATION_SELECTORS = 0xFE00..0xFE0F
-    private val SKIN_TONES = 0x1F3FB..0x1F3FF
+    /**
+     * Blocs d'emojis du plan supplémentaire (dont les couleurs de peau) : par plage et non par catégorie Unicode,
+     * car un JDK ancien ne connaît pas les emojis récents (🫣, Unicode 14, est « non attribué » pour le JDK 17).
+     */
+    private val EMOJI_BLOCKS = 0x1F000..0x1FAFF
 }
 
 /**

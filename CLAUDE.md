@@ -1034,7 +1034,8 @@ Principes :
     (`gauge` / `gauges` : « Satiété 80 % », espace insécable, partie entière bornée comme le widget), stations
     (« Baignoire, vide » / « Lit, Cookie et Noisette dedans » / « Coffre »), objets (« Balle, jouet », « Carotte, à
     manger », « Crotte de Cookie »), et la règle d'annonce des bulles (`announces`). `SpokenText.plain` /
-    `plainLines` : un texte affiché sans ses emojis ni symboles (catégorie Unicode *So*, jointures, sélecteurs de
+    `plainLines` : un texte affiché sans ses emojis ni symboles (catégorie Unicode *So*, blocs d'emojis U+1F000–1FAFF
+    par plage — le JDK 17 de la CI ne connaît pas 🫣, Unicode 14 —, jointures, sélecteurs de
     variante, couleurs de peau), pour les descriptions dérivées d'un libellé (« 🛁 Baignoire », « 💤\nDodo »).
     `ReducedMotion.isReduced(animateur, transition, fenêtre)`. `Palette.UI_*` + `Contrast` (luminance et rapport
     WCAG 2.x). `WidgetTexts.Gauge.description` ; ses libellés viennent de `A11yTexts` (mêmes mots).
