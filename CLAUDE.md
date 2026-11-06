@@ -16,10 +16,14 @@ Code, commentaires, commits et UI sont **en français**.
 
 - `unitTests.isReturnDefaultValues = true` : dans les tests JVM, les classes Android (`Rect`, `Color`,
   `org.json`…) renvoient silencieusement 0/false/null. **Le code testé ne doit pas dépendre d'Android.**
-- Clés SharedPreferences : passer par `Prefs` (fichier `"pet"`). Ne jamais renommer une clé existante
-  sans migration — ce sont les sauvegardes des utilisateurs.
-- `PetState.save()` ne réécrit pas si un autre lapin est né depuis (garde sur `bornAt`) ; `reset()`
-  n'efface que `PetState.PET_KEYS` (à tenir à jour si `save()` change).
+- **Réglages** : passer par `Prefs` (fichier `"pet"`). **Animaux** : uniquement par `PetRepository` (fichier
+  `"pets"`, schéma versionné, voir « Schéma de persistance v1 »). Ne jamais renommer une clé ni un identifiant
+  sauvegardé (`Look` : `id` des options ; noms d'enum `Personality`, `Toy`) sans migration — ce sont les
+  sauvegardes des utilisateurs (et, à terme, ce qu'échangent deux téléphones).
+- Les jauges ne changent **que** par `PetCtx.on(pet, PetEvent)` (→ `PetRules`) : jamais `pet.stats = …` hors
+  tests. `PetRepository.save()` ignore un animal qui n'est plus enregistré (remplacé par une adoption).
+- Les activités ne lisent l'animal que par le repository et n'écrivent que par `PetCommands` (le service est
+  l'autorité quand il tourne).
 - Ignorer `.claude/worktrees/` (copies de travail) dans les recherches.
 - Le repo est indexé par **graft** : `graft ask "<question>" --source`, `graft grep`, `graft skeleton <fichier>`,
   `graft callers <symbole> --depth all` avant tout déplacement/renommage.
@@ -31,7 +35,8 @@ Package `com.tamacookie` (+ `com.tamacookie.feature` depuis l'étape 3a). Cœur 
 `PetCtx` (faux hôte : `FakePetCtx`). Les fonctionnalités sont des plugins (`feature/station/`, `feature/toy/`,
 `feature/mischief/`, `feature/menu/` : voir les recettes « Ajouter… » en fin de fichier). Depuis l'étape 4, toutes les
 fenêtres passent par le port `OverlayHost` (adaptateur `OverlayManager`, ids `WindowId` par entité) et la vue de
-l'animal n'affiche qu'un `BunnyRenderState`.
+l'animal n'affiche qu'un `BunnyRenderState`. Depuis l'étape 5, les jauges sont `PetStats` + `PetRules` (événements → état + effets, `GameRules`) et
+les animaux ne sont lus / écrits que par `PetRepository` (`persist/` : schéma versionné, `PetSnapshot` portable).
 Problèmes à résorber (audit) :
 - `BunnyService` (~1 270 l.) est un god-object : ~16 responsabilités, ~45 `internal var`.
 - `StationController`, `ToyController`, `MischiefController`, `PageTracker`, `OverlayWindows` reçoivent
@@ -41,7 +46,8 @@ Problèmes à résorber (audit) :
   locomotion et le sommeil (voir écarts 3b).
 - Les vues sont de l'état de jeu (`bunny.pose`, `bunny.facing` écrits par 4 classes).  → étape 4 : `BunnyRenderState`.
 - `Platforms` (dans ScreenSensorService.kt) : état global `@Volatile`, compteurs `*Version` qui perdent des événements.
-- `PetState` mélange règles, persistance et `Context` ; `Look` stocke des **index** (fragile).
+- `PetState` mélange règles, persistance et `Context` ; `Look` stocke des **index** (fragile).  → étape 5 :
+  `PetStats` + `PetRules`, `PetRepository` (schéma versionné, ids stables), `PetState` supprimé.
 
 ## Architecture cible : hexagonal + monde d'entités (ECS léger)
 
@@ -91,8 +97,8 @@ Principes :
 | 2 | `Pet` + `World` (un seul animal), `Body`/`BunnyActor`, `PetCtx`/`PetHost`, `Clock` ; faux hôte de test | ✅ |
 | 3 | Fonctionnalités en plugins recevant `pet` : **3a** stations (occupant, capacité, `FloatingPanel`) ; **3b** jouets, bêtises, menu | ✅ |
 | 4 | `OverlayManager` unique + `RenderState` par entité | ✅ |
-| 5 | `PetStats` + `PetRules` + `PetRepository` versionné par `PetId`, look par ids stables (migration) | ⏳ |
-| 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | |
+| 5 | `PetStats` + `PetRules` + `PetRepository` versionné par `PetId`, look par ids stables (migration) | ✅ |
+| 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ⏳ |
 | 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | |
 | 8 | Module `:core` (JVM pur), detekt, chaînes dans `strings.xml`, accessibilité | |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
@@ -121,6 +127,7 @@ Principes :
   - L'ancienne interface `Body` (physique des objets) s'appelle désormais `PropBody`.
   - `PetId.resident(bornAt)` : identifiant **dérivé de `bornAt`** (déjà sauvegardé), stable sans nouvelle clé de
     prefs ; un vrai UUID persistant viendra avec `PetRepository` (étape 5). `Identity.name` lit `PetState.name`.
+    → **étape 5** : `PetId` = UUID persistant (créé à la migration / l'adoption), `Identity` immuable porte le nom.
   - `Body` possède `pose` et `facing` : `BunnyView.pose`/`facing` délèguent au `Body` branché (`bunny.body = pet.body`) ;
     les aperçus (`MainActivity`, `AdoptActivity`) gardent leur propre `Body`. `walkPhase`, `airVy`, `eatProgress`,
     `expr` restent copiés dans la vue par le service (→ `RenderState`, étape 4).
@@ -288,6 +295,95 @@ Principes :
     `placeBunny` / `bunnyAway` / `pages.bunnyShift` ne concernent que le résident (→ étape 7, par animal) ;
     `ScreenSensorService` a son propre WindowManager (hors périmètre, étape 6).
 
+- **Étape 5** (jauges, persistance, apparence ; `PetState` 249 l. supprimé, `BunnyService` 918 → 992 l. avec
+  l'adoption sans redémarrage) — 5 commits :
+  - **`PetStats`** (data class immuable) + **`PetRules.apply(stats, event, now, traits, rules) → Result(stats,
+    effects)`** (`PetRules.kt`) : `PetEvent` (`Elapsed`, `Fed`, `Petted`, `PlayStarted`, `PlayHit`, `Bathed`,
+    `PoopRemoved`, `Healed`, `AppVisited`, `HardLanding`, `FellAsleep`, `Woken(grumpy)`, `Caged`, `Released`,
+    `Found`, `NotFound`) et `PetEffect` (`PoopSpawned(n)`, `Refused`, `WokeUp`). Bornes appliquées dans
+    `PetRules.clamp` seulement. `Mood` est une enum de premier niveau (ex-`PetState.Mood`). `Traits` = caractère +
+    jouet préféré (ce que la règle sait en plus des jauges).
+  - **Comportement numérique identique** : `PetRulesTest` contient une **trace de référence** (400 événements
+    aléatoires par caractère, empreinte au bit près de toutes les jauges à chaque étape) produite par l'ancien
+    `PetState` ; le commit 1/5 contenait le test différentiel (ancien / nouveau) qui l'a validée, supprimé avec
+    `PetState`. Les anciennes mutations directes (bonheur −4 à l'atterrissage, +15 / −3 au cache-cache, réveil −3,
+    `sleeping`, `caged`) sont des événements ; leurs bornes unilatérales (`coerceAtMost`…) étaient équivalentes.
+  - **Seul chemin** : `PetCtx.on(pet, event)` (méthode par défaut) → `Pet.on` → `PetRules` ; si
+    `event.savesNow` (nourri, partie commencée, bain, crotte ramassée, soin, dodo, réveil, cage) et non refusé →
+    `PetCtx.save(pet)` (avant : `save()` appelé par ces mêmes méthodes de `PetState` ; le réveil par caresse et
+    l'entrée au bain sauvegardent désormais aussi, sans effet visible). `Pet.wouldRefuse(event)` = essai à blanc
+    (repas refusé par `ToyController.feed` avant de sortir la nourriture).
+  - **`GameRules`** (`GameRules.kt`) : taux, gains, seuils d'humeur, et (4/5) les seuils de comportement qui lisent
+    les jauges (saleté affichée, marche, fin de partie, doudou, « pas fatigué », véto, coffre) via `PetCtx.rules`.
+    Restent des littéraux hors jauges : `BunnyBrain` (décisions), les durées de `Tuning`, les seuils de texte de la
+    fiche du véto (`PetMenu`), et l'influence du caractère sur le **comportement** (`PLAYFUL` joue plus longtemps,
+    `LAZY` marche lentement, `GLUTTON` au coffre, seuil d'attention des bêtises) — à porter par `Species` / le
+    cerveau à l'étape 7.
+  - **`Personality.modifiers: Map<StatMod, Float>`** (`Personality.kt`) remplace `p(k, yes)` : `SATIETY_LOSS`,
+    `HAPPINESS_LOSS`, `ENERGY_LOSS`, `FOOD_JOY`, `PLAY_JOY`, `PET_JOY`, `APP_VISIT_JOY` (`PersonalityTest` :
+    table complète, exhaustivité).
+  - **Format retenu : (a) SharedPreferences + codec maison**, pas de `kotlinx.serialization` : aucune dépendance ni
+    plugin, chaque champ reste lisible / migrable clé par clé, et le `PetSnapshot` d'échange tient en ~20 lignes de
+    texte. `org.json` n'est pas utilisé (stub dans les tests JVM).
+  - **Port `PetStore`** (`persist/PetStore.kt`) + adaptateur **`PetRepository`** : seule classe qui lit / écrit les
+    animaux ; `load*` sans effet de bord ; `Clock` injecté (horodate `lastUpdate`) ; `newId` injecté (UUID). Le
+    **rattrapage hors-ligne** est fait explicitement par le service au démarrage (`Elapsed` depuis `lastUpdate`,
+    plafonné à 48 h par `GameRules.maxElapsedHours`) ; les activités ne le font plus (elles affichent l'état
+    sauvegardé). `residentOrCreate()` crée le résident (non adopté) au premier lancement. `Pets.repository(ctx)` :
+    instance par processus, migrations jouées à la première ouverture.
+  - **Migrations** (`persist/PetMigrations.kt`, liste `ALL`) : v0 → v1 lit les 22 clés à plat de l'ancien
+    `PetState` (`LEGACY_PET_KEYS`, testées contre un vrai fichier « ancienne version »), convertit l'apparence
+    (index → ids, bornés comme l'ancien affichage), génère le `PetId`, écrit le schéma 1 par `commit()` **puis**
+    efface les anciennes clés du fichier `"pet"` (les réglages y restent, clés inchangées). Idempotente ; si le
+    processus est tué entre les deux, l'ouverture suivante finit le ménage.
+  - **Apparence par ids stables** (`Look.kt`) : `Look` immuable de six enums (`Fur`, `Ears`, `EyeColor`, `Pattern`,
+    `Accessory`, `AccColor`) dont l'`id` est figé (`LookTest`) ; `Look.byId(…, défaut)` ; `Options` ne garde que les
+    utilitaires de couleur. `BunnyRenderState` n'a plus besoin de copier l'apparence.
+  - **`PetSnapshot`** (`persist/PetSnapshot.kt`) : représentation portable versionnée (id, espèce, nom, naissance,
+    caractère, jouet, apparence par ids, cinq jauges — pas la cage, les crottes, le sommeil) ; texte
+    `tamacookie-pet 1` + lignes `clé=valeur` encodées ; `decode` valide (taille ≤ 2 Ko en octets, en-tête, version,
+    doublons, id, espèce → rejet ; ids inconnus → défaut ; jauges bornées ; nom nettoyé / tronqué ; champs inconnus
+    ignorés). Pas encore branché (transport Bluetooth à venir).
+  - **Autorité unique** : `PetCommands.adopt` / `rename` (`PetCommands.kt`) envoient `ACTION_ADOPT` /
+    `ACTION_SET_NAME` au service s'il tourne, sinon écrivent par le repository. Le service applique, sauvegarde et
+    fête ; une **nouvelle adoption remplace le résident sans stop/start** (`replaceResident` : cache-cache, station,
+    menu, panneaux et objets fermés ; fenêtre de l'animal réutilisée sous le nouvel id ; bulle oubliée ; page
+    remise à zéro ; il tombe du haut de l'écran). La course au renommage (étape 0) disparaît : le service ne relit
+    plus jamais les prefs. `ACTION_RELOAD` ne sert plus qu'aux réglages (niveau de bêtises).
+  - **`PetState` a disparu** (pas de façade) : `Pet` porte `identity` (renommer = `rename`), `traits`, `look`,
+    `stats`, `adopted` ; `Pet.toRecord()` / `Pet.fromRecord()` ; `PetMenu`, `PetNotifier`, panneaux reçoivent le
+    `Pet`, `MenuEntry.text` reçoit `PetStats`.
+  - Tests : `PetRulesTest`, `PersonalityTest`, `GameRulesTest`, `PetRepositoryTest` (migration, idempotence,
+    reprise, premier lancement, lecture sans effet, adoption / ancien lapin ignoré, renommage), `LookTest`,
+    `PetSnapshotTest` ; `FakePetCtx.saved`, helper `testPet()` (remplace `newPet()`).
+  - **À vérifier sur téléphone** : mise à jour par-dessus la version installée (le lapin, son nom, son apparence,
+    ses jauges, la cage et les réglages doivent être là ; `adb shell run-as com.tamacookie cat
+    shared_prefs/pets.xml`) ; adoption et renommage service lancé / arrêté ; l'écran principal juste après
+    l'adoption (la commande est asynchrone : nom affiché éventuellement en retard d'un `onResume`) ; un retour à
+    une version antérieure perdrait l'animal (anciennes clés effacées).
+
+#### Schéma de persistance v1
+
+Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
+
+| Clé | Type | Contenu |
+|---|---|---|
+| `schema_version` | Int | `1` (absent = schéma 0 : animal dans le fichier `"pet"`) |
+| `pets` | String | ids des animaux séparés par `,`, ordre d'arrivée |
+| `resident` | String | id de l'animal qui vit sur ce téléphone |
+| `pet.<id>.name` / `.species` | String | nom (≤ 16), espèce (`rabbit`) |
+| `pet.<id>.bornAt` / `.lastUpdate` | Long | naissance, dernière sauvegarde (ms, heure murale) |
+| `pet.<id>.adopted` | Boolean | écran d'adoption validé |
+| `pet.<id>.personality` / `.favoriteToy` | String | nom d'enum `Personality` / `Toy` |
+| `pet.<id>.look.fur` / `.ears` / `.eyes` / `.pattern` / `.accessory` / `.accColor` | String | `id` de l'option (`chocolate`, `lop`…) |
+| `pet.<id>.satiety` / `.happiness` / `.energy` / `.cleanliness` / `.health` | Float | jauges 0..100 |
+| `pet.<id>.sleeping` / `.caged` | Boolean | endormi, en cage |
+| `pet.<id>.poops` / `.visitedApps` | Int | crottes à l'écran, apps visitées |
+| `pet.<id>.poopAcc` | Float | fraction de la prochaine crotte |
+
+Fichier **`pet`** (réglages, inchangé) : `enabled`, `mischief`, `dock_fx`, `dock_fy`, `pageW2_<largeur>`,
+`st_<STATION>_anchor` / `_fx` / `_fy`. Valeur inconnue ou absente → défaut (`PetFields.read`).
+
 ### Ajouter une station (ex. : le lit)
 
 1. `feature/station/BedStation.kt` : `object BedStation : StationBehavior` — `name` (« 🛏️ Lit »), `tapHint`,
@@ -343,6 +439,32 @@ Avant 3b : ~6 endroits (cascade et état dans `MischiefController`, `Act` + ense
 
 Fermeture du menu, mise en page, rafraîchissement suivent. Avant 3b : 4 endroits (enum `PetMenu.Action`, bouton et
 rangée dans `PetMenu`, branche de `TouchHandler.onMenuAction`, texte dynamique dans `refresh`).
+
+### Ajouter une stat (ex. : la soif)
+
+1. `PetStats` : `val thirst: Float = 80f` ; `PetRules.clamp` : la borner ; `PetRules.elapsed` : son évolution
+   (taux dans `GameRules`, ex. `thirstLossPerH`) ; un `PetEvent` qui la remonte (`Drank`), sa branche dans
+   `apply` et dans `savesNow` (le compilateur exige les deux) ; l'humeur dans `PetRules.mood` si besoin
+   (`Mood.THIRSTY` → `Lines`, `PetNotifier`, `PetMenu`, `BunnyRenderState.moodExpr` : signalés par le compilateur).
+2. Persistance : `PetFields` (`THIRST = "thirst"`, `write` + `read` avec défaut) — **pas de migration** : une clé
+   absente prend la valeur par défaut. `PetSnapshot` : l'ajouter seulement si elle a du sens sur un autre
+   téléphone (champ ignoré par les anciennes versions, défaut chez nous s'il manque).
+3. Si un caractère la module : une entrée `StatMod` et sa valeur dans `Personality.modifiers`.
+4. Tests : `PetRulesTest` (taux, bornes) — la trace de référence ne change pas tant que la nouvelle stat
+   n'influence pas les autres ; `PetRepositoryTest` (aller-retour).
+
+Un changement de **forme** (renommer / scinder une clé, changer une unité) demande une migration : une entrée à la
+fin de `PetMigrations.ALL`, `SCHEMA_VERSION` + 1, et un test à partir d'un fichier de la version précédente.
+
+### Ajouter une personnalité (ex. : peureux)
+
+1. `Personality` (`Personality.kt`) : ajouter **à la fin** `SHY("Peureux", "🙈", "…", mapOf(StatMod.HAPPINESS_LOSS
+   to 1.1f))` — le nom d'enum est sauvegardé et échangé (`PetSnapshot`) : ne plus le changer.
+2. `PersonalityTest` : sa ligne dans la table `expected` (le test d'exhaustivité l'exige).
+3. Comportement propre (hors jauges) : là où il agit (`BunnyBrain.attentionThresholdMs`, `ToyController`…), en
+   attendant `Species` / le cerveau par animal (étape 7). L'écran d'adoption la propose tout seul.
+
+Un pair qui envoie un caractère inconnu (version plus récente) le voit remplacé par `CUDDLY` (`PetSnapshot.decode`).
 
 Règles pour chaque étape : pas de big-bang, pas de nouvelle dépendance sans justification écrite,
 ajouter des tests JVM pour tout ce qui devient pur, mettre à jour ce fichier (colonne État + écarts).
