@@ -3,8 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-    # Le badge de couverture est commité par la CI elle-même : pas de nouveau passage pour lui
-    paths-ignore: ['.github/badges/**']
   pull_request:
   workflow_dispatch:
 
@@ -60,7 +58,7 @@ jobs:
           name: tamacookie-debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
-  # Badge de couverture sans service externe : SVG généré depuis le rapport JaCoCo et commité sur main.
+  # Badge de couverture sans service externe : SVG généré depuis le rapport JaCoCo et publié sur la branche `badges`.
   coverage-badge:
     name: badge de couverture
     needs: build
@@ -77,16 +75,18 @@ jobs:
           name: coverage-report
           path: coverage
 
-      - name: Générer et commiter le badge
+      # main est protégée (statut « build » requis) : le badge vit sur la branche dédiée `badges`,
+      # réécrite à chaque passage (un seul commit, pas d'historique) et jamais construite par la CI.
+      - name: Générer et publier le badge
         run: |
-          python3 .github/scripts/coverage_badge.py coverage/report.xml .github/badges/coverage.svg
-          if git diff --quiet -- .github/badges/coverage.svg; then
-            echo "Badge inchangé"
-            exit 0
-          fi
+          set -euo pipefail
+          python3 .github/scripts/coverage_badge.py coverage/report.xml "$RUNNER_TEMP/coverage.svg"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/coverage.svg
-          # [skip ci] (et paths-ignore) : ce commit ne relance pas la CI
-          git commit -m "CI : badge de couverture [skip ci]"
-          git push origin HEAD:main || echo "::warning::main a avancé entre-temps : le prochain passage mettra le badge à jour"
+          git switch --orphan badges
+          git rm -rq --cached . || true
+          git clean -fdxq -e coverage
+          cp "$RUNNER_TEMP/coverage.svg" coverage.svg
+          git add coverage.svg
+          git commit -qm "Badge de couverture ($GITHUB_SHA)"
+          git push --force origin HEAD:badges
