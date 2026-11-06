@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import com.tamacookie.AccColor
 import com.tamacookie.Accessory
 import com.tamacookie.AmbientAnimator
 import com.tamacookie.Ears

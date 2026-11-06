@@ -61,7 +61,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
     fun loadLevel() { level = ctx.prefs.getInt(Prefs.MISCHIEF, 1) }
 
     private fun exemptApp(): Boolean {
-        val pkg = (ctx.screen.snapshot.foregroundPkg ?: ctx.foregroundPkg() ?: "").lowercase()
+        val pkg = (ctx.screen.snapshot.foregroundPkg ?: ctx.foregroundPkg()).orEmpty().lowercase()
         return EXEMPT.any { it in pkg }
     }
 

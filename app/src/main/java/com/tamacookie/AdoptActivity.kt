@@ -101,7 +101,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
         nameEdit = EditText(this).apply {
-            setText(if (asCompanion) (COMPANION_NAMES.firstOrNull { it !in taken } ?: "") else pet?.identity?.name ?: Identity.DEFAULT_NAME)
+            setText(if (asCompanion) COMPANION_NAMES.firstOrNull { it !in taken }.orEmpty() else pet?.identity?.name ?: Identity.DEFAULT_NAME)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
             hint = "Nom du lapin"
