@@ -5,8 +5,10 @@ import com.tamacookie.Season
 
 /**
  * Répliques d'une espèce dites par la boucle (bavardage, accueil, voyage, chutes) et le toucher.
- * Les répliques des fonctionnalités (stations, jouets, bêtises, pages) restent dans leur fonctionnalité.
- * Chaque tableau est un tirage possible (`Speech.pickFrom`).
+ * Les répliques des fonctionnalités (stations, jouets, bêtises, pages) restent dans leur fonctionnalité,
+ * **sauf** celles qui nomment l'espèce ou sa nourriture (« lapin », « carotte ») : elles sont ici, pour qu'une
+ * autre espèce ait les siennes (étape 8c, `NoSpeciesWordsTest`).
+ * Chaque tableau est un tirage possible (`Speech.pickFrom`) : l'ordre et la taille fixent les tirages.
  */
 interface SpeciesLines {
     // --- Accueil, réveil, apparition ---
@@ -44,10 +46,23 @@ interface SpeciesLines {
     // --- Menu ---
     val GETTING_UP: String
     val NOT_TIRED: Array<String>
+    /** « Chanter » (éveillé). */
+    @Suppress("VariableNaming")   // convention des répliques de cette interface (MAJUSCULES)
+    val SONGS: Array<String>
+
+    // --- Coffre ---
+    /** Il arrive au coffre pour s'y servir seul. */
+    @Suppress("VariableNaming")   // convention des répliques de cette interface (MAJUSCULES)
+    val GOING_TO_CHEST: Array<String>
 
     // --- Voyage d'application en application ---
     val FOLLOWING: Array<String>
 
     /** Commentaires possibles à l'arrivée dans une app ([category] : `ApplicationInfo.CATEGORY_*`). */
     fun appComments(label: String, pkg: String, category: Int, isHome: Boolean): Array<String>
+
+    // --- Textes d'interface qui nomment l'espèce ---
+    /** Widget sans animal enregistré : invitation à l'adopter (espèce par défaut). */
+    @Suppress("VariableNaming")   // convention des répliques de cette interface (MAJUSCULES)
+    val ADOPT_PROMPT: String
 }

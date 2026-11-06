@@ -1,6 +1,7 @@
 package com.tamacookie.feature.menu
 
 import com.tamacookie.Act
+import com.tamacookie.CommonLines
 import com.tamacookie.Expr
 import com.tamacookie.PType
 import com.tamacookie.Pet
@@ -57,8 +58,6 @@ object MenuEntries {
     val HIDE = MenuEntry("🙈", "Ranger") { ctx, _ -> ctx.hide() }
 
     // --- Évolution 4a ---
-    private val SONGS = arrayOf("🎵 La la laaa… 🎶", "🎵 Une carotte, deux carottes… 🎶", "🎶 Je suis un lapin heureux ! 🎵",
-        "🎵 Tralala, tralali… 🎶")
     private val LULLABIES = arrayOf("🎵 Dodo, l'enfant do… 🎶", "🎶 Fais de beaux rêves… 🎵")
     private val BRUSHED = arrayOf("Ooh, ça fait du bien ! 🪥", "Tout doux, tout beau ✨", "Mon pelage brille !")
 
@@ -71,7 +70,7 @@ object MenuEntries {
         }
         ctx.emit(pet, PType.NOTE, 4)
         pet.express(Expr.HAPPY, 2f)
-        ctx.speech.sayOneOf(SONGS)
+        ctx.speech.sayOneOf(pet.species.lines.SONGS)
         if (pet.body.act in Act.FREE) {
             // comme `PetBehavior.startDance` (la danse dure 9 s, un saut toutes les 0,55 s)
             pet.mind.danceTime = 0f; pet.mind.danceHopIn = 0f
@@ -81,7 +80,7 @@ object MenuEntries {
 
     /** Brosser : un peu plus propre et content (`PetEvent.Brushed`) ; pas pendant son sommeil. */
     val BRUSH = MenuEntry("🪥", "Brosser") { ctx, pet ->
-        if (pet.stats.sleeping) { ctx.say("Chut… il dort 💤"); return@MenuEntry }
+        if (pet.stats.sleeping) { ctx.say(CommonLines.ASLEEP); return@MenuEntry }
         ctx.on(pet, PetEvent.Brushed)
         ctx.emit(pet, PType.SPARKLE, 3)
         pet.express(Expr.HAPPY, 1.5f)

@@ -76,7 +76,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
         cooldownUntil = now + BunnyBrain.attentionCooldownMs(level)
         ctx.lastInteraction = now - thresholdMs / 2      // recommence plus tard s'il est toujours ignoré
         if (level == 0 || exemptApp()) {
-            ctx.say(ctx.pick("Tu m'oublies ? 🥺", "Coucou… je suis là ! 👋", "Psst… 👀"))
+            ctx.say(ctx.pick(*IGNORED))
             return false
         }
         val p = pet
@@ -144,7 +144,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
     fun startHideSeek(fromMenu: Boolean): Boolean {
         val other = ctx.director.mischiefOwner()?.takeIf { it !== pet }
         if (other != null) {
-            if (fromMenu) ctx.say("${other.name} fait déjà des bêtises… une à la fois ! 😅", 2.5f)
+            if (fromMenu) ctx.say(oneAtATime(other.name), 2.5f)
             return false
         }
         return HideSeekMischief.startFrom(mctx, pet, fromMenu)
@@ -157,5 +157,9 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
 
     private companion object {
         val EXEMPT = listOf("dialer", "incallui", "telecom", "phone")
+        /** Ignoré trop longtemps, au niveau « sage » ou dans une app exemptée : il réclame sans bêtise. */
+        val IGNORED = arrayOf("Tu m'oublies ? 🥺", "Coucou… je suis là ! 👋", "Psst… 👀")
+        /** Cache-cache du menu refusé : un autre animal fait déjà une bêtise. */
+        fun oneAtATime(other: String) = "$other fait déjà des bêtises… une à la fois ! 😅"
     }
 }

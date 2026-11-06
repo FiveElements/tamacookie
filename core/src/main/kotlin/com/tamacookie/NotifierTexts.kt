@@ -1,8 +1,9 @@
 package com.tamacookie
 
 /**
- * Textes de la notification (Kotlin pur) : ligne des jauges, humeur du titre, alertes. Affichés par
- * `PetNotifier` (Android), repris par le widget ([com.tamacookie.widget.WidgetTexts]) et l'écran principal.
+ * Textes de la notification (Kotlin pur) : ligne des jauges, humeur du titre, compagnons, alertes. Affichés par
+ * `PetNotifier` (Android), repris par le widget ([com.tamacookie.widget.WidgetTexts]) et l'écran principal ;
+ * assemblés pour plusieurs animaux par [Director]. Les boutons et les canaux sont dans `strings.xml` (app).
  */
 object NotifierTexts {
     fun statusLine(satiety: Float, happiness: Float, energy: Float, cleanliness: Float): String =
@@ -19,6 +20,25 @@ object NotifierTexts {
             Mood.SAD -> "se sent seul"
             Mood.SICK -> "est malade"
         }
+
+    /** Titre de la notification permanente : « Cookie se promène », puis « · +2 compagnons ». */
+    fun title(name: String, moodText: String, companions: Int): String {
+        val base = "$name $moodText"
+        if (companions <= 0) return base
+        return base + " · +$companions " + if (companions == 1) "compagnon" else "compagnons"
+    }
+
+    /** Ligne de la notification avec des compagnons : jauges du résident ([line]), puis nom et humeur de chacun. */
+    fun withCompanions(line: String, companions: List<Pair<String, Mood>>): String =
+        line + "  ·  " + companions.joinToString("  ") { (name, mood) -> "$name ${MOOD_EMOJI[mood]}" }
+
+    /** Plusieurs alertes réunies dans une seule notification. */
+    fun joinAlerts(alerts: List<String>): String = alerts.joinToString(" · ")
+
+    private val MOOD_EMOJI = mapOf(
+        Mood.HAPPY to "😊", Mood.OK to "🙂", Mood.HUNGRY to "🥕", Mood.SLEEPY to "😴",
+        Mood.DIRTY to "🫧", Mood.SAD to "🥺", Mood.SICK to "🤒",
+    )
 
     /** Texte d'alerte pour une humeur, ou null si cette humeur ne mérite pas d'alerte. */
     fun alertText(name: String, mood: Mood): String? = when (mood) {

@@ -92,6 +92,9 @@ android {
         // Les avertissements existants sont figés dans la baseline ; tout nouveau problème bloque.
         baseline = file("lint-baseline.xml")
         abortOnError = true
+        // Étape 8c : les textes d'interface sont dans res/values/strings.xml — un texte en dur ou une
+        // concaténation affichée fait échouer le build (au lieu d'un simple avertissement).
+        error += listOf("HardcodedText", "SetTextI18n")
     }
 }
 

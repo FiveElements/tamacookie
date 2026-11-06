@@ -9,7 +9,7 @@ import com.tamacookie.species.SpeciesLines
  * Répliques du lapin dites par la boucle et le toucher (bavardage, accueil, voyage, toucher…) :
  * [SpeciesLines] de [Rabbit]. Les répliques des fonctionnalités (stations, jouets, bêtises, pages) sont
  * dans leur fonctionnalité. Kotlin pur ; chaque liste est un tirage possible pour `Speech.pickFrom`.
- * Les textes restent en français, en dur, jusqu'à leur extraction dans `strings.xml` (étape 8).
+ * Textes en français, en dur : le cœur ne lit pas les ressources Android (voir CLAUDE.md, « Textes »).
  */
 object RabbitLines : SpeciesLines {
 
@@ -66,6 +66,12 @@ object RabbitLines : SpeciesLines {
     // --- Menu ---
     override val GETTING_UP = "*bâille* D'accord, je me lève…"
     override val NOT_TIRED = arrayOf("Je ne suis pas fatigué !", "Dodo ? Déjà ?!")
+    override val SONGS = arrayOf("🎵 La la laaa… 🎶", "🎵 Une carotte, deux carottes… 🎶",
+        "🎶 Je suis un lapin heureux ! 🎵", "🎵 Tralala, tralali… 🎶")
+
+    // --- Coffre ---
+    override val GOING_TO_CHEST = arrayOf("Je vais me servir ! 😋", "Hop, au coffre !",
+        "Il y a sûrement des carottes là-dedans…", "Je sais où sont les jouets ! 🎁")
 
     // --- Voyage d'application en application ---
     override val FOLLOWING = arrayOf("J'arrive !", "Attends-moi !", "Hop, on change d'app !", "Je te suis ! 🐾")
@@ -92,4 +98,7 @@ object RabbitLines : SpeciesLines {
             else -> arrayOf("Coucou $label !", "Oh, $label ! On fait quoi ici ?", "Je visite $label 🐾", "C'est joli chez $label")
         }
     }
+
+    // --- Textes d'interface qui nomment l'espèce ---
+    override val ADOPT_PROMPT = "Touche pour adopter ton lapin"
 }

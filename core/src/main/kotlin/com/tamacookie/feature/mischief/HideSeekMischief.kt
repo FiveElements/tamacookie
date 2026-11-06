@@ -22,6 +22,9 @@ object HideSeekMischief : Mischief {
     /** Il ne suit pas l'utilisateur dans une autre application, et n'en dit rien. */
     override val travel = Travel.IGNORES
 
+    /** Occupé à cache-cache : réplique de `PetCtx.sayIfBusy` (on lui donne à manger, un jouet…). */
+    const val BUSY_LINE = "Je joue à cache-cache ! 🫣"
+
     override fun chance(level: Int) = 0.35f
 
     /** Un peureux se cache plus volontiers ([BehaviorMods.hideChanceFactor]). */

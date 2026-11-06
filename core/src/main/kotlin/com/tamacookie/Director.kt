@@ -187,8 +187,7 @@ class Director(private val world: World) {
     fun title(moodText: (Pet) -> String): String {
         val r = world.resident
         val n = world.pets.size - 1
-        val base = "${r.name} ${moodText(r)}"
-        return if (n <= 0) base else base + " · +$n " + (if (n == 1) "compagnon" else "compagnons")
+        return NotifierTexts.title(r.name, moodText(r), companions = n)
     }
 
     /** Ligne de la notification : jauges du résident, puis l'humeur de chaque compagnon. */
@@ -196,7 +195,7 @@ class Director(private val world: World) {
         val r = world.resident
         val others = world.pets.values.filter { it !== r }
         if (others.isEmpty()) return line(r)
-        return line(r) + "  ·  " + others.joinToString("  ") { "${it.name} ${MOOD_EMOJI[it.stats.mood]}" }
+        return NotifierTexts.withCompanions(line(r), others.map { it.name to it.stats.mood })
     }
 
     private val lastMood = HashMap<PetId, Mood>()
@@ -214,16 +213,11 @@ class Director(private val world: World) {
             text(p)?.let { out += it }
         }
         lastMood.keys.retainAll(world.pets.keys)
-        return if (out.isEmpty()) null else out.joinToString(" · ")
+        return if (out.isEmpty()) null else NotifierTexts.joinAlerts(out)
     }
 
     companion object {
         /** Activités d'une bêtise (celles de [Mischiefs.ALL]). */
         val MISCHIEF_ACTS: Set<Act> = EnumSet.noneOf(Act::class.java).apply { for (m in Mischiefs.ALL) addAll(m.acts) }
-
-        private val MOOD_EMOJI = mapOf(
-            Mood.HAPPY to "😊", Mood.OK to "🙂", Mood.HUNGRY to "🥕", Mood.SLEEPY to "😴",
-            Mood.DIRTY to "🫧", Mood.SAD to "🥺", Mood.SICK to "🤒",
-        )
     }
 }

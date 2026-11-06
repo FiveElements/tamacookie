@@ -52,6 +52,11 @@ versionnées, les problèmes existants y apparaissent donc tous).
   `PetCtx.rules`) : `AbstractMethodError` au toucher de « Dodo ». Le fil principal reste alors bloqué dans le
   gestionnaire de plantage et **toutes les fenêtres overlay sont figées** (même symptôme qu'une boucle arrêtée).
   Les tests JVM ne le voient pas (ils recompilent).
+- **Textes** (étape 8c) : un texte d'interface de l'app va dans `res/values/strings.xml` (lint `HardcodedText` et
+  `SetTextI18n` sont **bloquants** : pas de littéral ni de concaténation dans `setText`) ; un texte du cœur reste en
+  Kotlin, **dans un `object`** (fonctionnalité, `companion object` du contrôleur, `CommonLines`, `SpeciesLines`),
+  jamais écrit dans le code d'une méthode. Rien de « lapin » / « carotte » hors de `species/rabbit/` (test). Voir
+  « Textes : où ils vont » en fin de fichier.
 - Ignorer `.claude/worktrees/` (copies de travail) dans les recherches.
 - Le repo est indexé par **graft** : `graft ask "<question>" --source`, `graft grep`, `graft skeleton <fichier>`,
   `graft callers <symbole> --depth all` avant tout déplacement/renommage.
@@ -142,7 +147,7 @@ Principes :
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
 | 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ✅ |
 | — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins — voir « Évolutions » | ⏳ |
-| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ✅ ; **8c** chaînes dans `strings.xml` ; **8d** accessibilité | ⏳ |
+| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ✅ ; **8c** textes (`strings.xml`, répliques regroupées) ✅ ; **8d** accessibilité | ⏳ |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
 
 ### Évolutions (contenu sur les plugins : comportement existant inchangé, seulement des ajouts)
@@ -526,6 +531,8 @@ Principes :
   - **Ce qui reste « lapin » hors de `species/rabbit/`** : des répliques de fonctionnalités (carottes, « lapin » dans
     quelques textes de stations / jouets / menu / notification), les textes de l'écran principal et de l'adoption, le
     nom du canal de notification — du **contenu** (→ `strings.xml` à l'étape 8), pas du comportement.
+    → **Fait en 8c** : répliques déplacées dans `SpeciesLines`, textes de l'app dans `strings.xml` ; ce qui reste
+    (la carotte objet du jeu, le personnage de l'app) est listé dans « Textes : où ils vont » (fin de fichier).
   - **Animal courant** (`World.current`, `World.asPet(p) { … }`, `PetCtx.pet`) : la boucle, le toucher, le menu, les
     commandes l'installent ; les fonctionnalités voient l'animal dont on s'occupe sans changer de signature, et
     `PetCtx.rnd` (= `Mind.rnd` de l'animal courant), la bulle (`say`), la page (`PageTracker.bunnyPage` /
@@ -934,6 +941,84 @@ Principes :
     une PR venue d'un fork) : `github/codeql-action/upload-sarif` épinglé par SHA (v4.39.0), une catégorie par
     module (`detekt-core`, `detekt-app`). Les chemins du SARIF sont déjà relatifs à la racine (`%SRCROOT%`).
 
+- **Étape 8c** (textes ; texte affiché inchangé, sauf les pluriels de la fiche du véto) — 3 commits (cœur ; app ;
+  ce fichier) :
+  - **App → `res/values/strings.xml`** : **138 ressources ajoutées** (133 `<string>` dont 8 `translatable="false"`
+    — symboles et formats purs : `✕`, `🏠`/`🫣` du bouton flottant, `%1$s\n%2$s` des boutons, `%1$d` des jauges —,
+    4 `<plurals>`, 1 `<string-array>` : les noms proposés aux compagnons) ; 145 en tout. Concernés : `MainActivity`
+    (54 : réglages, autorisations, liste des animaux, dialogues, « Comment jouer »), `AdoptActivity` (20),
+    `PetMenu.kt` (menu, panneau 🏠, coffre, fiche du véto : 46), `PetNotifier` (canaux, titre, boutons : 11), tuile
+    (`tile_description`), widget (`widget_gauge_value`), bouton flottant (`OverlayWindows`), et le libellé du service
+    d'accessibilité dans le manifeste (`a11y_label`). La valeur `PROPERTY_SPECIAL_USE_FGS_SUBTYPE` du manifeste reste
+    en dur : elle n'est pas affichée (lue par le Play Store).
+  - **Conventions** : `tools:locale="fr"` (langue par défaut : le français) ; noms `<écran>_<rôle>` (`main_`,
+    `adopt_`, `menu_`, `stations_`, `chest_`, `vet_`, `notif_`, `widget_`, `tile_`, `a11y_`, `dock_`, `panel_`,
+    `common_`) ; **formats numérotés** (`%1$s`) au lieu des concaténations (titre de la notification : `notif_mood_caged`
+    puis `notif_title_hidden` ; ligne d'un animal : `main_pet_row` ; diagnostic : `vet_diag` + `vet_diag_separator`) ;
+    valeur entre guillemets quand ses espaces comptent (doubles espaces après un emoji, espace en tête).
+    `moodLabel(pet)` renvoie un id de ressource ; les helpers `section(…)` prennent un id.
+  - **Pluriels** (`one` / `many` / `other`, les formes du français) : `main_house_full`, `vet_age_days`,
+    `vet_apps_visited`, `vet_issue_poops`. **Écart voulu** : la fiche du véto affichait « 1 jour(s) », « 1 crotte(s) »,
+    « 1 apps visitées » → « 1 jour », « 1 crotte », « 1 app visitée » (et « 0 jour », « 0 app visitée ») ; à partir
+    de 2, inchangé.
+  - **Lint bloquant** : `error += listOf("HardcodedText", "SetTextI18n")` (`app/build.gradle.kts`) ; les
+    `@SuppressLint("SetTextI18n")` des activités, des panneaux et du bouton flottant ont disparu. Vérifié en
+    réintroduisant un `setText("…" + x)` : lint échoue. Limite : `SetTextI18n` ne voit que les appels directs
+    (`setText(…)`, `text = "…"`) — un `text = when { … -> "…" }` lui échappe (relu à la main ici).
+  - **Cœur : port de textes non implémenté (décision)**. Le cœur ne lit pas les ressources ; un port `UiTexts` (clé →
+    texte, défaut français en Kotlin, implémentation `:app` sur `strings.xml`) doublerait chaque texte (Kotlin +
+    XML) sans deuxième langue pour en profiter, et toucherait ~60 fichiers. **Voie retenue, à suivre quand une
+    deuxième langue arrivera** :
+    1. Textes d'**interface** du cœur (`NotifierTexts`, `WidgetTexts`, `TileTexts`, libellés de `MenuEntries`,
+       `label` / `desc` des enums `Personality`, `Look`, `Toy`, `Food`, `StationKind.behavior.name`) → port
+       `UiTexts` dans `:core` (une méthode par texte ; `FrenchUiTexts` = les littéraux d'aujourd'hui, utilisé par les
+       tests), adaptateur `ResourceUiTexts(context)` dans `:app` ; les libellés d'enum par leur **identifiant stable**
+       (`personality_<NOM>`, `look_fur_<id>`, `toy_<NOM>`, `station_<NOM>` : déjà sauvegardés, ne bougent pas).
+    2. **Répliques** (bulle) → restent en Kotlin : une langue = un autre jeu d'`object` qui implémentent les mêmes
+       interfaces (`SpeciesLines` l'est déjà ; les répliques des fonctionnalités passeraient de `val` d'`object` à
+       une interface par famille), choisi par la langue du téléphone à la création de `Speech`. Le nombre de
+       répliques peut différer d'une langue à l'autre : seuls les tirages changent, les tests restent en français.
+  - **Cœur : textes regroupés**. Les répliques étaient encore écrites **dans le code** de `ToyController`,
+    `StationController`, `PageTracker`, `MischiefController`, `PetCtx.sayIfBusy`, `MenuEntries.BRUSH` et
+    `BunnyService` (2) : elles sont désormais dans un `object` — le `companion object` de leur contrôleur
+    (`ToyController` : `POOP_THANKS`, `favorite(label)`, `PLAY_OVER`, `TAKEN`, `BIG_THROW` à côté de `FULL` /
+    `TOO_TIRED` ; `PageTracker` : `WANDER`, `BACK`, `desktopPage(n)` ; `MischiefController` : `IGNORED`,
+    `oneAtATime(nom)`), leur fonctionnalité (`ChestStation.BUMPED` / `BUMPED_OPEN`, `VetStation.HEALTHY` / `HEALED`,
+    `HideSeekMischief.BUSY_LINE`), ou **`CommonLines`** (nouveau : `ASLEEP`, `ASLEEP_NO_PLAY` — partagées par les
+    jouets, la nourriture et la brosse —, et les réponses de l'hôte aux commandes `HOUSE_FULL`, `goodbye(nom)`).
+    Le titre et la ligne de la notification à plusieurs animaux (« · +2 compagnons », humeurs) passent de `Director`
+    à `NotifierTexts` (`title`, `withCompanions`, `joinAlerts`). **Mêmes tirages** : `ctx.pick(*TABLEAU)` = même
+    `Random`, même ordre (tests de référence inchangés). Restent hors de ces `object` : les noms d'apps et de
+    plateformes (lus sur l'écran) et `Identity.DEFAULT_NAME` (« Cookie », donnée sauvegardée).
+  - **« lapin » / « carotte » hors de `species/rabbit/`** (CLAUDE.md, étape 7) — corrigés : chansons du menu
+    (« Une carotte, deux carottes… », « Je suis un lapin heureux ! ») → `SpeciesLines.SONGS` ; « Il y a sûrement des
+    carottes là-dedans… » (il va au coffre : tout le tirage de 4) → `SpeciesLines.GOING_TO_CHEST` ; widget sans
+    animal « 🐰 TamaCookie » / « Touche pour adopter ton lapin » → `Species.DEFAULT.emoji` / `SpeciesLines.ADOPT_PROMPT`
+    ; bouton « Faire apparaître Cookie 🐰 » et titres « Adopte… 🐰 » / « Personnaliser 🐰 » → emoji de l'espèce du
+    résident / de l'espèce par défaut. Avec un seul lapin, **rien ne change à l'écran**. Les nouveaux membres de
+    `SpeciesLines` gardent la convention MAJUSCULES (`@Suppress("VariableNaming")` local, comme les 18 de la
+    baseline).
+  - **Exceptions gardées** (justifiées, testées) : voir « Ce qui reste lapin » dans « Textes » (fin de fichier).
+  - **Tests** : `NoSpeciesWordsTest` (cœur, +3) lit les sources de `core/src/main/kotlin` — **littéraux seulement**,
+    ni commentaires ni identifiants (`Food.CARROT`, `CarrotDispute`), avec son lexique minimal testé (gabarits
+    imbriqués, chaînes brutes, caractères) — : aucun « lapin », « carott… » ni 🐰 hors de `species/rabbit/`, sauf les
+    2 exceptions listées (et une exception qui ne sert plus fait échouer le test) ; chaque espèce a ses `SONGS`,
+    `GOING_TO_CHEST`, `ADOPT_PROMPT`. `StringsResourceTest` (app, +3) lit `strings.xml` (XML du JDK) : « lapin »
+    seulement dans les 11 clés autorisées, plusieurs arguments toujours numérotés, pluriels complets. **492 → 498
+    tests** (471 dans `:core`, 27 dans `:app`).
+  - **detekt** : lignes trop longues réécrites (aucune nouvelle entrée) ; `detektBaseline` relancé pour **nettoyer**
+    12 entrées `MaxLineLength` devenues sans objet (9 app, 3 cœur ; le diff ne fait que retirer).
+  - **À vérifier sur tablette** (non couvert par les tests JVM) : écran principal (sous-titre, réglages, liste des
+    animaux avec « 💤 dort hors écran », autorisations ✅/⚠️ avec leurs doubles espaces, « Comment jouer » sur
+    14 lignes, bouton « Faire apparaître Cookie 🐰 » / « Ranger Cookie 🏠 », « Maison pleine (6 animaux) »),
+    dialogues (accessibilité : paragraphes et puces ; au revoir ; nouveau lapin), adoption (titres, cartes de
+    caractère, « …ou l'adopter comme compagnon », nom proposé « Noisette »), menu (titre, humeur, astuce 💡),
+    panneau 🏠 (« ✅ sur cette page », « 📍 page 2 du bureau », « 📦 rangé »), coffre (⭐ du jouet préféré),
+    fiche du véto (âge et apps au singulier / pluriel, diagnostic séparé par des virgules), notification (titre
+    « (en cage 🔒) », « (caché) », boutons, compagnons, alerte), widget (valeurs des jauges ; sans animal :
+    « 🐰 TamaCookie »), tuile (description lue par TalkBack), service d'accessibilité dans Paramètres (libellé),
+    bulles (chanson, coffre, « Au revoir … ! 👋 »).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -1064,14 +1149,15 @@ Un pair qui envoie un caractère inconnu (version plus récente) le voit remplac
    `behavior(p)` (un `BehaviorMods` par `Personality`, `when` exhaustif), `accepts(k)` / `accepts(t)` si certaines
    stations / jouets ne lui conviennent pas, et `lines` (cœur, `core/…/species/hamster/`).
 2. Cœur — `species/hamster/HamsterLines.kt` : `object HamsterLines : SpeciesLines` (le compilateur liste ce qui
-   manque). App — `species/hamster/HamsterRenderer.kt` : `class HamsterRenderer(d: Float) : PetRenderer` (`draw` du
+   manque, y compris les répliques qui nomment l'espèce ou sa nourriture : `SONGS`, `GOING_TO_CHEST`, `ADOPT_PROMPT`). App — `species/hamster/HamsterRenderer.kt` : `class HamsterRenderer(d: Float) : PetRenderer` (`draw` du
    corps pour chaque `Pose` / `Expr`, `onState` pour l'apparence, `hitTest`) et sa ligne dans `SpeciesRenderers`
    (`Hamster.ID to ::HamsterRenderer`) ; ses couleurs dans `Palette`.
 3. `Species.ALL` (`species/Species.kt`) : l'ajouter **après** le lapin (le premier est l'espèce par défaut des
    anciennes sauvegardes). `SpeciesTest` (cœur) et `DrawersTest` (app : un renderer par espèce) le couvrent
    (exhaustivité) ; `PetSnapshot` l'accepte tout seul.
 4. Pour le proposer : un choix d'espèce dans `AdoptActivity` (l'`Adoption` porte alors l'espèce jusqu'à
-   `Identity(species = …)`) — pas encore d'interface. Si son gabarit diffère du lapin : la fenêtre (`Arena.bw/bh`)
+   `Identity(species = …)`) — pas encore d'interface. Les textes de l'app qui disent « lapin »
+   (`StringsResourceTest.speciesWordsAllowed`) deviennent alors neutres ou par espèce. Si son gabarit diffère du lapin : la fenêtre (`Arena.bw/bh`)
    devient par animal (`ensurePetWindow` prend `p.species.spec`), et `BunnyActor` / `PageTracker` lisent la largeur
    de l'animal.
 
@@ -1091,6 +1177,57 @@ Boucle, cerveau, jauges, stations, jouets, bêtises, social, persistance suivent
 
 `Act.SOCIAL`, `ActRegistry`, interruption (caresse, glisser, voyage), cadence et perception suivent. Tests : à côté de
 `SocialSystemTest` (`core/src/test`), avec un `FakePetCtx` + `addPet` et des `Random` seedés.
+
+### Textes : où ils vont, en ajouter un, traduire (étape 8c)
+
+**Où vont les textes**
+
+| Texte | Où | Exemple |
+|---|---|---|
+| Interface de l'app (activités, panneaux, notification et ses canaux, widget, tuile, toasts, manifeste) | `app/src/main/res/values/strings.xml`, clé `<écran>_<rôle>` | `main_rename`, `vet_diag`, `notif_feed` |
+| Réplique d'une fonctionnalité (bulle) | l'`object` de la fonctionnalité (`feature/…`, `social/…`) | `VetStation.HEALED`, `HugSocial.ASK` |
+| Réplique d'un contrôleur du cœur | son `companion object` | `ToyController.PLAY_OVER`, `PageTracker.WANDER` |
+| Réplique partagée, ou réponse de l'hôte à une commande | `CommonLines` (cœur) | `CommonLines.ASLEEP`, `goodbye(nom)` |
+| Réplique qui nomme l'espèce ou sa nourriture (« lapin », « carotte ») | `SpeciesLines` (une implémentation par espèce : `RabbitLines`) | `SONGS`, `GOING_TO_CHEST` |
+| Texte d'interface calculé par le cœur | `NotifierTexts`, `WidgetTexts`, `TileTexts`, `MenuEntries`, `label` des enums | `NotifierTexts.title` |
+
+Le cœur n'a pas accès aux ressources : ses textes restent en Kotlin, **regroupés** dans ces `object` (jamais dans le
+code d'une méthode). Le port de textes est **décidé mais pas implémenté** (voir écarts 8c : `UiTexts` pour
+l'interface du cœur, un jeu d'`object` par langue pour les répliques).
+
+**Ajouter un texte**
+
+1. Dans l'app : une `<string>` dans `strings.xml`, dans le groupe de son écran ; un texte avec des valeurs prend un
+   **format numéroté** (`%1$s`, `%2$d`) — jamais `"…" + x` ni `"$a $b"` dans `setText` (lint `SetTextI18n` bloque) ;
+   un nombre qui accorde un mot prend un `<plurals>` (`one`, `many`, `other`) et `getQuantityString(id, n, n)`.
+   Apostrophe : `\'`, ou la valeur entre guillemets (qui garde aussi les espaces). Un symbole ou un format pur :
+   `translatable="false"`.
+2. Dans le cœur : la réplique dans l'`object` de sa fonctionnalité (tableau = tirage : `ctx.pick(*TABLEAU)` /
+   `speech.pickFrom`) ; si elle nomme l'espèce, un membre de `SpeciesLines` (le compilateur demande sa version à
+   chaque espèce). Ajouter une réplique à un tableau change les tirages : vérifier les tests de référence.
+3. `NoSpeciesWordsTest` (cœur) et `StringsResourceTest` (app) signalent un « lapin » / « carotte » / 🐰 hors des
+   endroits prévus.
+
+**Traduire** (quand une deuxième langue arrivera) : app — `res/values-en/strings.xml` avec les mêmes clés (lint
+`MissingTranslation` liste ce qui manque ; `translatable="false"` n'est pas à traduire) ; cœur — appliquer la voie
+décrite dans les écarts 8c (port `UiTexts` + `object` de répliques par langue) avant d'écrire la première traduction.
+
+**Ce qui reste « lapin » (et carotte) hors de `species/rabbit/`** — volontairement :
+
+- **Cœur** (`NoSpeciesWordsTest`, liste d'exceptions) : la **carotte objet du jeu** — `Food.CARROT` (« Carotte ») et
+  sa réplique « Une carotte !! 🥕 » (`CarrotFood`) : c'est une nourriture du coffre comme la fraise, pas un mot de
+  l'espèce ; une espèce qui n'en mange pas la refusera (`Species.accepts`). L'emoji 🥕 sert aussi d'**icône de la
+  faim** (`NotifierTexts.statusLine`, `WidgetTexts.gauges`, humeur « faim » des compagnons, `GLUTTON`, fiche du véto,
+  boutons « Nourrir ») : à rendre propre à l'espèce (`Species.foodEmoji`) le jour où une espèce ne mange pas de
+  carottes. Les commentaires et noms historiques (`BunnyService`, « le lapin » dans la KDoc) ne sont pas du texte.
+- **App** (`StringsResourceTest.speciesWordsAllowed`, 11 clés) : le **personnage de l'app** — l'adoption ne crée que
+  des lapins (pas de choix d'espèce) : `main_tagline`, `main_name_hint`, `adopt_name_hint`, `main_reset`,
+  `main_reset_title`, `main_reset_message`, `adopt_title_new`, `adopt_your_pet`, `notif_channel_pet_desc`, et les
+  textes de divulgation de l'accessibilité (`main_a11y_dialog_message`, `a11y_description`). Avec une deuxième
+  espèce adoptable, ces textes deviennent neutres (« ton animal ») ou par espèce (recette « Ajouter une espèce »,
+  étape 4). « Cookie » (canaux de notification, widget, tuile, `a11y_summary`) est le nom par défaut du personnage
+  (TamaCookie), pas celui de l'animal : gardé.
+- Le **genre** des textes (« il dort », « Touche pour t'occuper de lui ») reste masculin : à revoir avec la traduction.
 
 Règles pour chaque étape : pas de big-bang, pas de nouvelle dépendance sans justification écrite,
 ajouter des tests JVM pour tout ce qui devient pur, mettre à jour ce fichier (colonne État + écarts).

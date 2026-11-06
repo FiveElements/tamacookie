@@ -220,8 +220,7 @@ class PageTracker(private val ctx: PetCtx) {
         wanderDir = when { cp <= 1 -> 1; cp >= n -> -1; else -> if (ctx.rnd.nextBoolean()) 1 else -1 }
         pet.body.targetX = if (wanderDir > 0) arena.screenW + arena.bw else -arena.bw.toFloat()
         pet.body.facing = wanderDir.toFloat()
-        ctx.say(ctx.pick("Je vais voir la page d'à côté 👀", "Je pars explorer ! 🐾", "Qu'est-ce qu'il y a par là ?",
-            "Tu me retrouves ? 😜"), 2.2f)
+        ctx.say(ctx.pick(*WANDER), 2.2f)
         pet.setAct(Act.PAGE_OUT)
         return true
     }
@@ -260,8 +259,7 @@ class PageTracker(private val ctx: PetCtx) {
                 val w = arena.screenW
                 pet.body.targetX = if (fromLeft) w * (0.15f + ctx.rnd.nextFloat() * 0.3f) else w * (0.55f + ctx.rnd.nextFloat() * 0.3f)
                 pet.mind.travelThen = Act.IDLE
-                pet.mind.travelComment = ctx.pick("Me revoilà ! 🐾", "Tu es parti sans moi ?!", "Attends-moi !",
-                    "Coucou, je t'ai retrouvé !", "J'ai fait le tour, c'est mieux ici 😄")
+                pet.mind.travelComment = ctx.pick(*BACK)
                 pet.setAct(Act.TRAVEL_IN)
             }
         }
@@ -271,7 +269,19 @@ class PageTracker(private val ctx: PetCtx) {
     fun viewLabel(key: String?): String {
         if (key.isNullOrEmpty()) return "?"
         val (pkg, page) = split(key)
-        if (page != null) return "page $page du bureau"
+        if (page != null) return desktopPage(page)
         return ctx.appLabel(pkg) ?: pkg.substringAfterLast('.')
+    }
+
+    /** Répliques des pages du bureau (l'ordre fixe les tirages) et nom d'une page. */
+    private companion object {
+        /** Il part explorer une page voisine. */
+        val WANDER = arrayOf("Je vais voir la page d'à côté 👀", "Je pars explorer ! 🐾",
+            "Qu'est-ce qu'il y a par là ?", "Tu me retrouves ? 😜")
+        /** Il revient sur la page affichée. */
+        val BACK = arrayOf("Me revoilà ! 🐾", "Tu es parti sans moi ?!", "Attends-moi !",
+            "Coucou, je t'ai retrouvé !", "J'ai fait le tour, c'est mieux ici 😄")
+        /** Nom d'une page du bureau (panneau 🏠, commentaires). */
+        fun desktopPage(n: Int) = "page $n du bureau"
     }
 }

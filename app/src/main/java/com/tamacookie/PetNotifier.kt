@@ -33,12 +33,12 @@ class PetNotifier(
     private val nm: NotificationManager get() = ctx.getSystemService(NotificationManager::class.java)
 
     fun createChannels() {
-        nm.createNotificationChannel(NotificationChannel(CH_PET, "Cookie est là", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Notification permanente du lapin"
+        nm.createNotificationChannel(NotificationChannel(CH_PET, ctx.getString(R.string.notif_channel_pet), NotificationManager.IMPORTANCE_LOW).apply {
+            description = ctx.getString(R.string.notif_channel_pet_desc)
             setShowBadge(false)
         })
-        nm.createNotificationChannel(NotificationChannel(CH_ALERT, "Besoins de Cookie", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "Quand Cookie a faim, est sale ou malade"
+        nm.createNotificationChannel(NotificationChannel(CH_ALERT, ctx.getString(R.string.notif_channel_alerts), NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = ctx.getString(R.string.notif_channel_alerts_desc)
         })
     }
 
@@ -58,15 +58,17 @@ class PetNotifier(
             .setContentIntent(open)
             .setOngoing(true)
         // Avant l'initialisation (permission manquante) : notification minimale
-        val p = pet() ?: return b.setContentTitle("TamaCookie").build()
+        val p = pet() ?: return b.setContentTitle(ctx.getString(R.string.app_name)).build()
         val hidden = hidden()
         val moodTxt = NotifierTexts.moodText(p.stats.mood, p.stats.sleeping, hiding())
+        val mood = if (p.stats.caged) ctx.getString(R.string.notif_mood_caged, moodTxt) else moodTxt
+        val title = director().title { mood }
         return b
-            .setContentTitle(director().title { "$moodTxt" + (if (p.stats.caged) " (en cage 🔒)" else "") } + if (hidden) " (caché)" else "")
+            .setContentTitle(if (hidden) ctx.getString(R.string.notif_title_hidden, title) else title)
             .setContentText(director().statusLine(::statusLine))
-            .addAction(Notification.Action.Builder(null, "🥕 Nourrir", pi(BunnyService.ACTION_FEED, 1)).build())
-            .addAction(Notification.Action.Builder(null, if (hidden) "Montrer" else "Cacher", pi(BunnyService.ACTION_TOGGLE, 2)).build())
-            .addAction(Notification.Action.Builder(null, "Ranger", pi(BunnyService.ACTION_STOP, 3)).build())
+            .addAction(Notification.Action.Builder(null, ctx.getString(R.string.notif_feed), pi(BunnyService.ACTION_FEED, 1)).build())
+            .addAction(Notification.Action.Builder(null, ctx.getString(if (hidden) R.string.notif_show else R.string.notif_hide), pi(BunnyService.ACTION_TOGGLE, 2)).build())
+            .addAction(Notification.Action.Builder(null, ctx.getString(R.string.notif_stop), pi(BunnyService.ACTION_STOP, 3)).build())
             .build()
     }
 
@@ -86,7 +88,7 @@ class PetNotifier(
         val n = Notification.Builder(ctx, CH_ALERT)
             .setSmallIcon(R.drawable.ic_bunny)
             .setContentTitle(txt)
-            .setContentText("Touche pour t'occuper de lui")
+            .setContentText(ctx.getString(R.string.notif_alert_text))
             .setContentIntent(pi(BunnyService.ACTION_TOGGLE, 4).takeIf { hidden() }
                 ?: PendingIntent.getActivity(ctx, 5, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
             .setAutoCancel(true)

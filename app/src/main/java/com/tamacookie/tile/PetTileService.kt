@@ -65,7 +65,7 @@ class PetTileService : TileService() {
         val name = try { Pets.repository(this).loadResident()?.identity?.name } catch (_: Exception) { null }
         tile.label = TileTexts.label(name, getString(R.string.tile_label))
         tile.subtitle = st.subtitle
-        tile.contentDescription = "${tile.label} : ${st.action}"
+        tile.contentDescription = getString(R.string.tile_description, tile.label, st.action)
         tile.state = if (st.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.updateTile()
     }

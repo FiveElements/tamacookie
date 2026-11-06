@@ -60,7 +60,7 @@ open class Panel(context: Context) : LinearLayout(context) {
         title.paint.isFakeBoldText = true
         header.addView(title, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         header.addView(TextView(context).apply {
-            text = "✕"; setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setText(R.string.panel_close); setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTextColor(Color.parseColor("#7A6B75"))
             setPadding((10 * d).toInt(), 0, (4 * d).toInt(), 0)
             setOnClickListener { onClose() }
@@ -78,9 +78,9 @@ open class Panel(context: Context) : LinearLayout(context) {
         val m = (3 * d).toInt(); setMargins(m, m, m, m)
     }
 
-    @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
+    @SuppressLint("ClickableViewAccessibility")
     protected fun button(emoji: String, label: String, click: () -> Unit) = TextView(context).apply {
-        text = "$emoji\n$label"
+        text = context.getString(R.string.panel_button, emoji, label)
         gravity = Gravity.CENTER
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         setTextColor(Color.parseColor("#3A2E39"))
@@ -107,7 +107,7 @@ open class Panel(context: Context) : LinearLayout(context) {
  * dodo, objets, cache-cache, ranger), [MenuEntries.PER_ROW] par rangée.
  * Les soins se font dans les "widgets" flottants : baignoire, véto, cage.
  */
-@SuppressLint("ViewConstructor", "SetTextI18n")
+@SuppressLint("ViewConstructor")
 class PetMenu(
     context: Context,
     private val pet: Pet,
@@ -138,15 +138,16 @@ class PetMenu(
             }
             addView(r, if (i == 0) rowLp(6) else rowLp())
         }
-        addView(small("💡 Touche le coffre pour lui donner à manger ou un jouet. Glisse ${pet.name} dans la baignoire pour le laver, chez le véto pour voir sa santé.").apply {
+        addView(small(context.getString(R.string.menu_hint, pet.name)).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f); setPadding(0, (6 * d).toInt(), 0, 0)
         })
         refresh()
     }
 
     fun refresh() {
-        title.text = "${pet.species.emoji} ${pet.name} · ${pet.personality.emoji} ${pet.personality.label}"
-        moodText.text = moodLabel(pet)
+        val p = pet.personality
+        title.text = context.getString(R.string.menu_title, pet.species.emoji, pet.name, p.emoji, p.label)
+        moodText.setText(moodLabel(pet))
         for ((e, b) in dynamic) b.text = e.text(pet.stats)
     }
 }
@@ -155,7 +156,7 @@ class PetMenu(
  * Panneau du bouton 🏠 : chaque objet (baignoire, véto, cage) s'installe
  * indépendamment sur la vue courante, ou se range.
  */
-@SuppressLint("ViewConstructor", "SetTextI18n")
+@SuppressLint("ViewConstructor")
 class StationsPanel(
     context: Context,
     /** 0 = sur cette vue, 1 = sur une autre vue, 2 = rangé ; + libellé de l'endroit */
@@ -167,8 +168,8 @@ class StationsPanel(
     private val rows = LinkedHashMap<StationKind, Pair<TextView, TextView>>()
 
     init {
-        header(TextView(context).apply { text = "🏠 Objets de cette page" }, onClose)
-        addView(small("Chaque objet reste sur la page (ou l'app) où tu l'as mis.").apply {
+        header(TextView(context).apply { setText(R.string.stations_title) }, onClose)
+        addView(small(context.getString(R.string.stations_hint)).apply {
             setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
         })
         for (k in StationKind.values()) {
@@ -195,8 +196,13 @@ class StationsPanel(
         for ((k, pair) in rows) {
             val (info, btn) = pair
             val (st, where) = status(k)
-            info.text = "${info.tag}\n" + when (st) { 0 -> "✅ sur cette page"; 1 -> "📍 $where"; else -> "📦 rangé" }
-            btn.text = if (st == 0) "Ranger" else "Mettre ici"
+            val place = when (st) {
+                0 -> context.getString(R.string.stations_here)
+                1 -> context.getString(R.string.stations_elsewhere, where)
+                else -> context.getString(R.string.stations_stored)
+            }
+            info.text = context.getString(R.string.stations_row, info.tag, place)
+            btn.setText(if (st == 0) R.string.stations_store else R.string.stations_put_here)
             btn.background = GradientDrawable().apply {
                 cornerRadius = 12 * d
                 setColor(Color.parseColor(if (st == 0) "#FBEFE6" else "#FFE0E8"))
@@ -206,7 +212,7 @@ class StationsPanel(
 }
 
 /** Coffre ouvert : choisir à manger ou un jouet. */
-@SuppressLint("ViewConstructor", "SetTextI18n")
+@SuppressLint("ViewConstructor")
 class ChestPanel(
     context: Context,
     pet: Pet,
@@ -215,17 +221,20 @@ class ChestPanel(
     private val onClose: () -> Unit,
 ) : Panel(context) {
     init {
-        header(TextView(context).apply { text = "🧰 Le coffre de ${pet.name}" }, onClose)
-        addView(small("🍽️ À manger").apply { setPadding(0, (6 * d).toInt(), 0, 0) })
+        header(TextView(context).apply { text = context.getString(R.string.chest_title, pet.name) }, onClose)
+        addView(small(context.getString(R.string.chest_food)).apply { setPadding(0, (6 * d).toInt(), 0, 0) })
         for (chunk in Food.entries.chunked(PER_ROW)) {
             val foods = row()
             for (f in chunk) foods.addView(button(f.emoji, f.label) { onFood(f) }, btnLp())
             addView(foods, rowLp(2))
         }
-        addView(small("🎁 Jouets").apply { setPadding(0, (6 * d).toInt(), 0, 0) })
+        addView(small(context.getString(R.string.chest_toys)).apply { setPadding(0, (6 * d).toInt(), 0, 0) })
         for (chunk in Toy.entries.chunked(PER_ROW)) {
             val toys = row()
-            for (t in chunk) toys.addView(button(t.emoji, t.label + if (t == pet.favoriteToy) "⭐" else "") { onToy(t) }, btnLp())
+            for (t in chunk) {
+                val label = if (t == pet.favoriteToy) context.getString(R.string.chest_favorite, t.label) else t.label
+                toys.addView(button(t.emoji, label) { onToy(t) }, btnLp())
+            }
             addView(toys, rowLp(2))
         }
     }
@@ -236,18 +245,19 @@ class ChestPanel(
     }
 }
 
-fun moodLabel(pet: Pet): String = when (pet.stats.mood) {
-    Mood.HAPPY -> "Aux anges ✨"
-    Mood.OK -> "Tranquille"
-    Mood.HUNGRY -> "A très faim…"
-    Mood.SLEEPY -> if (pet.stats.sleeping) "Fait dodo… chut" else "Tombe de sommeil"
-    Mood.DIRTY -> "Aurait bien besoin d'un bain"
-    Mood.SAD -> "Se sent seul…"
-    Mood.SICK -> "Est malade 🤒"
+/** Humeur affichée sous le titre du menu (ressource `menu_mood_*`). */
+fun moodLabel(pet: Pet): Int = when (pet.stats.mood) {
+    Mood.HAPPY -> R.string.menu_mood_happy
+    Mood.OK -> R.string.menu_mood_ok
+    Mood.HUNGRY -> R.string.menu_mood_hungry
+    Mood.SLEEPY -> if (pet.stats.sleeping) R.string.menu_mood_sleeping else R.string.menu_mood_sleepy
+    Mood.DIRTY -> R.string.menu_mood_dirty
+    Mood.SAD -> R.string.menu_mood_sad
+    Mood.SICK -> R.string.menu_mood_sick
 }
 
 /** Fiche du vétérinaire : toutes les statistiques + soin. */
-@SuppressLint("ViewConstructor", "SetTextI18n")
+@SuppressLint("ViewConstructor")
 class VetPanel(
     context: Context,
     private val pet: Pet,
@@ -267,12 +277,13 @@ class VetPanel(
         info.setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
         addView(info)
         for ((label, color) in listOf(
-            "🥕 Faim" to "#F28C28", "💖 Bonheur" to "#FF5C8A", "⚡ Énergie" to "#F5C542",
-            "🛁 Propreté" to "#4FB3E8", "❤️‍🩹 Santé" to "#5CC489",
+            R.string.vet_gauge_satiety to "#F28C28", R.string.vet_gauge_happiness to "#FF5C8A",
+            R.string.vet_gauge_energy to "#F5C542", R.string.vet_gauge_cleanliness to "#4FB3E8",
+            R.string.vet_gauge_health to "#5CC489",
         )) {
             val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             row.addView(TextView(context).apply {
-                text = label; setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setSingleLine()
+                setText(label); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setSingleLine()
                 setTextColor(Color.parseColor("#3A2E39"))
             }, LayoutParams((112 * d).toInt(), LayoutParams.WRAP_CONTENT))
             val bar = StatBar(context, Color.parseColor(color))
@@ -287,28 +298,37 @@ class VetPanel(
         diag.setPadding(0, (6 * d).toInt(), 0, (4 * d).toInt())
         addView(diag)
         val r = row()
-        healBtn = button("💉", "Soigner") { onHeal() }
+        healBtn = button("💉", context.getString(R.string.vet_heal)) { onHeal() }
         r.addView(healBtn, btnLp())
-        r.addView(button("🚪", "Sortir") { onClose() }, btnLp())
+        r.addView(button("🚪", context.getString(R.string.vet_leave)) { onClose() }, btnLp())
         addView(r, rowLp(4))
         refresh()
     }
 
     fun refresh() {
-        title.text = "🩺 Fiche de ${pet.name}"
-        info.text = "${pet.personality.emoji} ${pet.personality.label} · ${pet.identity.ageDays(System.currentTimeMillis())} jour(s) · " +
-            "jouet préféré : ${pet.favoriteToy.emoji} · ${pet.stats.visitedApps} apps visitées"
+        val res = context.resources
+        title.text = context.getString(R.string.vet_title, pet.name)
+        val days = pet.identity.ageDays(System.currentTimeMillis())
+        val apps = pet.stats.visitedApps
+        info.text = context.getString(R.string.vet_info, pet.personality.emoji, pet.personality.label,
+            res.getQuantityString(R.plurals.vet_age_days, days, days), pet.favoriteToy.emoji,
+            res.getQuantityString(R.plurals.vet_apps_visited, apps, apps))
         val v = pet.stats.let { listOf(it.satiety, it.happiness, it.energy, it.cleanliness, it.health) }
-        v.forEachIndexed { i, x -> bars[i].value = x; values[i].text = "${x.toInt()}" }
+        v.forEachIndexed { i, x ->
+            bars[i].value = x
+            values[i].text = context.getString(R.string.vet_gauge_value, x.toInt())
+        }
         val issues = ArrayList<String>()
-        if (pet.stats.isSick) issues += "malade : un vaccin s'impose 💉"
-        else if (pet.stats.health < 70f) issues += "santé fragile"
-        if (pet.stats.satiety < 25f) issues += "il a faim"
-        if (pet.stats.cleanliness < 35f) issues += "un bain serait bien"
-        if (pet.stats.energy < 20f) issues += "il est épuisé"
-        if (pet.stats.happiness < 30f) issues += "il a besoin d'attention"
-        if (pet.stats.poops > 0) issues += "${pet.stats.poops} crotte(s) à ramasser"
-        diag.text = if (issues.isEmpty()) "✅ Diagnostic : en pleine forme !" else "📋 Diagnostic : " + issues.joinToString(", ")
+        if (pet.stats.isSick) issues += context.getString(R.string.vet_issue_sick)
+        else if (pet.stats.health < 70f) issues += context.getString(R.string.vet_issue_fragile)
+        if (pet.stats.satiety < 25f) issues += context.getString(R.string.vet_issue_hungry)
+        if (pet.stats.cleanliness < 35f) issues += context.getString(R.string.vet_issue_dirty)
+        if (pet.stats.energy < 20f) issues += context.getString(R.string.vet_issue_tired)
+        if (pet.stats.happiness < 30f) issues += context.getString(R.string.vet_issue_lonely)
+        val poops = pet.stats.poops
+        if (poops > 0) issues += res.getQuantityString(R.plurals.vet_issue_poops, poops, poops)
+        diag.text = if (issues.isEmpty()) context.getString(R.string.vet_diag_ok)
+        else context.getString(R.string.vet_diag, issues.joinToString(context.getString(R.string.vet_diag_separator)))
         healBtn.alpha = if (pet.stats.health < GameRules.DEFAULT.healthyAbove) 1f else 0.45f
     }
 }

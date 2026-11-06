@@ -3,6 +3,7 @@ package com.tamacookie.widget
 import com.tamacookie.Mood
 import com.tamacookie.NotifierTexts
 import com.tamacookie.PetStats
+import com.tamacookie.species.Species
 
 /**
  * Textes du widget d'écran d'accueil (évolution 4c, Kotlin pur) : ce qu'affiche [PetWidget], calculé à partir
@@ -61,10 +62,10 @@ object WidgetTexts {
         )
     }
 
-    /** Aucun animal enregistré (jamais lancé) : on invite à l'adopter. */
+    /** Aucun animal enregistré (jamais lancé) : on invite à adopter un animal de l'espèce par défaut. */
     val NO_PET = Content(
-        title = "🐰 TamaCookie",
-        subtitle = "Touche pour adopter ton lapin",
+        title = "${Species.DEFAULT.emoji} TamaCookie",
+        subtitle = Species.DEFAULT.lines.ADOPT_PROMPT,
         gauges = emptyList(),
         statusLine = "",
         status = "",
