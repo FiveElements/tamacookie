@@ -3,9 +3,9 @@ package com.tamacookie
 /**
  * Port **`ScreenActions`** (Kotlin pur) : ce que le cœur peut **faire** sur l'écran des autres applications.
  * Une seule chose, volontairement : appuyer sur le bouton « Ignorer / Passer l'annonce » d'une publicité
- * (chasseur de pubs). Jamais un geste simulé à une coordonnée : l'adaptateur (`ScreenSensorService`) relit
- * l'arbre d'accessibilité, retrouve un nœud de la liste blanche ([ScreenScan.isAdSkip]) qui recoupe encore
- * [pressAdSkip]`(target)` et lui envoie `ACTION_CLICK` ; sinon il ne fait rien.
+ * (chasseur de pubs). L'adaptateur (`ScreenSensorService`) relit l'arbre d'accessibilité, retrouve un nœud de la
+ * liste blanche ([ScreenScan.isAdSkip]) qui recoupe encore [pressAdSkip]`(target)` et lui envoie `ACTION_CLICK` ;
+ * si l'app le refuse (YouTube), un toucher simulé au centre de **ce** nœud ; sinon il ne fait rien.
  *
  * Implémenté par [AdSkipRelay] (qui passe la demande au service connecté) ; faux en test : `FakeScreenActions`.
  */

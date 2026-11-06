@@ -40,7 +40,7 @@ import android.view.accessibility.AccessibilityWindowInfo
  *  - (chasseur de pubs, réglage actif) la présence et la position du bouton « Ignorer / Passer l'annonce »
  *    d'une publicité ([ScreenScan.findAdSkip] : identifiant `…:id/skip_ad_button` ou libellé exact).
  * Ce qu'il fait, et seulement cela : appuyer (`ACTION_CLICK`) sur ce bouton-là quand Cookie saute dessus
- * ([pressAdSkip]) — jamais ailleurs, jamais un geste à une coordonnée.
+ * ([pressAdSkip] ; refusé par l'app → toucher simulé au centre de ce bouton) — jamais ailleurs.
  * Rien n'est stocké ni envoyé : tout reste en mémoire dans le processus de l'app.
  */
 class ScreenSensorService : AccessibilityService() {

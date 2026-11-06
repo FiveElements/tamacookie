@@ -101,6 +101,9 @@ TamaCookie › activer. Grisé : voir « paramètres restreints » ci-dessus. Le
 éléments à l'écran (icônes, boutons, clavier) et le défilement du bureau. Il n'agit que dans un cas : si le
 réglage « Chasseur de pubs » est activé, il appuie sur le bouton « Ignorer l'annonce » / « Passer l'annonce »
 d'une publicité (identifiant `skip_ad_button` de YouTube, ou libellé exact), quand le lapin saute dessus.
+YouTube refusant l'appui « accessibilité » sur ce bouton, le service simule alors un toucher bref **au centre de
+ce bouton** (droit « effectuer des gestes »). Après une mise à jour qui ajoute ce droit, **désactive puis réactive**
+TamaCookie dans Paramètres › Accessibilité pour qu'Android le prenne en compte.
 
 ### 4. Par ADB (développement, appareil branché)
 

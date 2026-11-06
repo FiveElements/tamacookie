@@ -36,6 +36,45 @@ class OverlayManager(private val wm: WindowManager) : WindowTable<Win>(Backend(w
         relayout(id, w.lp.x, w.lp.y)
     }
 
+    /**
+     * Chasseur de pubs : nos fenêtres qui recouvrent [area] deviennent **transparentes et traversables** pendant
+     * [ms] ms, le temps qu'un toucher simulé atteigne le bouton de l'app en dessous (sinon il tomberait sur le
+     * lapin, ou serait bloqué par Android : fenêtre d'une autre app opaque au-dessus du point touché).
+     */
+    fun clearArea(area: Box, ms: Long) {
+        for (id in stacking) {
+            val w = window(id) ?: continue
+            if (covers(w, area)) clearFor(id, w, ms)
+        }
+    }
+
+    private fun covers(w: Win, area: Box): Boolean {
+        val wd = Backend.widthOf(w); val ht = Backend.heightOf(w)
+        if (wd <= 0 || ht <= 0) return false
+        val x = w.lp.x.toFloat(); val y = w.lp.y.toFloat()
+        return Box(x, y, x + wd, y + ht).intersects(area)
+    }
+
+    /** [w] transparente et traversable pendant [ms] ms, puis ses paramètres d'avant (si elle est toujours là). */
+    private fun clearFor(id: WindowId, w: Win, ms: Long) {
+        val flags = w.lp.flags; val alpha = w.lp.alpha
+        w.lp.flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        w.lp.alpha = 0f
+        if (!update(w)) return
+        handler.postDelayed({
+            w.lp.flags = flags; w.lp.alpha = alpha
+            if (window(id) === w && isAttached(id)) update(w)
+        }, ms)
+    }
+
+    // Fenêtre retirée entre-temps (WindowManager) : journalisé et ignoré, comme Backend.remove
+    @Suppress("TooGenericExceptionCaught")
+    private fun update(w: Win): Boolean = try {
+        wm.updateViewLayout(w.view, w.lp); true
+    } catch (e: Exception) {
+        Log.w("TamaCookie", "clearArea", e); false
+    }
+
     override fun onPending() {
         if (flushPosted) return
         flushPosted = true
@@ -66,12 +105,17 @@ class OverlayManager(private val wm: WindowManager) : WindowTable<Win>(Backend(w
         }
 
         /** Taille affichée (ou demandée, avant la première mise en page) ; ≤ 0 si encore inconnue. */
-        override fun width(w: Win): Int = if (w.view.width > 0) w.view.width else w.lp.width
-        override fun height(w: Win): Int = if (w.view.height > 0) w.view.height else w.lp.height
+        override fun width(w: Win): Int = widthOf(w)
+        override fun height(w: Win): Int = heightOf(w)
 
         override fun redraw(w: Win) {
             val v = w.view
             if (v is Refreshable) v.refresh() else v.invalidate()
+        }
+
+        companion object {
+            fun widthOf(w: Win): Int = if (w.view.width > 0) w.view.width else w.lp.width
+            fun heightOf(w: Win): Int = if (w.view.height > 0) w.view.height else w.lp.height
         }
     }
 }

@@ -58,6 +58,8 @@ import kotlin.random.Random
 class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     companion object {
+        /** Chasseur de pubs : durée (ms) pendant laquelle nos fenêtres laissent passer le toucher simulé. */
+        private const val AD_TAP_CLEAR_MS = 400L
         const val ACTION_FEED = "com.tamacookie.FEED"
         const val ACTION_TOGGLE = "com.tamacookie.TOGGLE"
         const val ACTION_STOP = "com.tamacookie.STOP"
@@ -242,6 +244,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         watcher = graph.foregroundWatcher()
         wm = getSystemService(WindowManager::class.java)
         overlayManager = OverlayManager(wm)
+        graph.clearOverlayArea = { area -> overlayManager.clearArea(area, AD_TAP_CLEAR_MS) }
         windows = OverlayWindows(this, arena, { sharedPrefs }, overlayManager, bubbleAnchor)
         pages = PageTracker(this)
         toys = ToyController(this)
@@ -512,6 +515,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun onDestroy() {
         running = false
         visible = false
+        graph.clearOverlayArea = null
         graph.screen.adSkipWanted = false   // plus personne pour sauter sur le bouton : on ne le cherche plus
         val wasReady = ready
         ready = false

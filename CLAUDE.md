@@ -1218,7 +1218,7 @@ Principes :
   comportement existant inchangé sans bouton) — 4 commits (détection + port ; IA ; service + réglage + textes ;
   ce fichier et le README) :
   - **Première action du service d'accessibilité** (jusqu'ici il ne faisait que lire). Une seule, et gardée à
-    chaque étage : appuyer (`ACTION_CLICK` sur le **nœud**, jamais un geste à une coordonnée) sur le bouton qui
+    chaque étage : appuyer (`ACTION_CLICK` sur le **nœud** ; refusé → toucher simulé au centre de ce nœud, voir plus bas) sur le bouton qui
     passe une publicité, si le réglage est actif. Divulguée dans `a11y_description` (Paramètres › Accessibilité),
     `main_a11y_dialog_message` et le README.
   - **Liste blanche stricte** (`ScreenScan.isAdSkip`, pur) : nœud visible, **cliquable**, non éditable, de taille
@@ -1252,7 +1252,14 @@ Principes :
     connu (`ScreenSnapshot.adSkip`) ; le service branche `presser` à sa connexion (null à sa destruction).
     **`AdSkipAccess`** (app, sorti de `ScreenSensorService` pour rester sous `TooManyFunctions`) : sur le fil du scan,
     **relit** la fenêtre active, retrouve un nœud de la liste blanche qui recoupe **encore** la cible, `ACTION_CLICK`,
-    sinon rien ; puis revérifie 400 ms plus tard. `true` = demande transmise (l'appui est asynchrone). Le relais
+    sinon rien ; puis revérifie 400 ms plus tard. **Essai sur tablette : YouTube refuse l'`ACTION_CLICK` de ce bouton**
+    (`performAction` → false, action pourtant annoncée) : repli = **toucher simulé** (`dispatchGesture`, 50 ms,
+    `canPerformGestures`) au centre des bornes du nœud **relu à l'instant** (liste blanche), jamais ailleurs. Avant le
+    toucher, nos fenêtres qui recouvrent le bouton (le lapin perché dessus, sa bulle) deviennent transparentes et
+    traversables 400 ms (`AppGraph.clearOverlayArea` → `OverlayManager.clearArea` : `FLAG_NOT_TOUCHABLE` + `alpha` 0) —
+    sinon le toucher tombe sur le lapin, ou Android le bloque (fenêtre opaque d'une autre app au-dessus du point) ;
+    le geste part 60 ms après. Le nouveau droit (gestes) n'est pris en compte qu'en **réactivant** le service
+    d'accessibilité après la mise à jour. `true` = demande transmise (l'appui est asynchrone). Le relais
     n'est pas le hub (`ScreenSensorHub : ScreenActions` aurait changé la signature de son entrée `TooManyFunctions`
     dans la baseline) ; le hub gagne `adSkipWanted` et `onAdProbe` (classe déjà dans la baseline).
   - **IA** (`feature/adskip/AdSkipHunter.kt`, pur, `ActHandler` de **`Act.SKIP_AD`** — ajouté à la fin, dans
