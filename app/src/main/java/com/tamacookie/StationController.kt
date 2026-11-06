@@ -28,14 +28,39 @@ class StationController(private val ctx: PetCtx) {
         private set
     private var hoverStation: StationKind? = null
 
-    private var vetPanel: VetPanel? = null
-    private var vetLp: WindowManager.LayoutParams? = null
     private var vetTimer = 0f
-    private var stationsPanel: StationsPanel? = null
-    private var stationsLp: WindowManager.LayoutParams? = null
-    private var chestPanel: ChestPanel? = null
-    private var chestLp: WindowManager.LayoutParams? = null
     private var chestOf: Station? = null
+
+    /** Fiche du véto, à côté de la station (à droite si la place le permet). */
+    private val vetPanel = FloatingPanel<VetPanel>(ctx.windows, Tuning.VET_PANEL_W_DP, watchOutside = false) { lp, w, h ->
+        val s = get(StationKind.VET)
+        val win = ctx.windows
+        val scx = s.lp.x + s.lp.width / 2f
+        val scy = s.lp.y + s.lp.height / 2f
+        val right = scx + s.lp.width / 2f + 12 * d
+        lp.x = win.clampPanelX(if (right + w < arena.screenW) right else scx - s.lp.width / 2f - 12 * d - w, w)
+        lp.y = win.clampPanelY(scy - h / 2f, h)
+    }
+
+    /** Coffre ouvert, au-dessus de la station (dessous s'il n'y a pas la place) ; elle suit le défilement. */
+    private val chestPanel = FloatingPanel<ChestPanel>(ctx.windows, Tuning.CHEST_PANEL_W_DP, watchOutside = true) { lp, w, h ->
+        val s = chestOf ?: return@FloatingPanel
+        val win = ctx.windows
+        val scx = s.lp.x + s.lp.width / 2f
+        val scy = s.lp.y + s.lp.height / 2f
+        lp.x = win.clampPanelX(scx - w / 2f, w)
+        val above = scy - s.lp.height / 2f - h - 8 * d
+        lp.y = win.clampPanelY(if (above > arena.topY) above else scy + s.lp.height / 2f + 8 * d, h)
+    }
+
+    /** Panneau 🏠, à côté du bouton (du côté où il y a de la place). */
+    private val stationsPanel = FloatingPanel<StationsPanel>(ctx.windows, Tuning.STATIONS_PANEL_W_DP, watchOutside = true) { lp, w, h ->
+        val win = ctx.windows
+        val dockLp = win.dockLp
+        val dockCx = dockLp.x + dockLp.width / 2f
+        lp.x = win.clampPanelX(if (dockCx > arena.screenW / 2) dockLp.x - w - 8 * d else dockLp.x + dockLp.width + 8 * d, w)
+        lp.y = win.clampPanelY(dockLp.y + dockLp.height / 2f - h / 2f, h)
+    }
 
     // Le lapin percute le coffre : il s'ouvre et un objet en jaillit
     private var chestBumpCd = 0f
@@ -154,7 +179,7 @@ class StationController(private val ctx: PetCtx) {
         val bath = get(StationKind.BATH)
         if (bath.shown) { bath.view.t += dt; bath.view.invalidate() }
         vetTimer += dt
-        if (vetTimer > 1f) { vetTimer = 0f; vetPanel?.refresh() }
+        if (vetTimer > 1f) { vetTimer = 0f; vetPanel.view?.refresh() }
     }
 
     /** Une station animée est visible (baignoire, couvercle du coffre). */
@@ -351,7 +376,7 @@ class StationController(private val ctx: PetCtx) {
     /** Bouton 🏠 : panneau pour installer / ranger chaque objet sur la vue courante. */
     fun toggleStationsPanel() {
         ctx.noteInteraction()
-        if (stationsPanel != null) { closeStationsPanel(); return }
+        if (stationsPanel.isOpen) { closeStationsPanel(); return }
         ctx.closeMenu()
         val pages = ctx.pages
         val panel = StationsPanel(ctx.context,
@@ -379,35 +404,12 @@ class StationController(private val ctx: PetCtx) {
                 ctx.layoutAnchored()
             },
             onClose = { closeStationsPanel() })
-        val w = ctx.windows.panelWidth(Tuning.STATIONS_PANEL_W_DP)
-        val lp = ctx.windows.panelParams(w, watchOutside = true)
-        panel.setOnTouchListener { _, ev ->
-            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { closeStationsPanel(); true } else false
-        }
-        stationsPanel = panel; stationsLp = lp
-        layoutStationsPanel()
-        ctx.windows.add(panel, lp)
+        stationsPanel.open(panel) { closeStationsPanel() }
     }
 
-    private fun layoutStationsPanel() {
-        val panel = stationsPanel ?: return
-        val lp = stationsLp ?: return
-        val win = ctx.windows
-        val w = win.panelWidth(Tuning.STATIONS_PANEL_W_DP)
-        lp.width = w
-        val h = win.measurePanel(panel, w)
-        val dockLp = win.dockLp
-        val dockCx = dockLp.x + dockLp.width / 2f
-        lp.x = win.clampPanelX(if (dockCx > arena.screenW / 2) dockLp.x - w - 8 * d else dockLp.x + dockLp.width + 8 * d, w)
-        lp.y = win.clampPanelY(dockLp.y + dockLp.height / 2f - h / 2f, h)
-    }
+    fun closeStationsPanel() = stationsPanel.close()
 
-    fun closeStationsPanel() {
-        stationsPanel?.let { ctx.windows.safeRemove(it) }
-        stationsPanel = null; stationsLp = null
-    }
-
-    fun refreshStationsPanel() { stationsPanel?.refresh() }
+    fun refreshStationsPanel() { stationsPanel.view?.refresh() }
 
     // --- Coffre : nourriture et jouets ---
     private fun openChest(s: Station) {
@@ -419,34 +421,12 @@ class StationController(private val ctx: PetCtx) {
             onFood = { f -> closeChest(); ctx.feed(f, from = s) },
             onToy = { t -> closeChest(); ctx.startPlay(t, from = s) },
             onClose = { closeChest() })
-        val lp = ctx.windows.panelParams(ctx.windows.panelWidth(Tuning.CHEST_PANEL_W_DP), watchOutside = true)
-        panel.setOnTouchListener { _, ev ->
-            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { closeChest(); true } else false
-        }
-        chestPanel = panel; chestLp = lp; chestOf = s
-        layoutChestPanel()
-        ctx.windows.add(panel, lp)
-    }
-
-    private fun layoutChestPanel() {
-        val panel = chestPanel ?: return
-        val lp = chestLp ?: return
-        val s = chestOf ?: return
-        val win = ctx.windows
-        val w = win.panelWidth(Tuning.CHEST_PANEL_W_DP)
-        lp.width = w
-        val h = win.measurePanel(panel, w)
-        // position de la station à l'écran (elle suit le défilement du bureau)
-        val scx = s.lp.x + s.lp.width / 2f
-        val scy = s.lp.y + s.lp.height / 2f
-        lp.x = win.clampPanelX(scx - w / 2f, w)
-        val above = scy - s.lp.height / 2f - h - 8 * d
-        lp.y = win.clampPanelY(if (above > arena.topY) above else scy + s.lp.height / 2f + 8 * d, h)
+        chestOf = s
+        chestPanel.open(panel) { closeChest() }
     }
 
     fun closeChest() {
-        chestPanel?.let { ctx.windows.safeRemove(it) }
-        chestPanel = null; chestLp = null
+        chestPanel.close()
         chestOf?.view?.open = false
         chestOf = null
     }
@@ -454,7 +434,7 @@ class StationController(private val ctx: PetCtx) {
     /** Le coffre s'il est visible sur la page du lapin (et pas déjà ouvert par l'utilisateur). */
     fun visibleChest(): Station? {
         val s = get(StationKind.CHEST)
-        if (!s.shown || chestPanel != null || ctx.pages.bunnyElsewhere()) return null
+        if (!s.shown || chestPanel.isOpen || ctx.pages.bunnyElsewhere()) return null
         if (s.lp.x + s.lp.width < 0 || s.lp.x > arena.screenW) return null
         return s
     }
@@ -478,7 +458,7 @@ class StationController(private val ctx: PetCtx) {
         if (chestBumpCd > 0f) chestBumpCd -= dt
         if (chestLid > 0f) {
             chestLid -= dt
-            if (chestLid <= 0f && chestPanel == null) get(StationKind.CHEST).view.open = false
+            if (chestLid <= 0f && !chestPanel.isOpen) get(StationKind.CHEST).view.open = false
         }
         val act = pet.body.act
         // L'objet sort une fois le lapin retombé (pas en plein vol)
@@ -547,46 +527,24 @@ class StationController(private val ctx: PetCtx) {
                     pet.express(Expr.SAD, 1.5f)
                     ctx.say(ctx.pick("Aïe ! … merci docteur 💉", "Même pas mal ! (un peu)"))
                 }
-                vetPanel?.refresh()
+                vetPanel.view?.refresh()
             },
             onClose = { leaveStation(hopOut = true) })
-        val lp = ctx.windows.panelParams(ctx.windows.panelWidth(Tuning.VET_PANEL_W_DP), watchOutside = false)
-        vetPanel = p; vetLp = lp
-        layoutVetPanel()
-        ctx.windows.add(p, lp)
+        vetPanel.open(p)
     }
 
-    private fun layoutVetPanel() {
-        val p = vetPanel ?: return
-        val lp = vetLp ?: return
-        val s = get(StationKind.VET)
-        val win = ctx.windows
-        val w = win.panelWidth(Tuning.VET_PANEL_W_DP)
-        lp.width = w
-        val h = win.measurePanel(p, w)
-        val scx = s.lp.x + s.lp.width / 2f
-        val scy = s.lp.y + s.lp.height / 2f
-        val right = scx + s.lp.width / 2f + 12 * d
-        lp.x = win.clampPanelX(if (right + w < arena.screenW) right else scx - s.lp.width / 2f - 12 * d - w, w)
-        lp.y = win.clampPanelY(scy - h / 2f, h)
-    }
-
-    private fun closeVetPanel() {
-        vetPanel?.let { ctx.windows.safeRemove(it) }
-        vetPanel = null; vetLp = null
-    }
+    private fun closeVetPanel() = vetPanel.close()
 
     /** Après "Montrer" : s'il est toujours chez le véto, le panneau revient (sinon il y resterait bloqué). */
     fun reopenVetPanelIfNeeded() {
-        if (inStation == StationKind.VET && vetPanel == null) openVetPanel()
+        if (inStation == StationKind.VET && !vetPanel.isOpen) openVetPanel()
     }
 
     /** Nouvelle taille d'écran : les panneaux ouverts sont replacés dans l'écran. */
     fun repositionPanels() {
-        val win = ctx.windows
-        layoutVetPanel(); vetPanel?.let { v -> vetLp?.let { win.update(v, it) } }
-        layoutChestPanel(); chestPanel?.let { v -> chestLp?.let { win.update(v, it) } }
-        layoutStationsPanel(); stationsPanel?.let { v -> stationsLp?.let { win.update(v, it) } }
+        vetPanel.reposition()
+        chestPanel.reposition()
+        stationsPanel.reposition()
     }
 
     fun closePanels() {
