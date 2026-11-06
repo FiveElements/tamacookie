@@ -76,6 +76,19 @@
                 android:resource="@xml/accessibility_config" />
         </service>
 
+        <!-- Widget d'écran d'accueil (évolution 4c) -->
+        <receiver
+            android:name=".widget.PetWidget"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/pet_widget_info" />
+        </receiver>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

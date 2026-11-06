@@ -29,6 +29,8 @@ import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
 import com.tamacookie.persist.Pets
 import com.tamacookie.social.SocialSystem
+import com.tamacookie.widget.PetWidget
+import com.tamacookie.widget.UpdateThrottle
 import com.tamacookie.species.Species
 import java.util.Calendar
 import kotlin.math.roundToInt
@@ -56,10 +58,23 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         const val ACTION_TOGGLE = "com.tamacookie.TOGGLE"
         const val ACTION_STOP = "com.tamacookie.STOP"
         const val ACTION_RELOAD = "com.tamacookie.RELOAD"
+        /** Le faire venir (widget « Appeler ») : montré s'il était caché, sinon il répond. */
+        const val ACTION_SHOW = "com.tamacookie.SHOW"
+        /** Commande qui peut **démarrer** le service au premier plan (widget, tuile : voir [userCommand]). */
+        private const val EXTRA_FOREGROUND = "foreground"
         private const val TAG = "TamaCookie"
+        /** Réponse à « Appeler » quand il est déjà là. */
+        private const val CALLED = "Je suis là ! 👋"
 
         @Volatile var running = false
             private set
+
+        /**
+         * Commande d'un toucher de l'utilisateur hors de l'app (widget, tuile), envoyée par
+         * `startForegroundService` : le service la traite, démarré au besoin.
+         */
+        fun userCommand(ctx: Context, action: String): Intent =
+            Intent(ctx, BunnyService::class.java).setAction(action).putExtra(EXTRA_FOREGROUND, true)
 
         fun start(ctx: Context) {
             Prefs.of(ctx).edit().putBoolean(Prefs.ENABLED, true).apply()
@@ -171,6 +186,14 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private var lastTickWall = 0L
     private var lastSaveWall = 0L
     private var notifTimer = 0f
+    /** Démarrage du service (uptime) : « Appeler » juste après le lancement laisse la place à l'accueil. */
+    private var createdAt = 0L
+    /** Widget d'écran d'accueil : au plus une mise à jour par minute après les sauvegardes. */
+    private val widgetThrottle = UpdateThrottle()
+    private val widgetUpdate = Runnable {
+        widgetThrottle.fired(clock.uptimeMs())
+        PetWidget.updateAll(this)
+    }
     private var menuTimer = 0f
 
     // =====================================================================
@@ -180,6 +203,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     override fun onCreate() {
         super.onCreate()
+        createdAt = clock.uptimeMs()
         notifier = PetNotifier(
             this,
             pet = { if (world.pets.isEmpty()) null else resident },
@@ -244,6 +268,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         running = true
         ready = true
+        PetWidget.updateAll(this)
 
         for (p in shown) world.asPet(p) { toys.restorePoops(p) }
         handler.postDelayed({
@@ -417,8 +442,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         false
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
-        speech.at(SpeechPriority.HIGH) { command(intent) }
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.getBooleanExtra(EXTRA_FOREGROUND, false) == true && ready) {
+            // Envoyée par startForegroundService (widget, tuile) : le système attend startForeground à chaque fois
+            tryStartForeground()
+            // Démarré ainsi, le lapin doit revenir au redémarrage du téléphone, comme par l'écran principal
+            if (!prefs.getBoolean(Prefs.ENABLED, false)) prefs.edit().putBoolean(Prefs.ENABLED, true).apply()
+        }
+        return speech.at(SpeechPriority.HIGH) { command(intent) }
+    }
 
     /** Une commande (notification, activités) : réponse à l'utilisateur, ses répliques passent devant. */
     private fun command(intent: Intent?): Int {
@@ -430,6 +462,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         when (intent?.action) {
             ACTION_FEED -> { if (hidden) show(); toys.feed(); requestFrames() }
             ACTION_TOGGLE -> if (hidden) show() else hide()
+            ACTION_SHOW -> if (hidden) show() else if (clock.uptimeMs() - createdAt > 3_000) say(CALLED)
             ACTION_STOP -> { stop(this); return START_NOT_STICKY }
             // Réglages changés (niveau de bêtises)
             ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); loadWellbeing(); showNewLook() }
@@ -451,11 +484,13 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         val wasReady = ready
         ready = false
         handler.removeCallbacksAndMessages(null)
+        widgetThrottle.cancel()
         stopLoop()
         if (wasReady) {
             try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
             saveAll()
             removeAllWindows()
+            PetWidget.updateAll(this)   // « Rangé »
         }
         super.onDestroy()
     }
@@ -880,7 +915,17 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     // =====================================================================
     override val prefs: SharedPreferences get() = Prefs.of(this)
 
-    override fun save(pet: Pet) { repo.save(pet.toRecord()) }
+    override fun save(pet: Pet) {
+        repo.save(pet.toRecord())
+        if (ready && pet === resident) requestWidgetUpdate()
+    }
+
+    /** Le widget relit le résident sauvegardé : tout de suite, ou reporté pour rester à une fois par minute. */
+    private fun requestWidgetUpdate() {
+        val delay = widgetThrottle.request(clock.uptimeMs())
+        if (delay == 0L) PetWidget.updateAll(this)
+        else if (delay > 0L) handler.postDelayed(widgetUpdate, delay)
+    }
 
     override fun appLabel(pkg: String): String? = try {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()

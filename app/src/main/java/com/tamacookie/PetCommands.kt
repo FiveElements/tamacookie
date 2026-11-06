@@ -6,6 +6,7 @@ import com.tamacookie.feature.toy.Toy
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.PetFields
 import com.tamacookie.persist.Pets
+import com.tamacookie.widget.PetWidget
 
 /**
  * Ce que les activités demandent pour l'animal. **Une seule autorité** : si le service tourne, c'est lui
@@ -37,6 +38,7 @@ object PetCommands {
             ctx.startService(adoptionIntent(ctx, ACTION_ADOPT, a))
         } else {
             Pets.repository(ctx).adopt(a)
+            PetWidget.updateAll(ctx)
         }
     }
 
@@ -72,6 +74,7 @@ object PetCommands {
             ctx.startService(Intent(ctx, BunnyService::class.java).setAction(ACTION_SET_NAME).putExtra(EXTRA_NAME, n))
         } else {
             Pets.repository(ctx).rename(n)
+            PetWidget.updateAll(ctx)
         }
     }
 

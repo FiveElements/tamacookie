@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Widget d'écran d'accueil (évolution 4c). Mise à jour : par le service quand il sauvegarde
+     (au plus une fois par minute) et toutes les 30 min (minimum du système). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/widget_pet"
+    android:previewLayout="@layout/widget_pet"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen" />
