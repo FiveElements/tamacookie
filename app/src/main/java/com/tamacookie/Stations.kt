@@ -35,7 +35,7 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
     private val d = resources.displayMetrics.density
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 2.2f * d; color = Color.parseColor("#5B4A55")
+        style = Paint.Style.STROKE; strokeWidth = 2.2f * d; color = Palette.OUTLINE
         strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND
     }
     private val r = RectF()
@@ -52,9 +52,9 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
     }
 
     private fun drawChest(c: Canvas, w: Float, h: Float) {
-        val wood = Color.parseColor("#B07A4F")
-        val dark = Color.parseColor("#7A5236")
-        val gold = Color.parseColor("#E9B949")
+        val wood = Palette.WOOD
+        val dark = Palette.WOOD_DARK
+        val gold = Palette.GOLD
         val boxTop = h * 0.45f
         // couvercle (levé si ouvert)
         c.save()
@@ -66,9 +66,9 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         c.restore()
         // intérieur lumineux quand ouvert
         if (open) {
-            p.color = Color.parseColor("#FFE9A8")
+            p.color = Palette.CHEST_GLOW
             r.set(w * 0.12f, boxTop - 8 * d, w * 0.88f, boxTop + 6 * d); c.drawOval(r, p)
-            p.color = Color.parseColor("#FFD54A")
+            p.color = Palette.YELLOW
             for (i in 0..2) c.drawCircle(w * (0.3f + i * 0.2f), boxTop - 14 * d - (t * 20 + i * 7) % 14 * d, 2.4f * d, p)
         }
         // caisse
@@ -86,7 +86,7 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
 
     private fun drawBath(c: Canvas, w: Float, h: Float) {
         // pieds
-        p.color = Color.parseColor("#C9A227")
+        p.color = Palette.BATH_FEET
         c.drawCircle(w * 0.22f, h - 5 * d, 5 * d, p); c.drawCircle(w * 0.78f, h - 5 * d, 5 * d, p)
         // cuve
         val top = h * 0.38f
@@ -100,18 +100,18 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         c.drawPath(path, p); c.drawPath(path, stroke)
         // rebord + mousse
         r.set(w * 0.03f, top - 5 * d, w * 0.97f, top + 5 * d)
-        p.color = Color.parseColor("#E8F4FB"); c.drawRoundRect(r, 5 * d, 5 * d, p); c.drawRoundRect(r, 5 * d, 5 * d, stroke)
+        p.color = Palette.BATH_RIM; c.drawRoundRect(r, 5 * d, 5 * d, p); c.drawRoundRect(r, 5 * d, 5 * d, stroke)
         p.color = Color.WHITE
         for (i in 0..6) {
             val bx = w * (0.12f + i * 0.13f)
             val by = top - 6 * d + kotlin.math.sin(t * 2f + i) * 1.5f * d
             c.drawCircle(bx, by, (5 + (i % 3)) * d, p)
         }
-        p.color = Color.parseColor("#8FD3F4")
+        p.color = Palette.BATH_BUBBLE
         c.drawCircle(w * 0.30f, top - 14 * d - (t * 12 % 20) * d, 3 * d, p)
         c.drawCircle(w * 0.70f, top - 10 * d - ((t * 9 + 7) % 20) * d, 2.4f * d, p)
         // robinet
-        p.color = Color.parseColor("#B8B4BE")
+        p.color = Palette.METAL
         r.set(w * 0.86f, top - 22 * d, w * 0.92f, top - 4 * d); c.drawRoundRect(r, 2 * d, 2 * d, p)
     }
 
@@ -119,21 +119,21 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         // panneau avec croix (en haut à gauche, laisse la place au lapin)
         r.set(4 * d, 4 * d, 44 * d, 40 * d)
         p.color = Color.WHITE; c.drawRoundRect(r, 6 * d, 6 * d, p); c.drawRoundRect(r, 6 * d, 6 * d, stroke)
-        p.color = Color.parseColor("#3DBE7A")
+        p.color = Palette.VET_GREEN
         r.set(19 * d, 10 * d, 29 * d, 34 * d); c.drawRect(r, p)
         r.set(12 * d, 17 * d, 36 * d, 27 * d); c.drawRect(r, p)
         // table d'examen
         val top = h - 26 * d
         r.set(6 * d, top, w - 6 * d, top + 10 * d)
-        p.color = Color.parseColor("#9FD8F2"); c.drawRoundRect(r, 4 * d, 4 * d, p); c.drawRoundRect(r, 4 * d, 4 * d, stroke)
-        p.color = Color.parseColor("#B8B4BE")
+        p.color = Palette.VET_TABLE; c.drawRoundRect(r, 4 * d, 4 * d, p); c.drawRoundRect(r, 4 * d, 4 * d, stroke)
+        p.color = Palette.METAL
         r.set(w * 0.22f, top + 10 * d, w * 0.22f + 6 * d, h - 2 * d); c.drawRect(r, p)
         r.set(w * 0.78f - 6 * d, top + 10 * d, w * 0.78f, h - 2 * d); c.drawRect(r, p)
         // stéthoscope décoratif
-        stroke.color = Color.parseColor("#6E7B8B")
+        stroke.color = Palette.STETHOSCOPE
         r.set(w - 40 * d, 8 * d, w - 12 * d, 36 * d)
         c.drawArc(r, 0f, 180f, false, stroke)
-        stroke.color = Color.parseColor("#5B4A55")
+        stroke.color = Palette.OUTLINE
     }
 
     private fun drawCage(c: Canvas, w: Float, h: Float) {
@@ -141,10 +141,10 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         val top = 22 * d; val bottom = h - 6 * d
         // socle
         r.set(left - 4 * d, bottom - 10 * d, right + 4 * d, bottom)
-        p.color = Color.parseColor("#8C5F3F"); c.drawRoundRect(r, 4 * d, 4 * d, p); c.drawRoundRect(r, 4 * d, 4 * d, stroke)
+        p.color = Palette.CAGE_BASE; c.drawRoundRect(r, 4 * d, 4 * d, p); c.drawRoundRect(r, 4 * d, 4 * d, stroke)
         // dôme
         r.set(left, top - 18 * d, right, top + 18 * d)
-        stroke.color = Color.parseColor("#7A7480"); stroke.strokeWidth = 3f * d
+        stroke.color = Palette.CAGE_BARS; stroke.strokeWidth = 3f * d
         c.drawArc(r, 180f, 180f, false, stroke)
         // barreaux
         val n = 7
@@ -155,9 +155,9 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         c.drawLine(left, top + (bottom - top) * 0.45f, right, top + (bottom - top) * 0.45f, stroke)
         // anneau
         c.drawCircle(w / 2, top - 22 * d, 5 * d, stroke)
-        stroke.color = Color.parseColor("#5B4A55"); stroke.strokeWidth = 2.2f * d
+        stroke.color = Palette.OUTLINE; stroke.strokeWidth = 2.2f * d
         // cadenas
-        p.color = Color.parseColor("#E9B949")
+        p.color = Palette.GOLD
         r.set(right - 22 * d, bottom - 40 * d, right - 8 * d, bottom - 26 * d)
         c.drawRoundRect(r, 3 * d, 3 * d, p); c.drawRoundRect(r, 3 * d, 3 * d, stroke)
     }

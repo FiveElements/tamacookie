@@ -24,12 +24,12 @@ class PropView(context: Context, val kind: Kind) : View(context) {
     }
 
     var spin = 0f
-    var tint = Color.parseColor("#FF6F61")
+    var tint = Palette.BALL
     private val d = resources.displayMetrics.density
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 2f * resources.displayMetrics.density
-        color = Color.parseColor("#5B4A55")
+        color = Palette.OUTLINE
     }
     private val path = Path()
     private val r = RectF()
@@ -42,20 +42,20 @@ class PropView(context: Context, val kind: Kind) : View(context) {
                 path.reset()
                 path.moveTo(w * 0.30f, h * 0.30f); path.lineTo(w * 0.70f, h * 0.30f)
                 path.lineTo(w * 0.52f, h * 0.95f); path.lineTo(w * 0.48f, h * 0.95f); path.close()
-                p.color = Color.parseColor("#F28C28"); c.drawPath(path, p); c.drawPath(path, stroke)
-                p.color = Color.parseColor("#4CAF50")
+                p.color = Palette.CARROT; c.drawPath(path, p); c.drawPath(path, stroke)
+                p.color = Palette.LEAF
                 r.set(w * 0.38f, h * 0.02f, w * 0.50f, h * 0.32f); c.drawOval(r, p)
                 r.set(w * 0.50f, h * 0.02f, w * 0.62f, h * 0.32f); c.drawOval(r, p)
                 c.restore()
             }
             Kind.LETTUCE -> {
                 c.save(); c.rotate(spin * 0.3f, w / 2, h / 2)
-                p.color = Color.parseColor("#5FAE4E")
+                p.color = Palette.LETTUCE_DARK
                 r.set(w * 0.10f, h * 0.30f, w * 0.90f, h * 0.95f); c.drawOval(r, p); c.drawOval(r, stroke)
-                p.color = Color.parseColor("#8FD67E")
+                p.color = Palette.LETTUCE
                 r.set(w * 0.22f, h * 0.18f, w * 0.62f, h * 0.80f); c.drawOval(r, p); c.drawOval(r, stroke)
                 r.set(w * 0.42f, h * 0.22f, w * 0.82f, h * 0.82f); c.drawOval(r, p); c.drawOval(r, stroke)
-                p.color = Color.parseColor("#C9EFC0")
+                p.color = Palette.LETTUCE_VEIN
                 c.drawLine(w * 0.5f, h * 0.35f, w * 0.5f, h * 0.85f, stroke)
                 c.restore()
             }
@@ -66,16 +66,16 @@ class PropView(context: Context, val kind: Kind) : View(context) {
                 path.cubicTo(w * 0.05f, h * 0.70f, w * 0.10f, h * 0.25f, w * 0.5f, h * 0.30f)
                 path.cubicTo(w * 0.90f, h * 0.25f, w * 0.95f, h * 0.70f, w * 0.5f, h * 0.95f)
                 path.close()
-                p.color = Color.parseColor("#E5484D"); c.drawPath(path, p); c.drawPath(path, stroke)
-                p.color = Color.parseColor("#FFE08A")
+                p.color = Palette.STRAWBERRY; c.drawPath(path, p); c.drawPath(path, stroke)
+                p.color = Palette.SEED
                 for ((sx, sy) in listOf(0.35f to 0.5f, 0.6f to 0.48f, 0.48f to 0.65f, 0.38f to 0.75f, 0.62f to 0.7f))
                     c.drawCircle(w * sx, h * sy, 1.3f * d, p)
-                p.color = Color.parseColor("#4CAF50")
+                p.color = Palette.LEAF
                 r.set(w * 0.30f, h * 0.18f, w * 0.70f, h * 0.36f); c.drawOval(r, p)
                 c.restore()
             }
             Kind.POOP -> {
-                p.color = Color.parseColor("#8B5E3C")
+                p.color = Palette.POOP
                 r.set(w * 0.12f, h * 0.62f, w * 0.88f, h * 0.95f); c.drawOval(r, p); c.drawOval(r, stroke)
                 r.set(w * 0.22f, h * 0.38f, w * 0.78f, h * 0.70f); c.drawOval(r, p); c.drawOval(r, stroke)
                 r.set(w * 0.34f, h * 0.18f, w * 0.66f, h * 0.45f); c.drawOval(r, p); c.drawOval(r, stroke)
@@ -87,8 +87,8 @@ class PropView(context: Context, val kind: Kind) : View(context) {
             Kind.BALL -> {
                 c.save(); c.rotate(spin, w / 2, h / 2)
                 val rad = w * 0.44f
-                p.color = Color.parseColor("#FF6F61"); c.drawCircle(w / 2, h / 2, rad, p)
-                p.color = Color.parseColor("#FFD166")
+                p.color = Palette.BALL; c.drawCircle(w / 2, h / 2, rad, p)
+                p.color = Palette.BALL_STRIPE
                 r.set(w / 2 - rad, h / 2 - rad * 0.3f, w / 2 + rad, h / 2 + rad * 0.3f)
                 c.drawRect(r, p)
                 c.drawCircle(w / 2, h / 2, rad, stroke)
@@ -106,7 +106,7 @@ class PropView(context: Context, val kind: Kind) : View(context) {
                 path.reset()
                 path.moveTo(w * 0.44f, w * 1.05f); path.lineTo(w * 0.56f, w * 1.05f); path.lineTo(w * 0.5f, w * 0.96f); path.close()
                 c.drawPath(path, p)
-                p.color = Color.argb(110, 255, 255, 255)
+                p.color = Palette.BALLOON_SHINE
                 r.set(w * 0.24f, w * 0.16f, w * 0.40f, w * 0.40f); c.drawOval(r, p)
                 c.restore()
             }
@@ -114,7 +114,7 @@ class PropView(context: Context, val kind: Kind) : View(context) {
                 c.save(); c.rotate(spin * 0.08f, w / 2, h / 2)
                 p.color = tint
                 r.set(w * 0.04f, h * 0.30f, w * 0.96f, h * 0.70f); c.drawOval(r, p); c.drawOval(r, stroke)
-                p.color = Color.argb(90, 255, 255, 255)
+                p.color = Palette.FRISBEE_SHINE
                 r.set(w * 0.22f, h * 0.38f, w * 0.78f, h * 0.58f); c.drawOval(r, p)
                 // petit repère qui tourne
                 val a = Math.toRadians(spin.toDouble())
@@ -125,8 +125,8 @@ class PropView(context: Context, val kind: Kind) : View(context) {
             Kind.PLUSH -> {
                 // petit ours en peluche
                 c.save(); c.rotate(spin, w / 2, h / 2)
-                val brown = Color.parseColor("#B07A4F")
-                val light = Color.parseColor("#E8C39E")
+                val brown = Palette.WOOD
+                val light = Palette.PLUSH_LIGHT
                 p.color = brown
                 c.drawCircle(w * 0.28f, h * 0.20f, w * 0.11f, p); c.drawCircle(w * 0.28f, h * 0.20f, w * 0.11f, stroke)
                 c.drawCircle(w * 0.72f, h * 0.20f, w * 0.11f, p); c.drawCircle(w * 0.72f, h * 0.20f, w * 0.11f, stroke)
@@ -135,7 +135,7 @@ class PropView(context: Context, val kind: Kind) : View(context) {
                 p.color = light
                 r.set(w * 0.38f, h * 0.38f, w * 0.62f, h * 0.52f); c.drawOval(r, p)
                 r.set(w * 0.34f, h * 0.62f, w * 0.66f, h * 0.88f); c.drawOval(r, p)
-                p.color = Color.parseColor("#3A2E39")
+                p.color = Palette.INK
                 c.drawCircle(w * 0.41f, h * 0.31f, 1.8f * d, p); c.drawCircle(w * 0.59f, h * 0.31f, 1.8f * d, p)
                 c.drawCircle(w / 2, h * 0.42f, 1.8f * d, p)
                 c.restore()
@@ -172,14 +172,14 @@ class SpeechBubble(context: Context) : FrameLayout(context) {
     init {
         val d = resources.displayMetrics.density
         text.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        text.setTextColor(Color.parseColor("#3A2E39"))
+        text.setTextColor(Palette.INK)
         text.gravity = Gravity.CENTER
         text.maxWidth = (230 * d).toInt()
         text.setPadding((12 * d).toInt(), (7 * d).toInt(), (12 * d).toInt(), (7 * d).toInt())
         text.background = GradientDrawable().apply {
             setColor(Color.WHITE)
             cornerRadius = 16 * d
-            setStroke((2 * d).toInt(), Color.parseColor("#5B4A55"))
+            setStroke((2 * d).toInt(), Palette.OUTLINE)
         }
         addView(text, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
     }

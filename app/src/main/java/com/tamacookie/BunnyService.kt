@@ -1,11 +1,6 @@
 package com.tamacookie
 
-import android.annotation.SuppressLint
 import android.app.KeyguardManager
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -23,12 +18,8 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Choreographer
-import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
-import android.view.MotionEvent
-import android.view.VelocityTracker
 import android.view.View
-import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import com.tamacookie.BunnyView.Expr
@@ -36,7 +27,6 @@ import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
 import java.util.Calendar
 import kotlin.math.abs
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -59,10 +49,6 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         const val ACTION_TOGGLE = "com.tamacookie.TOGGLE"
         const val ACTION_STOP = "com.tamacookie.STOP"
         const val ACTION_RELOAD = "com.tamacookie.RELOAD"
-        private const val NOTIF_ID = 1
-        private const val ALERT_ID = 2
-        private const val CH_PET = "pet"
-        private const val CH_ALERT = "alerts"
         private const val TAG = "TamaCookie"
 
         @Volatile var running = false
@@ -96,6 +82,15 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     internal val rnd = Random(System.nanoTime())
     internal val brain = BunnyBrain(rnd)
     internal val handler = Handler(Looper.getMainLooper())
+    /** Paroles : bulle (si les fenêtres existent) + reprise de la boucle. */
+    internal val speech = Speech(rnd) { text, seconds ->
+        if (::windows.isInitialized) {
+            windows.say(text, seconds)
+            requestFrames()
+        }
+    }
+    private lateinit var notifier: PetNotifier
+    private lateinit var touch: TouchHandler
     private lateinit var watcher: ForegroundAppWatcher
     /** Fenêtres créées et domaines câblés : les intents peuvent être traités. */
     private var ready = false
@@ -137,7 +132,6 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     internal var travelThen = Act.IDLE
     private var lastTravelAt = 0L
     internal var chatterIn = 25f
-    private val tapTimes = ArrayDeque<Long>()
 
     // --- Plateforme (icône / bouton) sur laquelle il se tient, null = le sol ---
     internal var platform: Box? = null
@@ -155,12 +149,9 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         private set
     internal var bunnyAdded = false
         private set
-    internal var bunnyTouch: View.OnTouchListener? = null
-        private set
-
-    // --- Menu ---
-    private var menu: PetMenu? = null
-    private var lastMenuClose = 0L
+    /** Écouteur tactile du lapin (la cage lui transmet les gestes). */
+    internal val bunnyTouch: View.OnTouchListener?
+        get() = if (::touch.isInitialized) touch.listener else null
 
     // --- Boucle ---
     private var looping = false
@@ -172,10 +163,8 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     private var lastFrameNs = 0L
     private var lastTickWall = 0L
     private var lastSaveWall = 0L
-    private var lastNotifText = ""
     private var notifTimer = 0f
     private var menuTimer = 0f
-    private var lastAlertMood: PetState.Mood? = null
 
     // =====================================================================
     //  Cycle de vie
@@ -184,7 +173,13 @@ class BunnyService : Service(), Choreographer.FrameCallback {
 
     override fun onCreate() {
         super.onCreate()
-        createChannels()
+        notifier = PetNotifier(
+            this,
+            pet = { if (::pet.isInitialized) pet else null },
+            hidden = { hidden },
+            hiding = { ::mischief.isInitialized && mischief.hidingView != null },
+        )
+        notifier.createChannels()
         if (!Settings.canDrawOverlays(this)) {
             // Lancé par startForegroundService : il faut tout de même passer au premier plan avant de s'arrêter
             tryStartForeground()
@@ -202,6 +197,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         stations = StationController(this)
         toys = ToyController(this)
         mischief = MischiefController(this)
+        touch = TouchHandler(this)
 
         computeBounds()
         fx = screenW * (0.3f + rnd.nextFloat() * 0.4f)
@@ -241,14 +237,16 @@ class BunnyService : Service(), Choreographer.FrameCallback {
 
         startLoop()
         handler.postDelayed(appPoll, 2000)
-        handler.postDelayed({ say(greeting()) }, 900)
+        handler.postDelayed({
+            say(speech.greeting(pet.name, pet.mood, Calendar.getInstance().get(Calendar.HOUR_OF_DAY)))
+        }, 900)
     }
 
     /** Passe au premier plan ; false si le système le refuse (ex. redémarrage en arrière-plan sur Android 15+). */
     private fun tryStartForeground(): Boolean = try {
-        val n = buildNotification()
-        if (Build.VERSION.SDK_INT >= 34) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        else startForeground(NOTIF_ID, n)
+        val n = notifier.build()
+        if (Build.VERSION.SDK_INT >= 34) startForeground(PetNotifier.NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        else startForeground(PetNotifier.NOTIF_ID, n)
         true
     } catch (e: Exception) {
         // ForegroundServiceStartNotAllowedException (API 31+) ou autre refus
@@ -273,7 +271,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
                 applyView()
                 bunny.look = pet.look
                 bunny.emit(PType.SPARKLE, 6)
-                say(pick("Je m'appelle ${pet.name} ! ✨", "Tu aimes mon nouveau look ? ✨"))
+                speech.sayOneOf(Lines.newLook(pet.name))
                 requestFrames()
             }
         }
@@ -337,7 +335,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         handler.postDelayed(appPoll, 1500)
         tickStats(force = true)
         if (!hidden) startLoop()
-        if (greet && !pet.sleeping) say(pick("Te revoilà ! 💕", "Coucou toi !", "Tu m'as manqué !"))
+        if (greet && !pet.sleeping) speech.sayOneOf(Lines.WELCOME_BACK)
     }
 
     // =====================================================================
@@ -350,7 +348,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         placeBunny()
         windows.add(bunny, bunnyLp)
         bunnyAdded = true
-        setupBunnyTouch()
+        touch.attach(bunny)
         stations.create()
         windows.createDock { stations.toggleStationsPanel() }
         windows.createBubble()
@@ -369,7 +367,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         windows.removeDock()
     }
 
-    private fun hide() {
+    internal fun hide() {
         if (hidden) return
         hidden = true
         removeAllWindows()
@@ -391,7 +389,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         applyView()   // gère aussi le lapin en cage sur une autre vue
         stations.reopenVetPanelIfNeeded()
         startLoop()
-        say(pick("Coucou, me revoilà !", "Je suis là ! 🐰", "Hop !"))
+        speech.sayOneOf(Lines.SHOWN)
         updateNotification(force = true)
     }
 
@@ -505,7 +503,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     private fun canSuspend(): Boolean {
         val invisible = act == Act.HIDDEN || bunnyAway || pages.bunnyOffscreen()
         if (!invisible) return false
-        return menu == null && !windows.bubbleShown && !pages.scrollingRecently() &&
+        return !touch.menuOpen && !windows.bubbleShown && !pages.scrollingRecently() &&
             !toys.hasToyOrFood() && !toys.anyMoving() && !stations.animating()
     }
 
@@ -579,9 +577,9 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         windows.updateBubble(dt)
 
         menuTimer += dt
-        if (menuTimer > 1f) { menuTimer = 0f; menu?.refresh() }
+        if (menuTimer > 1f) { menuTimer = 0f; touch.refreshMenu() }
         notifTimer += dt
-        if (notifTimer > 20f) { notifTimer = 0f; updateNotification(force = false); checkAlerts() }
+        if (notifTimer > 20f) { notifTimer = 0f; updateNotification(force = false); notifier.checkAlerts() }
     }
 
     private fun tickStats(force: Boolean) {
@@ -595,7 +593,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
                 toys.spawnPoop((fx - bunny.facing * 40 * d).coerceIn(minX, maxX))
             }
         }
-        if (newPoops > 0 && act != Act.SLEEP) say(pick("Oups… 💩", "C'est pas moi !", "Hihi… pardon"))
+        if (newPoops > 0 && act != Act.SLEEP) speech.sayOneOf(Lines.POOPED)
         if (now - lastSaveWall > Tuning.SAVE_EVERY_MS) { pet.save(); lastSaveWall = now }
     }
 
@@ -646,7 +644,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
                 fy = surfaceY()
                 if (!pet.sleeping) {
                     express(Expr.HAPPY, 2f)
-                    say(pick("Bien dormi ! ☀️", "*s'étire* Bonjour !", "Quelle bonne sieste !"))
+                    speech.sayOneOf(Lines.WOKE_UP)
                     setAct(Act.IDLE, 3f)
                 }
             }
@@ -658,7 +656,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
                     pet.feed(toys.eatingFood)
                     bunny.emit(PType.HEART, 3)
                     express(Expr.HAPPY, 2f)
-                    say(pick("Miam ! 🥕", "Trop bon !", "Merci ! *rot*", "Délicieux !"))
+                    speech.sayOneOf(Lines.ATE)
                     setAct(Act.IDLE, 3f)
                 }
             }
@@ -825,7 +823,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         phys.stop()
         afterAir = if (act == Act.SLEEP) Act.SLEEP else Act.IDLE
         express(Expr.SURPRISED, 1f)
-        if (act != Act.SLEEP) say(pick("Oups !", "Whoaaa !", "Ça bouge !"), 1.5f)
+        if (act != Act.SLEEP) speech.sayOneOf(Lines.PLATFORM_LOST, 1.5f)
         setAct(Act.AIR)
     }
 
@@ -851,9 +849,9 @@ class BunnyService : Service(), Choreographer.FrameCallback {
             bunny.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }
         if (ev.hard) {
-            if (ev.onPlatform) say(pick("Ouille ! Ça tourne…", "Aïe aïe aïe…"))
+            if (ev.onPlatform) speech.sayOneOf(Lines.HARD_LANDING_PLATFORM)
             else {
-                say(pick("Ouille ! Ça tourne…", "Aïe aïe aïe…", "Doucement !"))
+                speech.sayOneOf(Lines.HARD_LANDING_GROUND)
                 pet.happiness = (pet.happiness - 4f).coerceAtLeast(0f)
             }
             setAct(Act.DIZZY)
@@ -864,7 +862,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         setAct(next, if (next == Act.IDLE) idle else 3f)
         val lbl = platformLabel
         if (ev.onPlatform && !lbl.isNullOrBlank() && next == Act.IDLE && rnd.nextFloat() < 0.35f) {
-            say(pick("Je suis sur $lbl !", "Coucou depuis $lbl 👋", "La vue est belle d'ici !", "Hop, sur $lbl !"), 2.2f)
+            speech.sayOneOf(Lines.onPlatform(lbl), 2.2f)
         }
     }
 
@@ -876,7 +874,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         }
         pet.sleeping = true
         pet.save()
-        say(pick("Bonne nuit… 💤", "*bâille* Je fais une petite sieste", "Zzz…"))
+        speech.sayOneOf(Lines.GOING_TO_SLEEP)
         if (stations.inStation == StationKind.CAGE) return   // il dort dans sa cage
         if (stations.inStation != null) stations.leaveStation(hopOut = false)
         setActOrAfterAir(Act.SLEEP)
@@ -888,243 +886,19 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     }
 
     // =====================================================================
-    //  Interactions tactiles avec le lapin
+    //  Toucher, glisser / lancer, menu : voir [TouchHandler]
     // =====================================================================
-    @SuppressLint("ClickableViewAccessibility")
-    private fun setupBunnyTouch() {
-        val slop = ViewConfiguration.get(this).scaledTouchSlop * 1.5f
-        val gd = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent) = true
-            override fun onSingleTapConfirmed(e: MotionEvent): Boolean { onPetTap(); return true }
-            override fun onDoubleTap(e: MotionEvent): Boolean { toggleMenu(); return true }
-            override fun onLongPress(e: MotionEvent) {
-                bunny.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                toggleMenu()
-            }
-        })
-        var downX = 0f; var downY = 0f
-        var offX = 0f; var offY = 0f
-        var dragging = false
-        var lastRawX = 0f
-        var vt: VelocityTracker? = null
-
-        val listener = View.OnTouchListener { _, ev ->
-            val e2 = MotionEvent.obtain(ev); e2.setLocation(ev.rawX, ev.rawY)
-            when (ev.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    downX = ev.rawX; downY = ev.rawY; lastRawX = ev.rawX
-                    dragging = false
-                    vt?.recycle(); vt = VelocityTracker.obtain()
-                    requestFrames()
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!dragging && hypot(ev.rawX - downX, ev.rawY - downY) > slop) {
-                        dragging = true
-                        val cancel = MotionEvent.obtain(ev); cancel.action = MotionEvent.ACTION_CANCEL
-                        gd.onTouchEvent(cancel); cancel.recycle()
-                        pages.rebaseToActivePage()
-                        offX = downX - fx; offY = downY - fy
-                        startDrag()
-                    }
-                    if (dragging) {
-                        fx = (ev.rawX - offX).coerceIn(0f, screenW)
-                        fy = min(ev.rawY - offY, groundY).coerceAtLeast(topY + 90 * d)
-                        if (abs(ev.rawX - lastRawX) > 2 * d) bunny.facing = sign(ev.rawX - lastRawX)
-                        lastRawX = ev.rawX
-                        stations.updateHover()
-                    }
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    vt?.addMovement(e2)
-                    if (dragging) {
-                        vt?.computeCurrentVelocity(1000)
-                        val target = stations.takeHover()
-                        if (target != null) stations.enterStation(target)
-                        else release(vt?.xVelocity ?: 0f, vt?.yVelocity ?: 0f)
-                        dragging = false
-                        vt?.recycle(); vt = null
-                        e2.recycle()
-                        return@OnTouchListener true   // pas de "tap" après un lancer
-                    }
-                    vt?.recycle(); vt = null
-                }
-            }
-            vt?.addMovement(e2)
-            e2.recycle()
-            if (!dragging) gd.onTouchEvent(ev)
-            true
-        }
-        bunnyTouch = listener
-        bunny.setOnTouchListener(listener)
-    }
-
-    private fun startDrag() {
-        if (act == Act.PEEK) {
-            mischief.endHiding()
-            pet.happiness = (pet.happiness + 15f).coerceAtMost(100f)
-            say("Trouvé !! 🎉", 1.5f)
-        } else if (mischief.isHiding()) mischief.endHiding()
-        closeMenu()
-        platform = null
-        phys.airLandY = null
-        if (stations.inStation != null) stations.leaveStation(hopOut = false)
-        if (pet.sleeping) { pet.sleeping = false; pet.happiness = (pet.happiness - 3f).coerceAtLeast(0f) }
-        toys.dropHeldToy()
-        mischief.noteInteraction()
-        setAct(Act.DRAGGED)
-        say(pick("Waaah !", "Hé ! Pose-moi !", "Je voleeee !", "Hiii !"), 1.8f)
-        bunny.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-    }
-
-    private fun release(vxPx: Float, vyPx: Float) {
-        phys.release(vxPx, vyPx)
-        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * d) say(pick("Wiiiiii !", "Je vole !!", "Aaaaah !"), 1.6f)
-        afterAir = Act.IDLE
-        setAct(Act.AIR)
-    }
-
-    private fun onPetTap() {
-        val now = System.currentTimeMillis()
-        bunny.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        mischief.noteInteraction()
-        when (act) {
-            Act.PEEK -> { mischief.foundBunny(); return }
-            Act.HIDE_RUN -> return
-            Act.SQUAT -> { mischief.onSquatPetted(); return }
-            Act.CAGED -> {
-                pet.pet()
-                bunny.emit(PType.HEART, 1)
-                say(pick("Un câlin à travers les barreaux… 🥺", "Fais-moi sortir !", "Snif, merci…"), 2f)
-                return
-            }
-            Act.BATH, Act.VET -> { bunny.emit(PType.HEART, 1); return }
-            else -> {}
-        }
-        if (act == Act.SLEEP || pet.sleeping) {
-            pet.sleeping = false
-            pet.happiness = (pet.happiness - 3f).coerceAtLeast(0f)
-            express(Expr.ANGRY, 2.5f)
-            say(pick("Hmpf… je dormais !", "Encore 5 minutes…", "Grrr… 😾"))
-            setActOrAfterAir(Act.IDLE, 3f)
-            return
-        }
-        tapTimes.addLast(now)
-        while (tapTimes.isNotEmpty() && now - tapTimes.first() > Tuning.TAP_WINDOW_MS) tapTimes.removeFirst()
-        if (tapTimes.size >= Tuning.TICKLE_TAPS) {
-            tapTimes.clear()
-            express(Expr.HAPPY, 1.5f)
-            say(pick("Ça chatouille !! 🤭", "Arrête, hihi !"))
-            targetX = if (fx > screenW / 2) fx - screenW * 0.35f else fx + screenW * 0.35f
-            setActOrAfterAir(Act.WALK)
-            return
-        }
-        pet.pet()
-        bunny.emit(PType.HEART, 2 + rnd.nextInt(3))
-        express(Expr.HAPPY, 1.6f)
-        if (rnd.nextFloat() < 0.45f) say(
-            pick("Hihi ! 💕", "Encore !", "J'adore les câlins", "Mmmh…", "Tu es gentil·le !", "*ronronne* (oui, les lapins aussi)"),
-            2f
-        )
-        if (act == Act.IDLE || act == Act.WALK || act == Act.SIT) {
-            if (rnd.nextFloat() < 0.35f) jump(-560 * d, 0f, then = Act.IDLE) else setAct(Act.IDLE, 2.5f)
-        }
-    }
+    internal fun closeMenu() { if (::touch.isInitialized) touch.closeMenu() }
 
     // =====================================================================
-    //  Menu de soins
+    //  Paroles (répliques dans [Lines], tirage et bulle dans [Speech])
     // =====================================================================
-    @SuppressLint("ClickableViewAccessibility")
-    private fun toggleMenu() {
-        if (menu != null) { closeMenu(); return }
-        if (System.currentTimeMillis() - lastMenuClose < Tuning.MENU_REOPEN_GUARD_MS) return
-        lateinit var m: PetMenu
-        m = PetMenu(this, pet) { a ->
-            // Sécurité : si ce panneau n'est plus le menu courant, on le retire quand même
-            if (menu !== m) { windows.safeRemove(m); if (a != PetMenu.Action.CLOSE) onMenuAction(a) }
-            else onMenuAction(a)
-        }
-        mischief.noteInteraction()
-        val w = windows.panelWidth(Tuning.MENU_W_DP)
-        val lp = windows.panelParams(w, watchOutside = true)
-        val mh = windows.measurePanel(m, w)
-        // position à l'écran du lapin (il peut être décalé par le défilement du bureau)
-        val sx = fx + pages.bunnyShift
-        lp.x = windows.clampPanelX(sx - w / 2f, w)
-        var y = (fy - 125 * d - mh).roundToInt()
-        if (y < topY + 8 * d) y = (topY + 8 * d).roundToInt()
-        lp.y = y
-        m.setOnTouchListener { _, ev ->
-            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-                if (menu === m) closeMenu() else windows.safeRemove(m); true
-            } else false
-        }
-        windows.add(m, lp)
-        m.alpha = 0f; m.scaleX = 0.9f; m.scaleY = 0.9f
-        m.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start()
-        menu = m
-        if (act == Act.WALK) setAct(Act.IDLE, 6f)
-    }
+    internal fun say(text: String, seconds: Float = Speech.DEFAULT_SECONDS) = speech.say(text, seconds)
 
-    internal fun closeMenu() {
-        menu?.let {
-            windows.safeRemove(it)
-            lastMenuClose = System.currentTimeMillis()
-        }
-        menu = null
-    }
-
-    private fun onMenuAction(a: PetMenu.Action) {
-        when (a) {
-            PetMenu.Action.STATIONS -> { closeMenu(); stations.toggleStationsPanel() }
-            PetMenu.Action.HIDE_SEEK -> { closeMenu(); mischief.startHideSeek(fromMenu = true) }
-            PetMenu.Action.SLEEP -> {
-                closeMenu()
-                if (pet.sleeping) {
-                    pet.sleeping = false; pet.save()
-                    express(Expr.SLEEPY, 2f)
-                    say("*bâille* D'accord, je me lève…")
-                    setActOrAfterAir(Act.IDLE, 3f)
-                } else if (pet.energy > 92f) {
-                    say(pick("Je ne suis pas fatigué !", "Dodo ? Déjà ?!"))
-                } else startSleep()
-            }
-            PetMenu.Action.HIDE -> { closeMenu(); hide() }
-            PetMenu.Action.CLOSE -> closeMenu()
-        }
-    }
-
-    // =====================================================================
-    //  Paroles
-    // =====================================================================
-    internal fun say(text: String, seconds: Float = 3.2f) {
-        if (!::windows.isInitialized) return
-        windows.say(text, seconds)
-        requestFrames()
-    }
-
-    internal fun pick(vararg s: String) = s[rnd.nextInt(s.size)]
-
-    private fun greeting(): String {
-        val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        return when {
-            pet.mood == PetState.Mood.HUNGRY -> "Coucou… j'ai faim 🥺"
-            h < 11 -> "Bonjour ! ☀️ C'est moi, ${pet.name} !"
-            h < 18 -> "Coucou ! C'est ${pet.name} 🐰"
-            else -> "Bonsoir ! 🌙 ${pet.name} est là"
-        }
-    }
+    internal fun pick(vararg s: String) = speech.pick(*s)
 
     private fun chatter() {
-        val line = when (pet.mood) {
-            PetState.Mood.HUNGRY -> pick("J'ai faim… 🥕", "Mon ventre gargouille…", "Une petite carotte ?")
-            PetState.Mood.SLEEPY -> pick("*bâille*", "Je suis fatigué…", "Une sieste me ferait du bien")
-            PetState.Mood.DIRTY -> pick("Je suis tout sale…", "Un bain ? 🫧", "Ça sent pas très bon ici…")
-            PetState.Mood.SAD -> pick("Je m'ennuie…", "Tu joues avec moi ?", "Un câlin ? 🥺")
-            PetState.Mood.SICK -> pick("Je ne me sens pas bien… 🤒", "Atchoum !", "J'ai besoin d'un médicament")
-            PetState.Mood.HAPPY -> pick("La vie est belle ! ✨", "♪ La la la ♫", "Je t'aime bien 💕", "Tu fais quoi ?", "Il fait beau sur ton écran !")
-            PetState.Mood.OK -> pick("Hmm hmm…", "*renifle*", "Tu fais quoi ?", "Je me promène 🐾")
-        }
-        say(line)
+        say(speech.chatterLine(pet.mood))
         if (pet.mood == PetState.Mood.HAPPY && rnd.nextFloat() < 0.3f) startDance()
     }
 
@@ -1167,110 +941,16 @@ class BunnyService : Service(), Choreographer.FrameCallback {
         travelThen = then
         // Il court vers le bord le plus proche et "saute" dans la nouvelle app
         targetX = if (fx < screenW / 2) -bw.toFloat() else screenW + bw
-        say(pick("J'arrive !", "Attends-moi !", "Hop, on change d'app !", "Je te suis ! 🐾"), 1.5f)
+        speech.sayOneOf(Lines.FOLLOWING, 1.5f)
         setAct(Act.TRAVEL_OUT)
         requestFrames()
     }
 
-    private fun commentFor(app: ForegroundAppWatcher.AppInfo): String {
-        val n = app.label
-        val pkg = app.pkg.lowercase()
-        return when {
-            app.isHome -> pick("De retour à la maison 🏠", "Ah, l'écran d'accueil !", "On fait quoi maintenant ?")
-            "camera" in pkg -> pick("Prends-moi en photo ! 📸", "Je fais mon plus beau sourire")
-            "clock" in pkg || "alarm" in pkg -> pick("Il est l'heure de… manger ?", "Tic tac 🕰️")
-            "store" in pkg || "vending" in pkg -> pick("On fait les boutiques ? 🛍️", "Tu m'achètes une carotte ?")
-            app.category == ApplicationInfo.CATEGORY_GAME -> pick("Un jeu ! Je peux jouer ? 🎮", "Vas-y, bats le record !")
-            app.category == ApplicationInfo.CATEGORY_VIDEO -> pick("Pop-corn ? 🍿 Je regarde avec toi", "Chut, ça commence !")
-            app.category == ApplicationInfo.CATEGORY_AUDIO -> pick("J'adore cette musique ♪", "On danse ? ♫")
-            app.category == ApplicationInfo.CATEGORY_SOCIAL -> pick("Dis bonjour de ma part sur $n !", "Qui t'écrit ? 👀")
-            app.category == ApplicationInfo.CATEGORY_MAPS -> pick("On part en voyage ? 🗺️", "Je peux venir ?")
-            app.category == ApplicationInfo.CATEGORY_NEWS -> pick("Quoi de neuf dans le monde ?", "Des nouvelles des lapins ?")
-            app.category == ApplicationInfo.CATEGORY_IMAGE -> pick("Montre-moi tes photos !", "Il y a des photos de moi ?")
-            app.category == ApplicationInfo.CATEGORY_PRODUCTIVITY -> pick("Courage pour le travail 💪", "Je ne dérange pas… promis")
-            else -> pick("Coucou $n !", "Oh, $n ! On fait quoi ici ?", "Je visite $n 🐾", "C'est joli chez $n")
-        }
-    }
+    private fun commentFor(app: ForegroundAppWatcher.AppInfo): String =
+        speech.appComment(app.label, app.pkg, app.category, app.isHome)
 
     // =====================================================================
-    //  Notifications
+    //  Notifications : voir [PetNotifier]
     // =====================================================================
-    private fun createChannels() {
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(CH_PET, "Cookie est là", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Notification permanente du lapin"
-            setShowBadge(false)
-        })
-        nm.createNotificationChannel(NotificationChannel(CH_ALERT, "Besoins de Cookie", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "Quand Cookie a faim, est sale ou malade"
-        })
-    }
-
-    private fun pi(action: String, code: Int): PendingIntent = PendingIntent.getService(
-        this, code, Intent(this, BunnyService::class.java).setAction(action),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-    )
-
-    private fun statusLine(): String =
-        "🥕${pet.satiety.toInt()}  💖${pet.happiness.toInt()}  ⚡${pet.energy.toInt()}  🛁${pet.cleanliness.toInt()}"
-
-    private fun buildNotification(): Notification {
-        val open = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
-        )
-        val b = Notification.Builder(this, CH_PET)
-            .setSmallIcon(R.drawable.ic_bunny)
-            .setContentIntent(open)
-            .setOngoing(true)
-        if (!::pet.isInitialized) {
-            // Avant l'initialisation (permission manquante) : notification minimale
-            return b.setContentTitle("TamaCookie").build()
-        }
-        val hiding = ::mischief.isInitialized && mischief.hidingView != null
-        val moodTxt = if (hiding) "se cache… trouve-le sur une autre page ! 🫣" else when (pet.mood) {
-            PetState.Mood.HAPPY -> "est aux anges"
-            PetState.Mood.OK -> "se promène"
-            PetState.Mood.HUNGRY -> "a faim"
-            PetState.Mood.SLEEPY -> if (pet.sleeping) "dort" else "a sommeil"
-            PetState.Mood.DIRTY -> "a besoin d'un bain"
-            PetState.Mood.SAD -> "se sent seul"
-            PetState.Mood.SICK -> "est malade"
-        }
-        return b
-            .setContentTitle("${pet.name} $moodTxt" + (if (pet.caged) " (en cage 🔒)" else "") + if (hidden) " (caché)" else "")
-            .setContentText(statusLine())
-            .addAction(Notification.Action.Builder(null, "🥕 Nourrir", pi(ACTION_FEED, 1)).build())
-            .addAction(Notification.Action.Builder(null, if (hidden) "Montrer" else "Cacher", pi(ACTION_TOGGLE, 2)).build())
-            .addAction(Notification.Action.Builder(null, "Ranger", pi(ACTION_STOP, 3)).build())
-            .build()
-    }
-
-    internal fun updateNotification(force: Boolean) {
-        val key = statusLine() + pet.mood + hidden
-        if (!force && key == lastNotifText) return
-        lastNotifText = key
-        getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification())
-    }
-
-    private fun checkAlerts() {
-        val m = pet.mood
-        if (m == lastAlertMood) return
-        lastAlertMood = m
-        val txt = when (m) {
-            PetState.Mood.HUNGRY -> "${pet.name} a faim ! 🥕"
-            PetState.Mood.DIRTY -> "${pet.name} a besoin d'un bain 🫧"
-            PetState.Mood.SICK -> "${pet.name} est malade 🤒"
-            PetState.Mood.SAD -> "${pet.name} s'ennuie de toi 🥺"
-            else -> return
-        }
-        val n = Notification.Builder(this, CH_ALERT)
-            .setSmallIcon(R.drawable.ic_bunny)
-            .setContentTitle(txt)
-            .setContentText("Touche pour t'occuper de lui")
-            .setContentIntent(pi(ACTION_TOGGLE, 4).takeIf { hidden }
-                ?: PendingIntent.getActivity(this, 5, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
-            .setAutoCancel(true)
-            .build()
-        getSystemService(NotificationManager::class.java).notify(ALERT_ID, n)
-    }
+    internal fun updateNotification(force: Boolean) = notifier.update(force)
 }

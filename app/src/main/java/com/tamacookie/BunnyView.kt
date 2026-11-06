@@ -40,7 +40,7 @@ class BunnyView(context: Context) : View(context) {
     var walkPhase = 0f              // 0..1, cycle de saut pendant la marche
     var airVy = 0f                  // vitesse verticale (px/s) pour l'étirement en l'air
     var eatProgress = 0f            // 0..1
-    var foodColor = Color.parseColor("#F28C28")
+    var foodColor = Palette.CARROT
         set(v) { field = v; carrot.color = v }
     var dirty = false
     var veryDirty = false
@@ -56,25 +56,25 @@ class BunnyView(context: Context) : View(context) {
 
     // --- Peintures ---
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; color = Color.parseColor("#5B4A55")
+        style = Paint.Style.STROKE; color = Palette.OUTLINE
         strokeWidth = 5f; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND
     }
-    private val fur = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFFBF5") }
-    private val furShade = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F1E6DC") }
-    private val pink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F6AFC0") }
-    private val cheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#66F07893") }
-    private val sickCheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#669BC48A") }
-    private val nose = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F07893") }
-    private val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#3A2E39") }
+    private val fur = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR }
+    private val furShade = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR_SHADE }
+    private val pink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.PINK }
+    private val cheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CHEEK }
+    private val sickCheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SICK_CHEEK }
+    private val nose = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.NOSE }
+    private val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.INK }
     private val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; color = Color.parseColor("#3A2E39")
+        style = Paint.Style.STROKE; color = Palette.INK
         strokeWidth = 2.6f; strokeCap = Paint.Cap.ROUND
     }
-    private val dirt = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#9C7A5B") }
-    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(45, 0, 0, 0) }
-    private val carrot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F28C28") }
-    private val leaf = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4CAF50") }
+    private val dirt = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.DIRT }
+    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SHADOW }
+    private val carrot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CARROT }
+    private val leaf = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LEAF }
     private val pPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
@@ -89,9 +89,9 @@ class BunnyView(context: Context) : View(context) {
     private val accStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 1.8f; strokeJoin = Paint.Join.ROUND
     }
-    private val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4A3B45") }
-    private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD54A") }
-    private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(60, 255, 255, 255) }
+    private val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.HAT }
+    private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.YELLOW }
+    private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LENS }
     private var darkFur = false
 
     var look: Look = Look()
@@ -102,14 +102,14 @@ class BunnyView(context: Context) : View(context) {
         fur.color = f
         furShade.color = Options.shade(f, 0.93f)
         darkFur = Options.isDark(f)
-        outline.color = Color.parseColor(if (darkFur) "#1E181C" else "#5B4A55")
-        line.color = Color.parseColor(if (darkFur) "#F3E9DD" else "#3A2E39")
+        outline.color = if (darkFur) Palette.OUTLINE_DARK else Palette.OUTLINE
+        line.color = if (darkFur) Palette.CREAM else Palette.INK
         eye.color = Options.eyeColor(look.eyes)
         val lum = 0.299f * Color.red(f) + 0.587f * Color.green(f) + 0.114f * Color.blue(f)
         patch.color = when {
-            lum > 190f -> Color.parseColor("#7A5A48")
+            lum > 190f -> Palette.PATCH_LIGHT
             lum > 110f -> Options.shade(f, 0.55f)
-            else -> Color.parseColor("#F3E9DD")
+            else -> Palette.CREAM
         }
         acc.color = Options.accColor(look.accColor)
         accStroke.color = outline.color
@@ -554,27 +554,27 @@ class BunnyView(context: Context) : View(context) {
             val a = (p.life / p.maxLife).coerceIn(0f, 1f)
             val alpha = (min(1f, a * 2.5f) * 255).toInt()
             when (p.type) {
-                PType.HEART -> { pPaint.color = Color.parseColor("#FF5C8A"); pPaint.alpha = alpha; heart(c, p.x, p.y, p.size) }
-                PType.ZZZ -> text(c, "z", p.x, p.y, p.size * (1.4f - a * 0.5f), "#7A8CD6", alpha)
-                PType.NOTE -> text(c, if (p.rot > 3f) "♪" else "♫", p.x, p.y, p.size, "#B05CE0", alpha)
-                PType.SPARKLE -> { pPaint.color = Color.parseColor("#7FD3FF"); pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * (0.6f + a)) }
-                PType.DROP -> { pPaint.color = Color.parseColor("#6EC6FF"); pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
-                PType.CRUMB -> { pPaint.color = Color.parseColor("#F28C28"); pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
+                PType.HEART -> { pPaint.color = Palette.HEART; pPaint.alpha = alpha; heart(c, p.x, p.y, p.size) }
+                PType.ZZZ -> text(c, "z", p.x, p.y, p.size * (1.4f - a * 0.5f), Palette.ZZZ, alpha)
+                PType.NOTE -> text(c, if (p.rot > 3f) "♪" else "♫", p.x, p.y, p.size, Palette.NOTE, alpha)
+                PType.SPARKLE -> { pPaint.color = Palette.SPARKLE; pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * (0.6f + a)) }
+                PType.DROP -> { pPaint.color = Palette.DROP; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
+                PType.CRUMB -> { pPaint.color = Palette.CARROT; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
                 PType.STAR -> {
                     val ang = p.rot + t * 6f
-                    text(c, "★", p.x + cos(ang) * 24f * d, p.y + sin(ang) * 7f * d, 11f * d, "#FFC83D", alpha)
+                    text(c, "★", p.x + cos(ang) * 24f * d, p.y + sin(ang) * 7f * d, 11f * d, Palette.STAR, alpha)
                 }
                 PType.BUBBLE -> {
-                    pPaint.color = Color.parseColor("#8DA05A"); pPaint.alpha = alpha / 2
+                    pPaint.color = Palette.DIRT_BUBBLE; pPaint.alpha = alpha / 2
                     c.drawCircle(p.x, p.y, p.size, pPaint)
                 }
             }
         }
     }
 
-    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: String, alpha: Int) {
+    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, alpha: Int) {
         textPaint.textSize = size
-        textPaint.color = Color.parseColor(color)
+        textPaint.color = color
         textPaint.alpha = alpha
         c.drawText(s, x, y, textPaint)
     }

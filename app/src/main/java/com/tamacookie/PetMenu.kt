@@ -19,14 +19,14 @@ import android.widget.TextView
 class StatBar(context: Context, private val color: Int) : View(context) {
     var value = 0f
         set(v) { field = v; invalidate() }
-    private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Color.parseColor("#EFE7E1") }
+    private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Palette.BAR_BG }
     private val fg = Paint(Paint.ANTI_ALIAS_FLAG)
     private val r = RectF()
 
     override fun onDraw(c: Canvas) {
         val h = height.toFloat()
         r.set(0f, 0f, width.toFloat(), h); c.drawRoundRect(r, h / 2, h / 2, bg)
-        fg.color = if (value < 25f) Color.parseColor("#E5484D") else color
+        fg.color = if (value < 25f) Palette.BAR_LOW else color
         r.set(0f, 0f, width * (value / 100f).coerceIn(0.04f, 1f), h); c.drawRoundRect(r, h / 2, h / 2, fg)
     }
 }
