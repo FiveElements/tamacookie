@@ -8,7 +8,7 @@
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
             file="build.gradle.kts"
-            line="21"
+            line="38"
             column="9"/>
     </issue>
 
@@ -24,13 +24,20 @@
     </issue>
 
     <issue
+        id="ObsoleteSdkInt"
+        message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 33. Merge all the resources in this folder into `mipmap-anydpi`.">
+        <location
+            file="src/main/res/mipmap-anydpi-v26"/>
+    </issue>
+
+    <issue
         id="ClickableViewAccessibility"
         message="Custom view ``StationsPanel`` has `setOnTouchListener` called on it but does not override `performClick`"
         errorLine1="        panel.setOnTouchListener { _, ev ->"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/tamacookie/BunnyService.kt"
-            line="2023"
+            file="src/main/java/com/tamacookie/StationController.kt"
+            line="383"
             column="9"/>
     </issue>
 
@@ -40,8 +47,8 @@
         errorLine1="        panel.setOnTouchListener { _, ev ->"
         errorLine2="                                 ^">
         <location
-            file="src/main/java/com/tamacookie/BunnyService.kt"
-            line="2023"
+            file="src/main/java/com/tamacookie/StationController.kt"
+            line="383"
             column="34"/>
     </issue>
 
@@ -51,8 +58,8 @@
         errorLine1="        panel.setOnTouchListener { _, ev ->"
         errorLine2="        ^">
         <location
-            file="src/main/java/com/tamacookie/BunnyService.kt"
-            line="2138"
+            file="src/main/java/com/tamacookie/StationController.kt"
+            line="422"
             column="9"/>
     </issue>
 
@@ -62,8 +69,8 @@
         errorLine1="        panel.setOnTouchListener { _, ev ->"
         errorLine2="                                 ^">
         <location
-            file="src/main/java/com/tamacookie/BunnyService.kt"
-            line="2138"
+            file="src/main/java/com/tamacookie/StationController.kt"
+            line="422"
             column="34"/>
     </issue>
 
