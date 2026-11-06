@@ -75,6 +75,8 @@ object Tuning {
     // --- Plusieurs animaux ---
     /** Animaux affichés en même temps (chaque fenêtre déplacée coûte un `updateViewLayout` par image). */
     const val MAX_PETS_SHOWN = 3
+    /** Animaux d'un même téléphone au plus (résident + compagnons) ; au-delà de [MAX_PETS_SHOWN], ils dorment hors écran. */
+    const val MAX_PETS = 6
 
     // --- Temps ---
     const val STATS_EVERY_MS = 10_000L

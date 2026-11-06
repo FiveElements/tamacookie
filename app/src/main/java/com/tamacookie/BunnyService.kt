@@ -342,6 +342,54 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         requestFrames()
     }
 
+    /** Un compagnon rejoint le résident (commande [PetCommands.ACTION_ADOPT_COMPANION]) : il tombe du ciel. */
+    private fun adoptCompanion(a: Adoption) {
+        if (world.pets.size >= Tuning.MAX_PETS) { say("On est déjà assez nombreux ici ! 🐾"); return }
+        val rec = a.copy(isNew = true).apply(null, repo::newPetId, clock.wallMs())
+        repo.addCompanion(rec)
+        val p = Pet.fromRecord(rec, BunnyPhysics(arena.d), newPetRandom(rec.id))
+        world.add(p)
+        computeBounds()
+        dropIn(p)
+        if (world.isShown(p)) showPet(p)
+        updateNotification(force = true)
+        requestFrames()
+    }
+
+    /** [p] apparaît à l'écran (nouveau compagnon, ou un compagnon qui dormait hors écran prend une place). */
+    private fun showPet(p: Pet) = world.asPet(p) {
+        ensurePetWindow(p)
+        if (!hidden) attachPet(p)
+        toys.restorePoops(p)
+        emit(p, PType.SPARKLE, 6)
+        say(speech.greeting(p.name, p.stats.mood, hourNow(), p.species.lines))
+    }
+
+    /** Un compagnon s'en va (commande [PetCommands.ACTION_REMOVE_PET]) ; le résident ne peut pas être retiré. */
+    private fun removeCompanion(id: PetId) {
+        val p = world.pets[id] ?: return
+        if (p === resident) return
+        if (p.isHiding) mischief.endHiding(p)
+        if (world.stationOf(p) != null) stations.leaveStation(p, hopOut = false)
+        touch.closeMenuOf(id)
+        windows.forgetBubble(id)
+        director.bubbles.forget(id)
+        petWindows.remove(id)?.let { w ->
+            overlayManager.release(w.id)
+            touch.detach(w.view)
+            viewOwner.remove(w.view)
+        }
+        awayPets.remove(id)
+        toys.removePoopsOf(id)
+        world.remove(id)
+        repo.remove(id)
+        // Un compagnon qui dormait hors écran prend la place libérée
+        for (q in shown.toList()) if (q.id !in petWindows) { dropIn(q); showPet(q) }
+        say("Au revoir ${p.name} ! 👋")
+        updateNotification(force = true)
+        requestFrames()
+    }
+
     /** Passe au premier plan ; false si le système le refuse (ex. redémarrage en arrière-plan sur Android 15+). */
     private fun tryStartForeground(): Boolean = try {
         val n = notifier.build()
@@ -377,6 +425,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 showNewLook()
             }
             PetCommands.ACTION_ADOPT -> PetCommands.adoptionFrom(intent)?.let(::adopt)
+            PetCommands.ACTION_ADOPT_COMPANION -> PetCommands.adoptionFrom(intent)?.let(::adoptCompanion)
+            PetCommands.ACTION_REMOVE_PET -> intent.getStringExtra(PetCommands.EXTRA_ID)?.let { removeCompanion(PetId(it)) }
         }
         return START_STICKY
     }

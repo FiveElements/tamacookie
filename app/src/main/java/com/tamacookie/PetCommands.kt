@@ -15,8 +15,13 @@ import com.tamacookie.persist.Pets
 object PetCommands {
     const val ACTION_ADOPT = "com.tamacookie.ADOPT"
     const val ACTION_SET_NAME = "com.tamacookie.SET_NAME"
+    /** Un nouvel animal rejoint le résident (étape 7). */
+    const val ACTION_ADOPT_COMPANION = "com.tamacookie.ADOPT_COMPANION"
+    /** Un compagnon s'en va (jamais le résident). */
+    const val ACTION_REMOVE_PET = "com.tamacookie.REMOVE_PET"
 
     const val EXTRA_NAME = "name"
+    const val EXTRA_ID = "id"
     private const val EXTRA_NEW = "new"
     private const val EXTRA_PERSONALITY = "personality"
     private const val EXTRA_TOY = "favoriteToy"
@@ -29,16 +34,37 @@ object PetCommands {
 
     fun adopt(ctx: Context, a: Adoption) {
         if (BunnyService.running) {
-            ctx.startService(Intent(ctx, BunnyService::class.java).setAction(ACTION_ADOPT)
-                .putExtra(EXTRA_NAME, a.name).putExtra(EXTRA_NEW, a.isNew)
-                .putExtra(EXTRA_PERSONALITY, a.personality.name).putExtra(EXTRA_TOY, a.favoriteToy.name)
-                .putExtra(EXTRA_FUR, a.look.fur.id).putExtra(EXTRA_EARS, a.look.ears.id)
-                .putExtra(EXTRA_EYES, a.look.eyes.id).putExtra(EXTRA_PATTERN, a.look.pattern.id)
-                .putExtra(EXTRA_ACC, a.look.accessory.id).putExtra(EXTRA_ACC_COLOR, a.look.accColor.id))
+            ctx.startService(adoptionIntent(ctx, ACTION_ADOPT, a))
         } else {
             Pets.repository(ctx).adopt(a)
         }
     }
+
+    /** Adopte un compagnon (nouvel animal, le résident reste) ; refusé au-delà de [Tuning.MAX_PETS]. */
+    fun adoptCompanion(ctx: Context, a: Adoption) {
+        if (BunnyService.running) {
+            ctx.startService(adoptionIntent(ctx, ACTION_ADOPT_COMPANION, a.copy(isNew = true)))
+        } else {
+            Pets.repository(ctx).adoptCompanion(a)
+        }
+    }
+
+    /** Le compagnon [id] s'en va (ses clés sont effacées) ; le résident ne peut pas être retiré. */
+    fun removeCompanion(ctx: Context, id: PetId) {
+        if (BunnyService.running) {
+            ctx.startService(Intent(ctx, BunnyService::class.java).setAction(ACTION_REMOVE_PET).putExtra(EXTRA_ID, id.value))
+        } else {
+            Pets.repository(ctx).removeCompanion(id)
+        }
+    }
+
+    private fun adoptionIntent(ctx: Context, action: String, a: Adoption): Intent =
+        Intent(ctx, BunnyService::class.java).setAction(action)
+            .putExtra(EXTRA_NAME, a.name).putExtra(EXTRA_NEW, a.isNew)
+            .putExtra(EXTRA_PERSONALITY, a.personality.name).putExtra(EXTRA_TOY, a.favoriteToy.name)
+            .putExtra(EXTRA_FUR, a.look.fur.id).putExtra(EXTRA_EARS, a.look.ears.id)
+            .putExtra(EXTRA_EYES, a.look.eyes.id).putExtra(EXTRA_PATTERN, a.look.pattern.id)
+            .putExtra(EXTRA_ACC, a.look.accessory.id).putExtra(EXTRA_ACC_COLOR, a.look.accColor.id)
 
     fun rename(ctx: Context, name: String) {
         val n = Adoption.cleanName(name) ?: return

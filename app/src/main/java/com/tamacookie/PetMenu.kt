@@ -145,7 +145,7 @@ class PetMenu(
     }
 
     fun refresh() {
-        title.text = "🐰 ${pet.name} · ${pet.personality.emoji} ${pet.personality.label}"
+        title.text = "${pet.species.emoji} ${pet.name} · ${pet.personality.emoji} ${pet.personality.label}"
         moodText.text = moodLabel(pet)
         for ((e, b) in dynamic) b.text = e.text(pet.stats)
     }

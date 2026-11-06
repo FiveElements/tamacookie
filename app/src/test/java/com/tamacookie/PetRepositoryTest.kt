@@ -6,6 +6,7 @@ import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.PetMigrations
 import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
+import com.tamacookie.species.Species
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -247,5 +248,72 @@ class PetRepositoryTest {
         assertEquals(10f, p.stats.satiety)
         p.on(PetEvent.Elapsed((clock.wall - rec.lastUpdate) / 3_600_000f), clock.wall)
         assertEquals(0f, p.stats.satiety)                         // rattrapage explicite, plafonné à 48 h
+    }
+    // ------------------------------------------------------------------ Compagnons (étape 7)
+
+    private fun companion(name: String) = Adoption(name, Look(fur = Fur.CREAM), Personality.PLAYFUL, Toy.FRISBEE, isNew = false)
+
+    @Test
+    fun `compagnon - adopte a cote du resident, qui reste le resident`() {
+        val pets = FakePrefs()
+        val repo = open(pets, legacyFile())
+        val resident = repo.loadResident()!!
+        val c = repo.adoptCompanion(companion("Praline"))!!
+        assertNotEquals(resident.id, c.id)
+        assertEquals(resident.id, repo.residentId())
+        assertEquals(listOf(resident.id, c.id), repo.ids())
+        assertEquals(listOf(c.copy(lastUpdate = clock.wall)), repo.companions())
+        assertEquals(PetStats(), c.stats)                         // toujours un nouvel animal (isNew forcé)
+        assertEquals(Traits(Personality.PLAYFUL, Toy.FRISBEE), c.traits)
+        assertEquals(Species.DEFAULT.id, c.identity.species)
+        assertEquals("rabbit", pets.getString("pet.${c.id.value}.species", null))
+        // le résident n'a pas bougé (aucune clé réécrite)
+        assertEquals(resident, repo.loadResident())
+    }
+
+    @Test
+    fun `compagnon - sauvegarde par PetId, independante du resident`() {
+        val repo = open(FakePrefs(), legacyFile())
+        val resident = repo.loadResident()!!
+        val c = repo.adoptCompanion(companion("Praline"))!!
+        assertTrue(repo.save(c.copy(stats = PetStats(satiety = 12f))))
+        assertEquals(12f, repo.load(c.id)!!.stats.satiety)
+        assertEquals(resident.stats, repo.loadResident()!!.stats)
+    }
+
+    @Test
+    fun `compagnon - retirer, jamais le resident`() {
+        val pets = FakePrefs()
+        val repo = open(pets, legacyFile())
+        val resident = repo.loadResident()!!
+        val c = repo.adoptCompanion(companion("Praline"))!!
+        assertFalse(repo.removeCompanion(resident.id))
+        assertFalse(repo.removeCompanion(PetId("inconnu")))
+        assertTrue(repo.removeCompanion(c.id))
+        assertEquals(listOf(resident.id), repo.ids())
+        assertTrue(pets.map.keys.none { it.startsWith("pet.${c.id.value}.") })
+        assertFalse(repo.save(c))                                 // parti : ne revient pas
+        assertEquals(resident.id, repo.residentId())
+    }
+
+    @Test
+    fun `compagnon - plafond, et pas sans resident`() {
+        assertNull(open(FakePrefs(), FakePrefs()).adoptCompanion(companion("Seul")))
+        val repo = open(FakePrefs(), legacyFile())
+        repeat(Tuning.MAX_PETS - 1) { assertTrue(repo.adoptCompanion(companion("C$it")) != null) }
+        assertEquals(Tuning.MAX_PETS, repo.ids().size)
+        assertNull(repo.adoptCompanion(companion("De trop")))
+    }
+
+    @Test
+    fun `nouveau lapin - remplace le resident, garde les compagnons`() {
+        val repo = open(FakePrefs(), legacyFile())
+        val old = repo.loadResident()!!
+        val c = repo.adoptCompanion(companion("Praline"))!!
+        val adopted = repo.adopt(Adoption("Caramel", Look(), Personality.LAZY, Toy.BALL, isNew = true))
+        assertEquals(adopted.id, repo.residentId())
+        assertEquals(listOf(c.id, adopted.id), repo.ids())
+        assertEquals(listOf(c.id), repo.companions().map { it.id })
+        assertNull(repo.load(old.id))
     }
 }
