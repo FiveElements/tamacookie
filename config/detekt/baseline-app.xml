@@ -29,9 +29,6 @@
     <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$root.addView(btnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (22 * d).toInt() })</ID>
     <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$row.addView(c, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { rightMargin = (8 * d).toInt() })</ID>
     <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$setStroke((if (sel) 4 * d else 1.5f * d).toInt(), Color.parseColor(if (sel) "#F07893" else "#B9ACA3"))</ID>
-    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$setText(if (asCompanion) COMPANION_NAMES.firstOrNull { it !in taken }.orEmpty() else pet?.identity?.name ?: Identity.DEFAULT_NAME)</ID>
-    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$text = "${personality.emoji} ${personality.label} — ${personality.desc}\n(le caractère se choisit à l'adoption)"</ID>
-    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$val name = Adoption.cleanName(nameEdit.text.toString()) ?: if (asCompanion) COMPANION_NAMES.random() else Identity.DEFAULT_NAME</ID>
     <ID>MaxLineLength:AndroidForegroundApps.kt:UsageStatsForegroundSource$class</ID>
     <ID>MaxLineLength:BalloonToyDrawer.kt:BalloonToyDrawer$path.moveTo(w * 0.44f, w * 1.05f)</ID>
     <ID>MaxLineLength:BedStationDrawer.kt:BedStationDrawer$r.set(16 * d, h * 0.42f, w * 0.38f, h * 0.62f)</ID>
@@ -45,25 +42,19 @@
     <ID>MaxLineLength:ChestStationDrawer.kt:ChestStationDrawer$for (i in 0..2) c.drawCircle(w * (0.3f + i * 0.2f), boxTop - 14 * d - (t * 20 + i * 7) % 14 * d, 2.4f * d, p)</ID>
     <ID>MaxLineLength:EntityWindows.kt:EntityWindows$*</ID>
     <ID>MaxLineLength:FakePrefs.kt:FakePrefs$override</ID>
-    <ID>MaxLineLength:MainActivity.kt:MainActivity$if (full) companionBtn.text = "💞 Maison pleine (${Tuning.MAX_PETS} animaux)" else companionBtn.text = "💞 Adopter un compagnon"</ID>
     <ID>MaxLineLength:MainActivity.kt:MainActivity$petList.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
     <ID>MaxLineLength:MainActivity.kt:MainActivity$root</ID>
     <ID>MaxLineLength:MainActivity.kt:MainActivity$root.addView(nameRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (12 * d).toInt() })</ID>
-    <ID>MaxLineLength:MainActivity.kt:MainActivity$text</ID>
     <ID>MaxLineLength:MainActivity.kt:MainActivity$val nameRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }</ID>
     <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$dockY = y.roundToInt().coerceIn(arena.topY.toInt(), (arena.groundY - dockLp.height).toInt().coerceAtLeast(arena.topY.toInt()))</ID>
     <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$if (overlay.isAttached(WindowId.Dock)) overlay.move(WindowId.Dock, dockX, dockY) else { dockLp.x = dockX; dockLp.y = dockY }</ID>
     <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$placeDock(prefs.getFloat(Prefs.DOCK_FX, 1f) * arena.screenW, prefs.getFloat(Prefs.DOCK_FY, 0.42f) * arena.groundY)</ID>
     <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$val lp = params(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, touchable = false)</ID>
     <ID>MaxLineLength:PetCommands.kt:PetCommands$ctx.startService(Intent(ctx, BunnyService::class.java).setAction(ACTION_REMOVE_PET).putExtra(EXTRA_ID, id.value))</ID>
-    <ID>MaxLineLength:PetMenu.kt:ChestPanel$for (t in chunk) toys.addView(button(t.emoji, t.label + if (t == pet.favoriteToy) "⭐" else "") { onToy(t) }, btnLp())</ID>
     <ID>MaxLineLength:PetMenu.kt:Panel$MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -&gt; v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()</ID>
     <ID>MaxLineLength:PetMenu.kt:Panel$protected fun rowLp</ID>
-    <ID>MaxLineLength:PetMenu.kt:PetMenu$addView</ID>
     <ID>MaxLineLength:PetMenu.kt:StationsPanel$addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
     <ID>MaxLineLength:PetMenu.kt:VetPanel$addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
-    <ID>MaxLineLength:PetMenu.kt:VetPanel$diag.text = if (issues.isEmpty()) "✅ Diagnostic : en pleine forme !" else "📋 Diagnostic : " + issues.joinToString(", ")</ID>
-    <ID>MaxLineLength:PetMenu.kt:VetPanel$info.text</ID>
     <ID>MaxLineLength:PetMigrations.kt:PetMigrations$Migration(0, "clés à plat du fichier « pet », apparence par index → clés par PetId, apparence par id", ::v0toV1)</ID>
     <ID>MaxLineLength:PetNotifier.kt:PetNotifier$.</ID>
     <ID>MaxLineLength:PetNotifier.kt:PetNotifier$?:</ID>

@@ -166,11 +166,11 @@ class OverlayWindows(
         private set
     val dockSize: Int get() = dockLp.width
 
-    @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
+    @SuppressLint("ClickableViewAccessibility")
     fun createDock(onTap: () -> Unit) {
         val size = (Tuning.DOCK_SIZE_DP * d).toInt()
         dock = TextView(context).apply {
-            text = DOCK_HOME
+            setText(R.string.dock_home)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
@@ -238,11 +238,6 @@ class OverlayWindows(
 
     /** 🫣 pendant qu'il se cache, 🏠 sinon. */
     fun setDockHiding(hiding: Boolean) {
-        if (::dock.isInitialized) dock.text = if (hiding) DOCK_HIDING else DOCK_HOME
-    }
-
-    private companion object {
-        const val DOCK_HOME = "🏠"
-        const val DOCK_HIDING = "🫣"
+        if (::dock.isInitialized) dock.setText(if (hiding) R.string.dock_hiding else R.string.dock_home)
     }
 }

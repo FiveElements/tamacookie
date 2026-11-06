@@ -2,8 +2,8 @@ package com.tamacookie
 
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.Pets
+import com.tamacookie.species.Species
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -25,7 +25,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 
-@SuppressLint("SetTextI18n")
 class MainActivity : Activity(), Choreographer.FrameCallback {
 
     private val d by lazy { resources.displayMetrics.density }
@@ -46,6 +45,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private var previewLook = Look()
     private var previewExpr = Expr.NORMAL
     private var previewFacing = 1f
+    /** Emoji de l'espèce du résident (bouton principal). */
+    private var residentEmoji = Species.DEFAULT.emoji
     /** Le lapin vient d'être lancé : on passera en arrière-plan après la réponse à la demande de permission. */
     private var backgroundAfterPermission = false
 
@@ -68,13 +69,13 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
 
         root.addView(TextView(this).apply {
-            text = "TamaCookie"
+            setText(R.string.app_name)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
             setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
             gravity = Gravity.CENTER
         })
         root.addView(TextView(this).apply {
-            text = "Un petit lapin qui vit sur ton écran"
+            setText(R.string.main_tagline)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setTextColor(Color.parseColor("#7A6B75")); gravity = Gravity.CENTER
         })
@@ -95,20 +96,20 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             setText(residentName())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
-            hint = "Nom du lapin"
+            setHint(R.string.main_name_hint)
         }
         nameRow.addView(nameEdit, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        nameRow.addView(smallButton("Renommer") { rename() })
-        nameRow.addView(smallButton("✏️ Apparence") {
+        nameRow.addView(smallButton(getString(R.string.main_rename)) { rename() })
+        nameRow.addView(smallButton(getString(R.string.main_edit_look)) {
             startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, false))
         }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = (8 * d).toInt() })
         root.addView(nameRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (12 * d).toInt() })
 
         // Animaux : le résident et ses compagnons (lecture seule par le repository, actions par commandes)
-        section(root, "Tes animaux")
+        section(root, R.string.main_pets_title)
         petList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(petList, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        companionBtn = smallButton("💞 Adopter un compagnon") {
+        companionBtn = smallButton(getString(R.string.main_adopt_companion)) {
             startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_COMPANION, true))
         }
         root.addView(companionBtn, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
@@ -116,12 +117,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         })
 
         // Niveau de bêtises
-        section(root, "Bêtises")
+        section(root, R.string.main_mischief_title)
         val prefs = Prefs.of(this)
         val levels = listOf(
-            "😇 Sage" to "Il réclame de l'attention, sans plus",
-            "😜 Taquin" to "Frappe à l'écran, s'assoit parfois sur un bouton",
-            "😈 Petit monstre" to "S'assoit sur tes boutons et ton clavier, commente tout",
+            R.string.main_mischief_0 to R.string.main_mischief_0_desc,
+            R.string.main_mischief_1 to R.string.main_mischief_1_desc,
+            R.string.main_mischief_2 to R.string.main_mischief_2_desc,
         )
         val levelRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val levelDesc = TextView(this).apply {
@@ -132,11 +133,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         fun paintLevels() {
             val cur = prefs.getInt(Prefs.MISCHIEF, 1)
             levelChips.forEachIndexed { i, c -> c.background = chipBg(i == cur) }
-            levelDesc.text = levels[cur].second + if (cur > 0) " (bouton/clavier : nécessite l'accessibilité)" else ""
+            val desc = getString(levels[cur].second)
+            levelDesc.text = if (cur > 0) getString(R.string.main_mischief_needs_a11y, desc) else desc
         }
         levels.forEachIndexed { i, (label, _) ->
             val c = TextView(this).apply {
-                text = label; gravity = Gravity.CENTER
+                setText(label); gravity = Gravity.CENTER
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
                 val p = (10 * d).toInt(); setPadding(p, p, p, p)
                 setOnClickListener {
@@ -153,7 +155,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         paintLevels()
 
         // Thèmes de saison (décor et répliques ajoutés : l'apparence choisie n'est jamais modifiée)
-        section(root, "Saisons")
+        section(root, R.string.main_seasons_title)
         val seasonChip = TextView(this).apply {
             gravity = Gravity.CENTER
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
@@ -161,7 +163,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
         fun paintSeason() {
             val on = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT)
-            seasonChip.text = if (on) "🎄🎃🌸 Thèmes de saison : activés" else "Thèmes de saison : désactivés"
+            seasonChip.setText(if (on) R.string.main_seasons_on else R.string.main_seasons_off)
             seasonChip.background = chipBg(on)
         }
         seasonChip.setOnClickListener {
@@ -172,14 +174,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
         root.addView(seasonChip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         root.addView(TextView(this).apply {
-            text = "Bonnet et flocons à Noël, citrouille à Halloween, fleurs au printemps"
+            setText(R.string.main_seasons_desc)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
             setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintSeason()
 
         // Bien-être numérique (évolution 4c) : il propose une pause, ne bloque jamais rien
-        section(root, "Bien-être")
+        section(root, R.string.main_wellbeing_title)
         val wellChip = TextView(this).apply {
             gravity = Gravity.CENTER
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
@@ -187,7 +189,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
         fun paintWellbeing() {
             val on = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT)
-            wellChip.text = if (on) "☕ Pauses proposées : activées" else "Pauses proposées : désactivées"
+            wellChip.setText(if (on) R.string.main_wellbeing_on else R.string.main_wellbeing_off)
             wellChip.background = chipBg(on)
         }
         wellChip.setOnClickListener {
@@ -198,15 +200,15 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
         root.addView(wellChip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         root.addView(TextView(this).apply {
-            text = "Après ${GameRules.DEFAULT.breakSuggestAfterMin} min dans la même app, il bâille et propose une pause ; " +
-                "après ${GameRules.DEFAULT.breakSulkAfterMin} min, il boude jusqu'à ce que tu changes d'app ou le caresses"
+            val rules = GameRules.DEFAULT
+            text = getString(R.string.main_wellbeing_desc, rules.breakSuggestAfterMin, rules.breakSulkAfterMin)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
             setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintWellbeing()
 
 
-        section(root, "Autorisations")
+        section(root, R.string.main_perms_title)
         overlayBtn = permButton(root) {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
         }
@@ -223,9 +225,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
         a11yBtn = permButton(root) { confirmAccessibility() }
         a11yHelp = TextView(this).apply {
-            text = "Paramètres › Accessibilité › « Applications installées » (Samsung) ou " +
-                "« Applications téléchargées » (Pixel) › TamaCookie. " +
-                "Si c'est grisé (« paramètre restreint ») : touche ici, puis ⋮ › « Autoriser les paramètres restreints », et réessaie."
+            setText(R.string.main_a11y_help)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(Color.parseColor("#7A6B75"))
             setPadding((12 * d).toInt(), 0, (12 * d).toInt(), (6 * d).toInt())
@@ -246,30 +246,15 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             topMargin = (18 * d).toInt(); bottomMargin = (18 * d).toInt()
         })
 
-        section(root, "Comment jouer")
+        section(root, R.string.main_howto_title)
         root.addView(TextView(this).apply {
-            text = """
-                👆  Touche-le pour le caresser
-                👆👆  Double-touche ou appui long : menu (dodo, objets, cache-cache…)
-                ✋  Fais-le glisser pour l'attraper… et lance-le !
-                🎾  4 jouets : balle, ballon, frisbee, doudou (tu peux les lancer aussi)
-                🏠  Bouton flottant 🏠 : installe la baignoire, le véto, la cage — chacun sur la page de ton choix
-                🫣  Cache-cache : il se cache sur une autre page du bureau, va le chercher !
-                🛁  Glisse-le dans la baignoire pour le laver
-                🩺  Chez le véto : ses statistiques et les soins
-                🔒  En cage, il est isolé… mais son bonheur chute 3x plus vite
-                💩  Touche ses crottes pour nettoyer
-                😈  Ignoré trop longtemps, il fait des bêtises pour attirer ton attention
-                📱  Change d'application : il te suit et commente ce que tu fais
-                🦘  Avec l'accessibilité : il saute sur les icônes et les boutons (lance-le dessus !)
-                💤  Il dort la nuit ou quand il est fatigué
-            """.trimIndent()
+            setText(R.string.main_howto)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(Color.parseColor("#3A2E39"))
             setLineSpacing(0f, 1.35f)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
-        root.addView(smallButton("Adopter un nouveau lapin") { confirmReset() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+        root.addView(smallButton(getString(R.string.main_reset)) { confirmReset() }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
             topMargin = (24 * d).toInt()
         })
 
@@ -293,6 +278,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         // Lecture seule : si le service tourne, l'état en mémoire peut être un peu plus récent (jauges)
         val pet = Pets.repository(this).loadResident()
         previewLook = pet?.look ?: Look()
+        residentEmoji = Species.of(pet?.identity?.species).emoji
         nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
         refreshPets()
         refresh()
@@ -335,15 +321,17 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         val overlay = Settings.canDrawOverlays(this)
         val notif = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         val usage = UsageStatsForegroundSource.hasPermission(this)
-        setPerm(overlayBtn, overlay, "Afficher par-dessus les autres apps", "obligatoire")
-        setPerm(notifBtn, notif, "Notifications", "recommandé")
-        setPerm(usageBtn, usage, "Accès aux données d'utilisation", "pour qu'il te suive d'app en app")
+        setPerm(overlayBtn, overlay, R.string.main_perm_overlay, R.string.main_perm_overlay_why)
+        setPerm(notifBtn, notif, R.string.main_perm_notif, R.string.main_perm_notif_why)
+        setPerm(usageBtn, usage, R.string.main_perm_usage, R.string.main_perm_usage_why)
         val a11y = ScreenSensorService.isEnabled(this)
-        setPerm(a11yBtn, a11y, "Sauter sur les icônes (accessibilité)", "optionnel")
+        setPerm(a11yBtn, a11y, R.string.main_perm_a11y, R.string.main_perm_a11y_why)
         a11yHelp.visibility = if (a11y) View.GONE else View.VISIBLE
 
         val running = BunnyService.running
-        mainBtn.text = if (running) "Ranger ${nameEdit.text} 🏠" else "Faire apparaître ${nameEdit.text} 🐰"
+        val name = nameEdit.text.toString()
+        mainBtn.text = if (running) getString(R.string.main_stop_pet, name)
+        else getString(R.string.main_start_pet, name, residentEmoji)
         mainBtn.background = GradientDrawable().apply {
             cornerRadius = 18 * d
             setColor(Color.parseColor(if (!overlay) "#BDB3B8" else if (running) "#7A6B75" else "#F07893"))
@@ -371,24 +359,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     /** Divulgation et consentement explicites AVANT d'ouvrir les réglages d'accessibilité. */
     private fun confirmAccessibility() {
         AlertDialog.Builder(this)
-            .setTitle("Autoriser l'accessibilité ?")
-            .setMessage(
-                "TamaCookie utilise l'API d'accessibilité d'Android uniquement pour le jeu :\n\n" +
-                    "• Ce qui est lu : la position des icônes et boutons affichés, leur nom court " +
-                    "(ex. « Chrome »), l'app au premier plan et le numéro de page du bureau ; " +
-                    "le fait que tu touches un bouton, fasses défiler ou tapes au clavier.\n" +
-                    "• Ce qui n'est JAMAIS lu : le texte que tu tapes, le contenu des champs de saisie " +
-                    "et des mots de passe.\n" +
-                    "• Pourquoi : pour que le lapin saute sur les icônes, te suive d'app en app, " +
-                    "joue à cache-cache sur le bureau et fasse ses bêtises.\n" +
-                    "• Rien n'est enregistré ni envoyé : tout reste en mémoire sur ton téléphone " +
-                    "(l'app n'a pas accès à Internet).\n\n" +
-                    "Tu peux le désactiver à tout moment dans Paramètres › Accessibilité."
-            )
-            .setPositiveButton("J'accepte") { _, _ ->
+            .setTitle(R.string.main_a11y_dialog_title)
+            .setMessage(R.string.main_a11y_dialog_message)
+            .setPositiveButton(R.string.main_a11y_dialog_accept) { _, _ ->
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
-            .setNegativeButton("Non merci", null)
+            .setNegativeButton(R.string.main_a11y_dialog_decline, null)
             .show()
     }
 
@@ -406,31 +382,37 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
                 background = GradientDrawable().apply { cornerRadius = 12 * d; setColor(Color.WHITE) }
             }
             val st = r.stats
-            val sleeping = if (i >= Tuning.MAX_PETS_SHOWN) "  💤 dort hors écran" else ""
+            val sleeping = if (i >= Tuning.MAX_PETS_SHOWN) getString(R.string.main_pet_offscreen) else ""
+            val role = getString(if (r === resident) R.string.main_pet_resident else R.string.main_pet_companion)
             row.addView(TextView(this).apply {
-                text = "${r.identity.name}  " + (if (r === resident) "🏠 résident" else "💞 compagnon") + sleeping + "\n" +
-                    NotifierTexts.statusLine(st.satiety, st.happiness, st.energy, st.cleanliness) + "  🩺${st.health.toInt()}"
+                text = getString(R.string.main_pet_row, r.identity.name, role, sleeping,
+                    NotifierTexts.statusLine(st.satiety, st.happiness, st.energy, st.cleanliness), st.health.toInt())
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Color.parseColor("#3A2E39"))
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-            if (r !== resident) row.addView(smallButton("Retirer") { confirmRemove(r.identity.id, r.identity.name) })
+            if (r !== resident) {
+                val id = r.identity.id; val name = r.identity.name
+                row.addView(smallButton(getString(R.string.main_pet_remove)) { confirmRemove(id, name) })
+            }
             petList.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
         }
         val full = all.size >= Tuning.MAX_PETS
         companionBtn.isEnabled = resident?.adopted == true && !full
         companionBtn.alpha = if (companionBtn.isEnabled) 1f else 0.5f
-        if (full) companionBtn.text = "💞 Maison pleine (${Tuning.MAX_PETS} animaux)" else companionBtn.text = "💞 Adopter un compagnon"
+        val max = Tuning.MAX_PETS
+        companionBtn.text = if (full) resources.getQuantityString(R.plurals.main_house_full, max, max)
+        else getString(R.string.main_adopt_companion)
     }
 
     private fun confirmRemove(id: PetId, name: String) {
         AlertDialog.Builder(this)
-            .setTitle("Dire au revoir à $name ?")
-            .setMessage("$name quittera ton téléphone (ses jauges et son apparence seront effacées).")
-            .setPositiveButton("Au revoir") { _, _ ->
+            .setTitle(getString(R.string.main_remove_title, name))
+            .setMessage(getString(R.string.main_remove_message, name))
+            .setPositiveButton(R.string.main_remove_confirm) { _, _ ->
                 PetCommands.removeCompanion(this, id)
                 // la commande est asynchrone si le service tourne : la liste suit au prochain affichage
                 petList.postDelayed({ refreshPets() }, 300)
             }
-            .setNegativeButton("Non", null)
+            .setNegativeButton(R.string.common_no, null)
             .show()
     }
 
@@ -445,19 +427,19 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
     private fun confirmReset() {
         AlertDialog.Builder(this)
-            .setTitle("Adopter un nouveau lapin ?")
-            .setMessage("${nameEdit.text} sera remplacé par un nouveau lapin que tu vas créer.")
-            .setPositiveButton("Oui") { _, _ ->
+            .setTitle(R.string.main_reset_title)
+            .setMessage(getString(R.string.main_reset_message, nameEdit.text.toString()))
+            .setPositiveButton(R.string.common_yes) { _, _ ->
                 startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, true))
             }
-            .setNegativeButton("Non", null)
+            .setNegativeButton(R.string.common_no, null)
             .show()
     }
 
     // --- petits helpers UI ---
-    private fun section(root: LinearLayout, title: String) {
+    private fun section(root: LinearLayout, title: Int) {
         root.addView(TextView(this).apply {
-            text = title
+            setText(title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
             setPadding(0, (8 * d).toInt(), 0, (6 * d).toInt())
@@ -475,8 +457,9 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         return tv
     }
 
-    private fun setPerm(tv: TextView, ok: Boolean, label: String, why: String) {
-        tv.text = if (ok) "✅  $label" else "⚠️  $label — $why (toucher pour autoriser)"
+    private fun setPerm(tv: TextView, ok: Boolean, label: Int, why: Int) {
+        tv.text = if (ok) getString(R.string.main_perm_granted, getString(label))
+        else getString(R.string.main_perm_missing, getString(label), getString(why))
         tv.isEnabled = !ok
         tv.background = GradientDrawable().apply {
             cornerRadius = 12 * d

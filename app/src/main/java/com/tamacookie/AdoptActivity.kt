@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
@@ -20,6 +19,7 @@ import android.widget.TextView
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.Pets
+import com.tamacookie.species.Species
 import kotlin.random.Random
 
 /**
@@ -30,15 +30,16 @@ import kotlin.random.Random
  * le résident ([EXTRA_NEW] vrai — avec, si un résident existe déjà, le choix de l'adopter plutôt comme
  * compagnon), ou adopter directement un **compagnon** ([EXTRA_COMPANION]).
  */
-@SuppressLint("SetTextI18n")
 class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
     companion object {
         const val EXTRA_NEW = "new"
         /** Adopter un compagnon (le résident reste). */
         const val EXTRA_COMPANION = "companion"
-        private val COMPANION_NAMES = listOf("Noisette", "Praline", "Caramel", "Biscuit", "Guimauve", "Pistache")
     }
+
+    /** Noms proposés à un compagnon (`adopt_companion_names`). */
+    private val companionNames by lazy { resources.getStringArray(R.array.adopt_companion_names).toList() }
 
     private val d by lazy { resources.displayMetrics.density }
     private lateinit var preview: PetView
@@ -86,10 +87,11 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         }
 
         root.addView(TextView(this).apply {
+            // Une adoption crée un animal de l'espèce par défaut ; la personnalisation montre celle du résident
             text = when {
-                asCompanion -> "Adopte un compagnon 🐰"
-                isNew -> "Adopte ton lapin 🐰"
-                else -> "Personnaliser 🐰"
+                asCompanion -> getString(R.string.adopt_title_companion, Species.DEFAULT.emoji)
+                isNew -> getString(R.string.adopt_title_new, Species.DEFAULT.emoji)
+                else -> getString(R.string.adopt_title_edit, Species.of(pet?.identity?.species).emoji)
             }
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
             setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
@@ -101,34 +103,37 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
         nameEdit = EditText(this).apply {
-            setText(if (asCompanion) COMPANION_NAMES.firstOrNull { it !in taken }.orEmpty() else pet?.identity?.name ?: Identity.DEFAULT_NAME)
+            setText(
+                if (asCompanion) companionNames.firstOrNull { it !in taken }.orEmpty()
+                else pet?.identity?.name ?: Identity.DEFAULT_NAME,
+            )
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
-            hint = "Nom du lapin"
+            setHint(R.string.adopt_name_hint)
             gravity = Gravity.CENTER
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
         }
         root.addView(nameEdit, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
-        section(root, "Pelage")
+        section(root, R.string.adopt_section_fur)
         root.addView(swatches(Fur.entries, { look.fur }) { look = look.copy(fur = it) })
-        section(root, "Oreilles")
+        section(root, R.string.adopt_section_ears)
         root.addView(chips(Ears.entries, { look.ears }) { look = look.copy(ears = it) })
-        section(root, "Yeux")
+        section(root, R.string.adopt_section_eyes)
         root.addView(swatches(EyeColor.entries, { look.eyes }) { look = look.copy(eyes = it) })
-        section(root, "Motif")
+        section(root, R.string.adopt_section_pattern)
         root.addView(chips(Pattern.entries, { look.pattern }) { look = look.copy(pattern = it) })
-        section(root, "Accessoire")
+        section(root, R.string.adopt_section_accessory)
         root.addView(chips(Accessory.entries, { look.accessory }) { look = look.copy(accessory = it) })
-        section(root, "Couleur de l'accessoire")
+        section(root, R.string.adopt_section_acc_color)
         root.addView(swatches(AccColor.entries, { look.accColor }) { look = look.copy(accColor = it) })
 
-        section(root, "Caractère")
+        section(root, R.string.adopt_section_personality)
         if (isNew) {
             val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             for (p in Personality.values()) {
                 val card = TextView(this).apply {
-                    text = "${p.emoji}  ${p.label} — ${p.desc}"
+                    text = getString(R.string.adopt_personality, p.emoji, p.label, p.desc)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                     setTextColor(Color.parseColor("#3A2E39"))
                     val pd = (12 * d).toInt(); setPadding(pd, pd, pd, pd)
@@ -140,24 +145,27 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             root.addView(list, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         } else {
             root.addView(TextView(this).apply {
-                text = "${personality.emoji}  ${personality.label} — ${personality.desc}\n(le caractère se choisit à l'adoption)"
+                text = getString(
+                    R.string.adopt_personality_fixed, personality.emoji, personality.label, personality.desc,
+                )
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(Color.parseColor("#7A6B75"))
             }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        btnRow.addView(bigButton("🎲 Au hasard", "#FBE3D6", "#3A2E39") { randomize() },
+        btnRow.addView(bigButton(getString(R.string.adopt_random), "#FBE3D6", "#3A2E39") { randomize() },
             LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { rightMargin = (8 * d).toInt() })
-        btnRow.addView(bigButton(if (isNew) "Adopter ! 💕" else "Enregistrer ✨", "#F07893", "#FFFFFF") { validate() },
+        val confirm = getString(if (isNew) R.string.adopt_confirm else R.string.adopt_save)
+        btnRow.addView(bigButton(confirm, "#F07893", "#FFFFFF") { validate() },
             LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         root.addView(btnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (22 * d).toInt() })
         // Nouveau lapin alors qu'un résident existe : il peut aussi le rejoindre au lieu de le remplacer
         if (isNew && !asCompanion && canAddCompanion) {
-            root.addView(bigButton("…ou l'adopter comme compagnon 💞", "#E3F4E8", "#3A2E39") { asCompanion = true; validate() },
+            root.addView(bigButton(getString(R.string.adopt_as_companion), "#E3F4E8", "#3A2E39") { asCompanion = true; validate() },
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (10 * d).toInt() })
             root.addView(TextView(this).apply {
-                text = "« Adopter ! » remplace ${pet?.identity?.name ?: "ton lapin"} ; un compagnon vit avec lui."
+                text = getString(R.string.adopt_replace_hint, pet?.identity?.name ?: getString(R.string.adopt_your_pet))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (6 * d).toInt() })
@@ -208,7 +216,8 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     }
 
     private fun validate() {
-        val name = Adoption.cleanName(nameEdit.text.toString()) ?: if (asCompanion) COMPANION_NAMES.random() else Identity.DEFAULT_NAME
+        val name = Adoption.cleanName(nameEdit.text.toString())
+            ?: if (asCompanion) companionNames.random() else Identity.DEFAULT_NAME
         val a = Adoption(
             name = name,
             look = look,
@@ -223,9 +232,9 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     }
 
     // --- UI helpers ---
-    private fun section(root: LinearLayout, title: String) {
+    private fun section(root: LinearLayout, title: Int) {
         root.addView(TextView(this).apply {
-            text = title
+            setText(title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
             setPadding(0, (14 * d).toInt(), 0, (6 * d).toInt())

@@ -1,10 +1,222 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!--
+  Textes d'interface de l'application (étape 8c). Langue par défaut : le français (tools:locale).
+  Noms : <écran>_<rôle> (main_, adopt_, menu_, stations_, chest_, vet_, notif_, widget_, tile_, a11y_).
+  Les répliques de l'animal et les textes du cœur (:core, Kotlin pur) ne sont pas ici : voir CLAUDE.md, « Textes ».
+  Une valeur entre guillemets garde ses espaces (doubles espaces après un emoji, espace en tête) ;
+  sans guillemets, une apostrophe s'écrit \'.
+  « lapin » n'apparaît que là où il désigne le personnage de l'app (l'adoption ne crée que des lapins) :
+  voir CLAUDE.md, « Ce qui reste lapin ».
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="fr">
     <string name="app_name">TamaCookie</string>
+
+    <!-- Commun -->
+    <string name="common_yes">Oui</string>
+    <string name="common_no">Non</string>
+
+    <!-- Écran principal (MainActivity) -->
+    <string name="main_tagline">Un petit lapin qui vit sur ton écran</string>
+    <string name="main_name_hint">Nom du lapin</string>
+    <string name="main_rename">Renommer</string>
+    <string name="main_edit_look">✏️ Apparence</string>
+    <string name="main_pets_title">Tes animaux</string>
+    <!-- Une ligne par animal : nom, rôle, « dort hors écran » éventuel ; puis jauges et santé -->
+    <string name="main_pet_row">"%1$s  %2$s%3$s\n%4$s  🩺%5$d"</string>
+    <string name="main_pet_resident">🏠 résident</string>
+    <string name="main_pet_companion">💞 compagnon</string>
+    <string name="main_pet_offscreen">"  💤 dort hors écran"</string>
+    <string name="main_pet_remove">Retirer</string>
+    <string name="main_adopt_companion">💞 Adopter un compagnon</string>
+    <plurals name="main_house_full">
+        <item quantity="one">💞 Maison pleine (%d animal)</item>
+        <item quantity="many">💞 Maison pleine (%d animaux)</item>
+        <item quantity="other">💞 Maison pleine (%d animaux)</item>
+    </plurals>
+    <string name="main_remove_title">Dire au revoir à %1$s ?</string>
+    <string name="main_remove_message">%1$s quittera ton téléphone (ses jauges et son apparence seront effacées).</string>
+    <string name="main_remove_confirm">Au revoir</string>
+
+    <string name="main_mischief_title">Bêtises</string>
+    <string name="main_mischief_0">😇 Sage</string>
+    <string name="main_mischief_0_desc">Il réclame de l\'attention, sans plus</string>
+    <string name="main_mischief_1">😜 Taquin</string>
+    <string name="main_mischief_1_desc">Frappe à l\'écran, s\'assoit parfois sur un bouton</string>
+    <string name="main_mischief_2">😈 Petit monstre</string>
+    <string name="main_mischief_2_desc">S\'assoit sur tes boutons et ton clavier, commente tout</string>
+    <string name="main_mischief_needs_a11y">%1$s (bouton/clavier : nécessite l\'accessibilité)</string>
+
+    <string name="main_seasons_title">Saisons</string>
+    <string name="main_seasons_on">🎄🎃🌸 Thèmes de saison : activés</string>
+    <string name="main_seasons_off">Thèmes de saison : désactivés</string>
+    <string name="main_seasons_desc">Bonnet et flocons à Noël, citrouille à Halloween, fleurs au printemps</string>
+
+    <string name="main_wellbeing_title">Bien-être</string>
+    <string name="main_wellbeing_on">☕ Pauses proposées : activées</string>
+    <string name="main_wellbeing_off">Pauses proposées : désactivées</string>
+    <string name="main_wellbeing_desc">Après %1$d min dans la même app, il bâille et propose une pause ; après %2$d min, il boude jusqu\'à ce que tu changes d\'app ou le caresses</string>
+
+    <string name="main_perms_title">Autorisations</string>
+    <string name="main_perm_granted">"✅  %1$s"</string>
+    <string name="main_perm_missing">"⚠️  %1$s — %2$s (toucher pour autoriser)"</string>
+    <string name="main_perm_overlay">Afficher par-dessus les autres apps</string>
+    <string name="main_perm_overlay_why">obligatoire</string>
+    <string name="main_perm_notif">Notifications</string>
+    <string name="main_perm_notif_why">recommandé</string>
+    <string name="main_perm_usage">Accès aux données d\'utilisation</string>
+    <string name="main_perm_usage_why">pour qu\'il te suive d\'app en app</string>
+    <string name="main_perm_a11y">Sauter sur les icônes (accessibilité)</string>
+    <string name="main_perm_a11y_why">optionnel</string>
+    <string name="main_a11y_help">Paramètres › Accessibilité › « Applications installées » (Samsung) ou « Applications téléchargées » (Pixel) › TamaCookie. Si c\'est grisé (« paramètre restreint ») : touche ici, puis ⋮ › « Autoriser les paramètres restreints », et réessaie.</string>
+    <string name="main_a11y_dialog_title">Autoriser l\'accessibilité ?</string>
+    <string name="main_a11y_dialog_message">TamaCookie utilise l\'API d\'accessibilité d\'Android uniquement pour le jeu :\n\n• Ce qui est lu : la position des icônes et boutons affichés, leur nom court (ex. « Chrome »), l\'app au premier plan et le numéro de page du bureau ; le fait que tu touches un bouton, fasses défiler ou tapes au clavier.\n• Ce qui n\'est JAMAIS lu : le texte que tu tapes, le contenu des champs de saisie et des mots de passe.\n• Pourquoi : pour que le lapin saute sur les icônes, te suive d\'app en app, joue à cache-cache sur le bureau et fasse ses bêtises.\n• Rien n\'est enregistré ni envoyé : tout reste en mémoire sur ton téléphone (l\'app n\'a pas accès à Internet).\n\nTu peux le désactiver à tout moment dans Paramètres › Accessibilité.</string>
+    <string name="main_a11y_dialog_accept">J\'accepte</string>
+    <string name="main_a11y_dialog_decline">Non merci</string>
+
+    <!-- Bouton principal : nom du résident (+ emoji de son espèce) -->
+    <string name="main_stop_pet">Ranger %1$s 🏠</string>
+    <string name="main_start_pet">Faire apparaître %1$s %2$s</string>
+
+    <string name="main_howto_title">Comment jouer</string>
+    <string name="main_howto">"👆  Touche-le pour le caresser\n👆👆  Double-touche ou appui long : menu (dodo, objets, cache-cache…)\n✋  Fais-le glisser pour l'attraper… et lance-le !\n🎾  4 jouets : balle, ballon, frisbee, doudou (tu peux les lancer aussi)\n🏠  Bouton flottant 🏠 : installe la baignoire, le véto, la cage — chacun sur la page de ton choix\n🫣  Cache-cache : il se cache sur une autre page du bureau, va le chercher !\n🛁  Glisse-le dans la baignoire pour le laver\n🩺  Chez le véto : ses statistiques et les soins\n🔒  En cage, il est isolé… mais son bonheur chute 3x plus vite\n💩  Touche ses crottes pour nettoyer\n😈  Ignoré trop longtemps, il fait des bêtises pour attirer ton attention\n📱  Change d'application : il te suit et commente ce que tu fais\n🦘  Avec l'accessibilité : il saute sur les icônes et les boutons (lance-le dessus !)\n💤  Il dort la nuit ou quand il est fatigué"</string>
+
+    <string name="main_reset">Adopter un nouveau lapin</string>
+    <string name="main_reset_title">Adopter un nouveau lapin ?</string>
+    <string name="main_reset_message">%1$s sera remplacé par un nouveau lapin que tu vas créer.</string>
+
+    <!-- Adoption / personnalisation (AdoptActivity) ; %1$s = emoji de l'espèce -->
+    <string name="adopt_title_companion">Adopte un compagnon %1$s</string>
+    <string name="adopt_title_new">Adopte ton lapin %1$s</string>
+    <string name="adopt_title_edit">Personnaliser %1$s</string>
+    <string name="adopt_name_hint">Nom du lapin</string>
+    <string name="adopt_section_fur">Pelage</string>
+    <string name="adopt_section_ears">Oreilles</string>
+    <string name="adopt_section_eyes">Yeux</string>
+    <string name="adopt_section_pattern">Motif</string>
+    <string name="adopt_section_accessory">Accessoire</string>
+    <string name="adopt_section_acc_color">Couleur de l\'accessoire</string>
+    <string name="adopt_section_personality">Caractère</string>
+    <!-- emoji, nom, description du caractère -->
+    <string name="adopt_personality">"%1$s  %2$s — %3$s"</string>
+    <string name="adopt_personality_fixed">"%1$s  %2$s — %3$s\n(le caractère se choisit à l'adoption)"</string>
+    <string name="adopt_random">🎲 Au hasard</string>
+    <string name="adopt_confirm">Adopter ! 💕</string>
+    <string name="adopt_save">Enregistrer ✨</string>
+    <string name="adopt_as_companion">…ou l\'adopter comme compagnon 💞</string>
+    <string name="adopt_replace_hint">« Adopter ! » remplace %1$s ; un compagnon vit avec lui.</string>
+    <string name="adopt_your_pet">ton lapin</string>
+    <!-- Noms proposés à un compagnon (le premier libre ; au hasard si le champ est vidé) -->
+    <string-array name="adopt_companion_names">
+        <item>Noisette</item>
+        <item>Praline</item>
+        <item>Caramel</item>
+        <item>Biscuit</item>
+        <item>Guimauve</item>
+        <item>Pistache</item>
+    </string-array>
+
+    <!-- Bouton flottant (OverlayWindows) : 🫣 pendant le cache-cache, 🏠 sinon -->
+    <string name="dock_home" translatable="false">🏠</string>
+    <string name="dock_hiding" translatable="false">🫣</string>
+
+    <!-- Panneaux flottants (PetMenu.kt) -->
+    <string name="panel_close" translatable="false">✕</string>
+    <!-- Bouton : emoji, retour à la ligne, libellé -->
+    <string name="panel_button" translatable="false">%1$s\n%2$s</string>
+
+    <!-- Menu rapide : emoji de l'espèce, nom, emoji et nom du caractère -->
+    <string name="menu_title">%1$s %2$s · %3$s %4$s</string>
+    <string name="menu_hint">💡 Touche le coffre pour lui donner à manger ou un jouet. Glisse %1$s dans la baignoire pour le laver, chez le véto pour voir sa santé.</string>
+    <string name="menu_mood_happy">Aux anges ✨</string>
+    <string name="menu_mood_ok">Tranquille</string>
+    <string name="menu_mood_hungry">A très faim…</string>
+    <string name="menu_mood_sleeping">Fait dodo… chut</string>
+    <string name="menu_mood_sleepy">Tombe de sommeil</string>
+    <string name="menu_mood_dirty">Aurait bien besoin d\'un bain</string>
+    <string name="menu_mood_sad">Se sent seul…</string>
+    <string name="menu_mood_sick">Est malade 🤒</string>
+
+    <!-- Panneau 🏠 -->
+    <string name="stations_title">🏠 Objets de cette page</string>
+    <string name="stations_hint">Chaque objet reste sur la page (ou l\'app) où tu l\'as mis.</string>
+    <!-- Nom de la station, retour à la ligne, où elle est -->
+    <string name="stations_row" translatable="false">%1$s\n%2$s</string>
+    <string name="stations_here">✅ sur cette page</string>
+    <string name="stations_elsewhere">📍 %1$s</string>
+    <string name="stations_stored">📦 rangé</string>
+    <string name="stations_store">Ranger</string>
+    <string name="stations_put_here">Mettre ici</string>
+
+    <!-- Coffre -->
+    <string name="chest_title">🧰 Le coffre de %1$s</string>
+    <string name="chest_food">🍽️ À manger</string>
+    <string name="chest_toys">🎁 Jouets</string>
+    <!-- Jouet préféré : son nom suivi d'une étoile -->
+    <string name="chest_favorite" translatable="false">%1$s⭐</string>
+
+    <!-- Fiche du véto -->
+    <string name="vet_title">🩺 Fiche de %1$s</string>
+    <!-- emoji et nom du caractère, âge, emoji du jouet préféré, apps visitées -->
+    <string name="vet_info">%1$s %2$s · %3$s · jouet préféré : %4$s · %5$s</string>
+    <plurals name="vet_age_days">
+        <item quantity="one">%d jour</item>
+        <item quantity="many">%d jours</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <plurals name="vet_apps_visited">
+        <item quantity="one">%d app visitée</item>
+        <item quantity="many">%d apps visitées</item>
+        <item quantity="other">%d apps visitées</item>
+    </plurals>
+    <string name="vet_gauge_satiety">🥕 Faim</string>
+    <string name="vet_gauge_happiness">💖 Bonheur</string>
+    <string name="vet_gauge_energy">⚡ Énergie</string>
+    <string name="vet_gauge_cleanliness">🛁 Propreté</string>
+    <string name="vet_gauge_health">❤️‍🩹 Santé</string>
+    <string name="vet_gauge_value" translatable="false">%1$d</string>
+    <string name="vet_heal">Soigner</string>
+    <string name="vet_leave">Sortir</string>
+    <string name="vet_diag_ok">✅ Diagnostic : en pleine forme !</string>
+    <string name="vet_diag">📋 Diagnostic : %1$s</string>
+    <string name="vet_diag_separator">", "</string>
+    <string name="vet_issue_sick">malade : un vaccin s\'impose 💉</string>
+    <string name="vet_issue_fragile">santé fragile</string>
+    <string name="vet_issue_hungry">il a faim</string>
+    <string name="vet_issue_dirty">un bain serait bien</string>
+    <string name="vet_issue_tired">il est épuisé</string>
+    <string name="vet_issue_lonely">il a besoin d\'attention</string>
+    <plurals name="vet_issue_poops">
+        <item quantity="one">%d crotte à ramasser</item>
+        <item quantity="many">%d crottes à ramasser</item>
+        <item quantity="other">%d crottes à ramasser</item>
+    </plurals>
+
+    <!-- Notification (PetNotifier) : canaux, titre, boutons -->
+    <string name="notif_channel_pet">Cookie est là</string>
+    <string name="notif_channel_pet_desc">Notification permanente du lapin</string>
+    <string name="notif_channel_alerts">Besoins de Cookie</string>
+    <string name="notif_channel_alerts_desc">Quand Cookie a faim, est sale ou malade</string>
+    <string name="notif_mood_caged">%1$s (en cage 🔒)</string>
+    <string name="notif_title_hidden">%1$s (caché)</string>
+    <string name="notif_feed">🥕 Nourrir</string>
+    <string name="notif_show">Montrer</string>
+    <string name="notif_hide">Cacher</string>
+    <string name="notif_stop">Ranger</string>
+    <string name="notif_alert_text">Touche pour t\'occuper de lui</string>
+
+    <!-- Service d'accessibilité (manifeste, accessibility_config.xml) -->
+    <string name="a11y_label">TamaCookie – sauter sur les icônes</string>
     <string name="a11y_summary">Permet à Cookie de sauter sur les icônes et les boutons</string>
     <string name="a11y_description">TamaCookie lit la position des éléments affichés (icônes, boutons) pour que le lapin puisse sauter dessus, ainsi que le nom court des icônes et boutons (par ex. « Chrome ») et le numéro de page du bureau. Il remarque aussi quand tu touches un bouton, fais défiler ou tapes au clavier, sans jamais lire le texte que tu saisis ni le contenu des champs de saisie ou des mots de passe. Tout reste sur le téléphone, en mémoire : rien n\'est enregistré ni envoyé.</string>
+
+    <!-- Widget (PetWidget ; le reste de ses textes : WidgetTexts, dans le cœur) -->
     <string name="widget_description">Cookie sur ton écran d\'accueil : humeur, jauges, nourrir et appeler</string>
     <string name="widget_feed">🥕 Nourrir</string>
     <string name="widget_call">👋 Appeler</string>
+    <string name="widget_gauge_value" translatable="false">%1$d</string>
+
+    <!-- Tuile Réglages rapides (PetTileService ; états : TileTexts, dans le cœur) -->
     <string name="tile_label">Cookie</string>
+    <!-- Lu par l'accessibilité : nom, ce que fera un toucher -->
+    <string name="tile_description">%1$s : %2$s</string>
 </resources>

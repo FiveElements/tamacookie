@@ -70,7 +70,7 @@ class PetWidget : AppWidgetProvider() {
                 v.setTextViewText(label, g.emoji)
                 v.setContentDescription(label, g.label)
                 v.setProgressBar(bar, 100, g.value, false)
-                v.setTextViewText(value, "${g.value}")
+                v.setTextViewText(value, ctx.getString(R.string.widget_gauge_value, g.value))
             }
             v.setTextViewText(R.id.widget_status, c.status)
             v.setViewVisibility(R.id.widget_status, if (c.status.isEmpty()) View.GONE else View.VISIBLE)
