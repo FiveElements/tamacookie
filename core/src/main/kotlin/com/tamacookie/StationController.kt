@@ -158,11 +158,19 @@ class StationController(
         return a != null && a == ctx.pages.currentView
     }
 
+    /**
+     * Un écran de notre app est visible ([OwnAppScreens]) : les stations **vides** sont retirées à la prochaine
+     * [layout] (elles recouvraient l'écran principal, ouvert en fenêtre pop-up par-dessus le bureau) et reviennent
+     * ensuite à leur place (rien n'est sauvegardé ni déplacé). Une station occupée reste : elle accompagne l'animal,
+     * qui reste affiché, et son occupant n'est pas dérangé (bain, cage, lit…).
+     */
+    var ownAppVisible = false
+
     /** Place, montre ou cache chaque station selon la vue et le défilement (fondu si elle apparaît sur place). */
     fun layout() {
         val pages = ctx.pages
         for (s in all) {
-            val off = pages.visibleOffset(s.anchor)
+            val off = if (ownAppVisible && !s.occupied) Float.NaN else pages.visibleOffset(s.anchor)
             val was = shown(s)
             val x = overlay.placeAnchored(s.windowId, s.cx - s.w / 2f, s.y, off, fadeIn = off == 0f)
             if (x != null) s.x = x
@@ -189,16 +197,22 @@ class StationController(
         pages.split(st.anchor.orEmpty()).second?.let { pages.bunnyPage = it }
     }
 
-    /** Animation des stations au décor animé (baignoire) et rafraîchissement du panneau véto. */
+    /**
+     * Une station au décor animé ne demande des images qu'affichée **et occupée** (bain qui mousse, roue qui
+     * tourne) : vide, elle reste dessinée immobile et ne retient pas la boucle (batterie).
+     */
+    private fun animates(s: Station) = s.behavior.animated && s.occupied && shown(s)
+
+    /** Animation des stations au décor animé (baignoire, roue occupées) et rafraîchissement du panneau véto. */
     fun update(dt: Float) {
-        for (s in all) if (s.behavior.animated && shown(s)) { s.t += dt; redraw(s) }
+        for (s in all) if (animates(s)) { s.t += dt; redraw(s) }
         vetTimer += dt
         if (vetTimer > 1f) { vetTimer = 0f; panels.refreshVet() }
     }
 
-    /** Une station animée est visible (baignoire, couvercle du coffre). */
+    /** Une station s'anime à l'écran (baignoire ou roue occupée, couvercle du coffre, objet qui en jaillit). */
     fun animating(): Boolean {
-        for (s in all) if (s.behavior.animated && shown(s)) return true
+        for (s in all) if (animates(s)) return true
         return chestLid > 0f || chestPop != null
     }
 

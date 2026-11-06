@@ -65,6 +65,8 @@ class StationControllerTest {
         return sc[k]
     }
 
+    private fun redraws(s: Station) = overlay.backend.ops.count { it.op == "redraw" && it.id == s.windowId }
+
     @Test fun `une station rangee n'a pas de fenetre, installee elle apparait en fondu`() {
         sc.layout()
         for (k in StationKind.entries) assertFalse(overlay.isAttached(sc[k].windowId))
@@ -178,15 +180,97 @@ class StationControllerTest {
         assertFalse(panels.vetOpen || panels.chestOpen || panels.stationsOpen)
     }
 
-    @Test fun `la baignoire affichee s'anime dans le modele`() {
+    @Test fun `la baignoire occupee et affichee s'anime dans le modele`() {
         val s = install(StationKind.BATH)
+        sc.enterStation(StationKind.BATH)
         sc.update(0.5f)
         assertEquals(0.5f, s.t, 1e-6f)
         assertTrue(sc.animating())
+        sc.leaveStation(hopOut = true)
         ctx.pages.currentView = "com.app.autre"
         sc.layout()
         sc.update(0.5f)
         assertEquals(0.5f, s.t, 1e-6f)          // pas affichée : pas animée
+    }
+
+    @Test fun `un ecran de l'app visible retire les stations vides, puis elles reviennent a leur place`() {
+        val bath = install(StationKind.BATH)
+        val wheel = install(StationKind.WHEEL)
+        val at = overlay.shownAt(wheel.windowId)
+        sc.enterStation(StationKind.BATH)
+        sc.ownAppVisible = true
+        sc.layout(); overlay.flush()
+        assertFalse(overlay.isAttached(wheel.windowId))      // vide : ne recouvre plus l'écran de l'app
+        assertTrue(overlay.isAttached(bath.windowId))        // occupée : reste avec son occupant
+        assertEquals(StationKind.BATH, ctx.world.stationOf(pet))
+        assertTrue(sc.anchoredHere(StationKind.WHEEL))       // placement inchangé
+        sc.leaveStation(hopOut = true)
+        sc.layout(); overlay.flush()
+        assertFalse(overlay.isAttached(bath.windowId))       // vidée pendant que l'app est visible
+        sc.ownAppVisible = false
+        sc.layout(); overlay.flush()
+        assertTrue(overlay.isAttached(bath.windowId))
+        assertEquals(at, overlay.shownAt(wheel.windowId))
+    }
+
+    @Test fun `la cage occupee reste affichee avec l'animal pendant qu'un ecran de l'app est visible`() {
+        val cage = install(StationKind.CAGE)
+        sc.enterStation(StationKind.CAGE)
+        sc.ownAppVisible = true
+        sc.layout(); overlay.flush()
+        assertTrue(overlay.isAttached(cage.windowId))
+        assertEquals(StationKind.CAGE, ctx.world.stationOf(pet))
+    }
+
+    @Test fun `une station retiree par l'app ne recoit pas l'animal glisse`() {
+        val cage = install(StationKind.CAGE)
+        sc.ownAppVisible = true
+        sc.layout(); overlay.flush()
+        pet.body.fx = cage.cx; pet.body.fy = cage.cy + 45f
+        sc.updateHover()
+        assertFalse(cage.highlight)
+        assertNull(sc.takeHover())
+    }
+
+    @Test fun `ecrans de l'app comptes un par un`() {
+        val screens = OwnAppScreens()
+        val seen = ArrayList<Boolean>()
+        screens.visible.observe { seen += it }
+        screens.started("principal")
+        screens.started("adoption")          // l'adoption démarre avant que l'écran principal s'arrête
+        screens.stopped("principal")
+        assertTrue(screens.visible.value)
+        screens.stopped("adoption")
+        assertFalse(screens.visible.value)
+        screens.stopped("adoption")          // arrêt en double : sans effet
+        assertEquals(listOf(true, false), seen)
+    }
+
+    @Test fun `une baignoire ou une roue vide affichee ne demande pas d'images`() {
+        for (k in listOf(StationKind.BATH, StationKind.WHEEL)) {
+            val s = install(k)
+            assertTrue(overlay.isAttached(s.windowId))
+            val redraws = redraws(s)
+            sc.update(0.5f)
+            assertEquals(0f, s.t, 1e-6f)            // dessinée immobile
+            assertEquals(redraws, redraws(s))
+            assertFalse(sc.animating())             // la boucle peut se suspendre
+        }
+    }
+
+    @Test fun `la roue s'anime tant qu'il court dedans, puis s'arrete`() {
+        val s = install(StationKind.WHEEL)
+        pet.stats = pet.stats.copy(energy = 90f)
+        sc.enterStation(StationKind.WHEEL)
+        assertTrue(s.occupied)
+        assertTrue(sc.animating())
+        sc.update(0.25f)
+        assertEquals(0.25f, s.t, 1e-6f)
+        sc.leaveStation(hopOut = true)
+        assertFalse(s.occupied)
+        assertFalse(sc.animating())
+        sc.update(0.25f)
+        assertEquals(0.25f, s.t, 1e-6f)
     }
 
     @Test fun `deux animaux dans le lit, chacun a sa place`() {

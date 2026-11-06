@@ -1,7 +1,9 @@
 package com.tamacookie
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.os.Bundle
 import android.os.PowerManager
 
 /**
@@ -10,6 +12,21 @@ import android.os.PowerManager
  */
 class TamaApp : Application() {
     val graph: AppGraph by lazy { AppGraph(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Nos écrans visibles (toutes les activités, pop-up et écran partagé compris) : le service y lit
+        // s'il doit retirer les stations vides (OwnAppScreens).
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) = graph.ownApp.started(activity)
+            override fun onActivityStopped(activity: Activity) = graph.ownApp.stopped(activity)
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityResumed(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
+    }
 }
 
 /**
@@ -20,6 +37,9 @@ class TamaApp : Application() {
 class AppGraph(private val app: Context) {
     /** Ce que voit le service d'accessibilité (remplace l'ancien objet global `Platforms`). Unique. */
     val screen = ScreenSensorHub()
+
+    /** Nos propres écrans visibles (tenu par [TamaApp], lu par `BunnyService`). Unique. */
+    val ownApp = OwnAppScreens()
 
     /**
      * Application au premier plan : l'accessibilité si son service est connecté, sinon UsageStats

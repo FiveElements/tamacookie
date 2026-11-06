@@ -16,6 +16,10 @@ java {
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+        // Le démon tourne en JDK 21 (gradle/gradle-daemon-jvm.properties) : compiler contre l'API du JDK 17, sinon
+        // un appel comme `list.removeFirst()` se lierait à la méthode du JDK 21, absente d'Android 13/14 (l'APK
+        // embarque le cœur). L'app compile contre android.jar (AGP) : rien à faire.
+        freeCompilerArgs.add("-Xjdk-release=17")
     }
 }
 
