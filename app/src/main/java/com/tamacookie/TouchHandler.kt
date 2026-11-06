@@ -21,7 +21,8 @@ import kotlin.math.sign
  *
  * Adaptateur d'entrée : passe par [PetCtx] pour l'animal, et reçoit explicitement les deux
  * contrôleurs qu'il pilote ([StationController] : survol / dépôt / panneau ; [MischiefController] :
- * trouvé, caresse pendant une bêtise, cache-cache depuis le menu). Reste lié à Android (gestes, vues).
+ * fin du cache-cache quand on l'attrape, cache-cache depuis le menu). La caresse pendant une activité
+ * (station, bêtise) va à son gestionnaire ([PetCtx.acts]). Reste lié à Android (gestes, vues).
  */
 class TouchHandler(
     private val ctx: PetCtx,
@@ -118,10 +119,10 @@ class TouchHandler(
     private fun startDrag() {
         val st = pet.stats
         if (pet.body.act == Act.PEEK) {
-            ctx.endHiding()
+            mischief.endHiding()
             st.happiness = (st.happiness + 15f).coerceAtMost(100f)
             ctx.say(Lines.FOUND_WHILE_DRAGGED, 1.5f)
-        } else if (pet.isHiding) ctx.endHiding()
+        } else if (pet.isHiding) mischief.endHiding()
         closeMenu()
         pet.body.platform = null
         pet.body.phys.airLandY = null
@@ -147,14 +148,8 @@ class TouchHandler(
         val st = pet.stats
         ctx.haptic(pet, HapticFeedbackConstants.CONFIRM)
         ctx.noteInteraction()
-        // Activité prise en charge par une fonctionnalité (dans une station…) : elle réagit à la caresse
+        // Activité prise en charge par une fonctionnalité (station, bêtise…) : elle réagit à la caresse
         ctx.acts.handlerFor(pet)?.let { if (it.onPet(pet)) return }
-        when (pet.body.act) {
-            Act.PEEK -> { mischief.foundBunny(); return }
-            Act.HIDE_RUN -> return
-            Act.SQUAT -> { mischief.onSquatPetted(); return }
-            else -> {}
-        }
         if (pet.body.act == Act.SLEEP || st.sleeping) {
             st.sleeping = false
             st.happiness = (st.happiness - 3f).coerceAtLeast(0f)

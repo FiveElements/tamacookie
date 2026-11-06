@@ -172,6 +172,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         stations = StationController(this, toys)
         stations.registerActs(acts)
         mischief = MischiefController(this)
+        mischief.registerActs(acts)
         touch = TouchHandler(this, stations, mischief)
 
         computeBounds()
@@ -676,9 +677,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                     actor.jump(p, -420 * d, 0f, then = Act.DANCE)
                 }
             }
-            Act.SQUAT -> mischief.updateSquat(p, dt)
-            Act.HIDE_RUN, Act.HIDDEN, Act.PEEK -> mischief.updateHide(p, dt)
-            Act.KNOCK -> mischief.updateKnock(p, dt)
             // Activité d'une fonctionnalité sans gestionnaire (station introuvable…) : il ne reste pas figé
             else -> p.setAct(Act.IDLE, 2f)
         }
@@ -913,13 +911,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         } catch (_: Exception) {}
     }
 
-    override var lastInteraction: Long
-        get() = mischief.lastInteraction
-        set(v) { mischief.lastInteraction = v }
-
-    override fun noteInteraction() = mischief.noteInteraction()
-
-    override fun endHiding() = mischief.endHiding()
+    override var lastInteraction: Long = clock.wallMs()
 
     override fun setDockHiding(hiding: Boolean) = windows.setDockHiding(hiding)
 }

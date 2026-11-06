@@ -70,8 +70,6 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override fun showFood(pet: Pet, food: Food) {}
 
     override var lastInteraction = clock.wallMs()
-    override fun noteInteraction() { lastInteraction = clock.wallMs() }
-    override fun endHiding() { dockShowsHiding = false }
     override fun startSleep(pet: Pet) { sleepRequests++; pet.stats.sleeping = true; pet.setActOrAfterAir(Act.SLEEP) }
 
     override fun requestFrames() {}

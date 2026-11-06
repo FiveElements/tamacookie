@@ -51,9 +51,9 @@ interface PetCtx {
     fun showFood(pet: Pet, food: Food)
 
     // --- Interactions entre fonctionnalités (questions au monde plutôt qu'appels de contrôleur) ---
-    /** Dernière interaction de l'utilisateur (heure murale, ms). */
+    /** Dernière interaction de l'utilisateur (heure murale, ms) : les bêtises attendent qu'il l'oublie. */
     var lastInteraction: Long
-    fun noteInteraction()
+    fun noteInteraction() { lastInteraction = clock.wallMs() }
     /**
      * Vrai (et il le dit) s'il est occupé : à cache-cache ou dans une station ([World.busy]).
      * La réplique vient du comportement de la station ([com.tamacookie.feature.station.StationBehavior.busyLine]).
@@ -64,7 +64,6 @@ interface PetCtx {
         say(k.behavior.busyLine(this))
         return true
     }
-    fun endHiding()
     fun startSleep(pet: Pet)
 
     // --- Boucle, notification, menu ---

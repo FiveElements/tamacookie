@@ -23,7 +23,14 @@ class MischiefControllerTest {
         resetPlatforms()
         ctx = FakePetCtx()
         mis = MischiefController(ctx)
+        mis.registerActs(ctx.acts)
     }
+
+    /** Une image de l'activité en cours, comme la boucle du service (via le registre). */
+    private fun step(dt: Float) = ctx.acts.handlerFor(pet)!!.update(pet, dt)
+
+    /** Tap sur l'animal, comme `TouchHandler.onPetTap` (via le registre). */
+    private fun tap(): Boolean = ctx.acts.handlerFor(pet)?.onPet(pet) ?: false
 
     @After fun tearDown() = resetPlatforms()
 
@@ -75,7 +82,7 @@ class MischiefControllerTest {
         pet.setAct(Act.KNOCK)
         var steps = 0
         while (ctx.vibrations.isEmpty()) {
-            mis.updateKnock(pet, 0.1f)
+            step(0.1f)
             assertTrue("il n'arrive jamais", ++steps < 200)
         }
         assertEquals(ctx.arena.screenW / 2, pet.body.fx, 3f)
@@ -83,7 +90,7 @@ class MischiefControllerTest {
         assertEquals(1, ctx.said.size)
         // Il reste un moment, puis retourne à ses occupations
         pet.body.actTime = 3.6f
-        mis.updateKnock(pet, 0.1f)
+        step(0.1f)
         assertEquals(Act.IDLE, pet.act)
         assertEquals(1, ctx.vibrations.size)
     }
@@ -115,7 +122,7 @@ class MischiefControllerTest {
         // Il court hors de l'écran, puis disparaît
         var steps = 0
         while (pet.act == Act.HIDE_RUN) {
-            mis.updateHide(pet, 0.1f)
+            step(0.1f)
             assertTrue(++steps < 200)
         }
         assertEquals(Act.HIDDEN, pet.act)
@@ -129,7 +136,7 @@ class MischiefControllerTest {
         assertEquals(Act.PEEK, pet.act)
 
         // Trouvé !
-        mis.foundBunny()
+        assertTrue(tap())
         assertNull(mis.hidingView)
         assertFalse(ctx.dockShowsHiding)
         assertEquals(Act.AIR, pet.act)
@@ -141,13 +148,13 @@ class MischiefControllerTest {
     fun `personne ne le cherche - il abandonne et retombe`() {
         pet.setAct(Act.HIDE_RUN)
         pet.body.targetX = pet.body.fx                   // déjà au bord : il se cache tout de suite
-        mis.updateHide(pet, 0.1f)
+        step(0.1f)
         assertEquals(Act.HIDDEN, pet.act)
         val happy = pet.stats.happiness
-        mis.updateHide(pet, 0.1f)
+        step(0.1f)
         assertEquals(Act.HIDDEN, pet.act)                // trop tôt pour abandonner
         ctx.clock.advance(Tuning.HIDE_GIVE_UP_MS + 1)
-        mis.updateHide(pet, 0.1f)
+        step(0.1f)
         assertEquals(Act.AIR, pet.act)
         assertEquals(Act.IDLE, pet.body.afterAir)
         assertEquals(happy - 3f, pet.stats.happiness, 1e-3f)
