@@ -23,6 +23,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.adskip.AdSkipHunter
 import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.wellbeing.WellbeingCoach
 import com.tamacookie.feature.wellbeing.WellbeingTracker
@@ -151,6 +152,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private lateinit var mischief: MischiefController
     private lateinit var behavior: PetBehavior
     private lateinit var social: SocialSystem
+    /** Chasseur de pubs (réglage `Prefs.AD_SKIP`, activé par défaut) : appuie par le port du capteur d'écran. */
+    private lateinit var adSkip: AdSkipHunter
     private val handler = Handler(Looper.getMainLooper())
     /**
      * Paroles : bulle de l'animal courant (si les fenêtres existent) + reprise de la boucle. Une seule bulle
@@ -249,6 +252,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         mischief.registerActs(acts)
         social = SocialSystem(this)
         social.registerActs(acts)
+        adSkip = AdSkipHunter(this, graph.screenActions)
+        adSkip.registerActs(acts)
         behavior = PetBehavior(this, behaviorHooks)
         touch = TouchHandler(this, windows, this, stations, mischief)
         val entities = EntityWindows(this, windows, world, toys, stations,
@@ -267,6 +272,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         mischief.loadLevel()
         loadSeasonal()
         loadWellbeing()
+        loadAdSkip()
         loadMotion()
         for (u in MotionSettings.URIS) contentResolver.registerContentObserver(u, false, motionObserver)
 
@@ -487,7 +493,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             ACTION_SHOW -> if (hidden) show() else if (clock.uptimeMs() - createdAt > 3_000) say(CALLED)
             ACTION_STOP -> { stop(this); return START_NOT_STICKY }
             // Réglages changés (niveau de bêtises)
-            ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); loadWellbeing(); loadMotion(); showNewLook() }
+            ACTION_RELOAD -> {
+                mischief.loadLevel(); loadSeasonal(); loadWellbeing(); loadAdSkip(); loadMotion(); showNewLook()
+            }
             PetCommands.ACTION_SET_NAME -> {
                 val n = Adoption.cleanName(intent.getStringExtra(PetCommands.EXTRA_NAME)) ?: return START_STICKY
                 resident.rename(n)
@@ -504,6 +512,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun onDestroy() {
         running = false
         visible = false
+        graph.screen.adSkipWanted = false   // plus personne pour sauter sur le bouton : on ne le cherche plus
         val wasReady = ready
         ready = false
         handler.removeCallbacksAndMessages(null)
@@ -623,6 +632,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private fun loadSeasonal() { seasonal.enabled = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT) }
 
     private fun loadWellbeing() { wellbeing.enabled = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT) }
+
+    /** Chasseur de pubs : coupé, le service d'accessibilité ne cherche même plus le bouton. */
+    private fun loadAdSkip() {
+        adSkip.enabled = prefs.getBoolean(Prefs.AD_SKIP, Prefs.AD_SKIP_DEFAULT)
+        graph.screen.adSkipWanted = adSkip.enabled
+    }
 
     /** La vue de [p] (créée à sa première apparition, avec l'écouteur des gestes). */
     private fun ensurePetWindow(p: Pet): PetWindow = petWindows.getOrPut(p.id) {
@@ -835,6 +850,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         for (p in pets) { p.body.actTime += dt; p.mind.tick(dt) }
         checkView()
         for (p in pets) world.asPet(p) { pages.checkPageReturn() }
+        adSkip.check()            // le bouton « Ignorer l'annonce » passe avant les bêtises et le bavardage
         mischief.checkUserEvents()
         stations.update(dt)
 

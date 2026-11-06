@@ -166,6 +166,7 @@ Principes :
 | 4a | Contenu peu coûteux : stations lit / gamelle / roue / jardin, jouets corde / pelote / tunnel, nourritures pomme / foin / friandise, bêtises bord de l'écran / langue, menu chanter / brosser | ✅ |
 | 4b | Caractère et apparence : personnalités peureux / farceur / explorateur, pelages roux / tacheté crème / bleu-gris, accessoires couronne / bandana / nœud papillon, thèmes de saison (Noël, Halloween, printemps) | ✅ |
 | 4c | Bien-être numérique (pause proposée, bouderie ; réglage, coupé par défaut), widget d'écran d'accueil (humeur, jauges, Nourrir, Appeler), tuile Réglages rapides (montrer / cacher) | ✅ |
+| — | Chasseur de pubs : il saute sur le bouton « Ignorer l'annonce » d'une publicité et l'appuie (réglage, activé par défaut) | ✅ |
 
 ### Écarts et décisions
 
@@ -1213,6 +1214,89 @@ Principes :
     mange et ressort ; gamelle sur une autre page ou rangée : il n'y va pas ; deux lapins affamés : un seul y va ;
     nourriture lancée pendant le trajet : il part vers elle.
 
+- **Évolution — Chasseur de pubs** (le lapin saute sur le bouton « Ignorer l'annonce » d'une pub et l'appuie ;
+  comportement existant inchangé sans bouton) — 4 commits (détection + port ; IA ; service + réglage + textes ;
+  ce fichier et le README) :
+  - **Première action du service d'accessibilité** (jusqu'ici il ne faisait que lire). Une seule, et gardée à
+    chaque étage : appuyer (`ACTION_CLICK` sur le **nœud**, jamais un geste à une coordonnée) sur le bouton qui
+    passe une publicité, si le réglage est actif. Divulguée dans `a11y_description` (Paramètres › Accessibilité),
+    `main_a11y_dialog_message` et le README.
+  - **Liste blanche stricte** (`ScreenScan.isAdSkip`, pur) : nœud visible, **cliquable**, non éditable, de taille
+    non nulle, et soit d'identifiant `…:id/skip_ad_button` (YouTube : `com.google.android.youtube:id/skip_ad_button`,
+    FrameLayout cliquable sans texte, ~232 × 96 px, en bas à droite du lecteur, après ~5 s de pub), soit de texte /
+    description **exactement** « Ignorer l'annonce », « Passer l'annonce », « Skip ad » / « Skip Ad », « Ignorer les
+    annonces » (casse, espaces, apostrophe typographique mis à part : `AD_SKIP_LABELS`), ou ceux de son **unique**
+    enfant non cliquable (le bouton YouTube : cadre → `skip_ad_button_container` décrit « Ignorer l'annonce » →
+    `skip_ad_button_text` « Ignorer »). Jamais : « Consulter le site de l'annonceur » (`player_learn_more_button`),
+    « Télécharger », « En savoir plus », « Fermer le panneau des annonces », « Fermer », ni « Ignorer » seul hors de
+    l'identifiant YouTube.
+  - **Écart avec la conception demandée (détection)** : le bouton n'est **pas** cherché dans `ScreenScan.walk` (le
+    parcours des plateformes) mais par `ScreenScan.findAdSkip` — quelques recherches faites **par l'application**
+    (`findAccessibilityNodeInfosByViewId` avec le package de la fenêtre, puis `findAccessibilityNodeInfosByText`
+    « Ignorer l », « Passer l », « Skip ad », candidats et leur parent filtrés par `isAdSkip` : ~4 IPC). Raisons : le
+    parcours ne descend pas dans un élément retenu comme plateforme (un lecteur cliquable de taille acceptable
+    cacherait le bouton), s'arrête à 800 nœuds (un arbre YouTube les dépasse vite) et à 60 plateformes ; le
+    modifier aurait changé les plateformes de toutes les apps. Ainsi `walk` est intact. Interface **`NodeFinder`** à
+    côté de `NodeReader` (identifiant, parent, recherches ; detekt : `NodeReader` était au plafond de fonctions),
+    `NodeInfoFinder` (app), `ScreenScan.collect` pour les faux arbres.
+  - **Quand on cherche** : à chaque scan complet (si le réglage est actif : `ScanResult.adSkip`), et — c'est ce
+    qui manquait — sur les **changements de contenu hors bureau** que le scan ignore au-delà de 1,5 s après un
+    changement de fenêtre (le bouton apparaît en cours de vidéo) : recherche légère `AdSkipAccess.schedule`, au
+    plus une toutes les **500 ms** (bouton vu ≲ 0,6 s après son apparition), seulement si le chasseur est voulu et
+    le lapin lancé. Coût : ~4 IPC / 500 ms tant que l'app au premier plan change son contenu (vidéo qui joue). Le
+    bouton est oublié écran éteint, à la déconnexion, réglage coupé, ou au scan suivant (autre fenêtre) ; **pas**
+    sur un défilement (le scan suivant le confirme). `flagReportViewIds` ajouté à `accessibility_config.xml`
+    (sans lui, ni `viewIdResourceName` ni la recherche par identifiant).
+  - **Port `ScreenActions.pressAdSkip(target): Boolean`** (`ScreenActions.kt`, pur) ; relais **`AdSkipRelay`**
+    (`AppGraph.screenActions`) : ne transmet que si `ScreenSensorHub.adSkipWanted` et que `target` recoupe le bouton
+    connu (`ScreenSnapshot.adSkip`) ; le service branche `presser` à sa connexion (null à sa destruction).
+    **`AdSkipAccess`** (app, sorti de `ScreenSensorService` pour rester sous `TooManyFunctions`) : sur le fil du scan,
+    **relit** la fenêtre active, retrouve un nœud de la liste blanche qui recoupe **encore** la cible, `ACTION_CLICK`,
+    sinon rien ; puis revérifie 400 ms plus tard. `true` = demande transmise (l'appui est asynchrone). Le relais
+    n'est pas le hub (`ScreenSensorHub : ScreenActions` aurait changé la signature de son entrée `TooManyFunctions`
+    dans la baseline) ; le hub gagne `adSkipWanted` et `onAdProbe` (classe déjà dans la baseline).
+  - **IA** (`feature/adskip/AdSkipHunter.kt`, pur, `ActHandler` de **`Act.SKIP_AD`** — ajouté à la fin, dans
+    `MOVING` et `BUSY_FOR_TRAVEL`, `travel = BUSY` ; « passe la pub » dans `A11yTexts.ACTIVITIES`) : `check()` à
+    chaque image, **avant** `mischief.checkUserEvents()` (et le bavardage, qui vit dans `IDLE`) ; un animal endormi
+    ne part pas. Candidats : affichés, fenêtre présente, éveillés, `IDLE` / `WALK` / `SIT` / `DANCE` (`READY` : ni
+    tenu, ni caché, ni en bêtise, ni en jeu, ni social), hors station, sur la page affichée ; « Cacher » : personne.
+    **Arbitrage** `Director.AdHunt` (classe imbriquée comme `BubbleQueue` : `Director` était au plafond de
+    fonctions) : `hunter()` = un animal en `SKIP_AD`, ou en l'air avec `afterAir == SKIP_AD` (déduit du monde, rien à
+    réserver) ; `hunterFor(target, eligible)` = personne si quelqu'un y est, sinon le plus proche (puis l'ordre du
+    monde). Il court (`spec.hideRunDp`), à ≤ 220 dp saute (`jumpTo` + `airLandY = target.top` : posé pile sur le
+    bouton, qui n'est pas une plateforme), tape du pied 0,35 s, appuie **une** fois (`pressAdSkip(target)`), et si
+    la demande passe : retour haptique, étoiles, « Hop ! Au revoir la pub ! 🐾 » (3 variantes dans
+    `AdSkipHunter.PRESSED`, priorité normale : pas annoncée au lecteur d'écran) ; il redescend 1,4 s après
+    l'atterrissage. Depuis une icône, `walkToward` le fait d'abord sauter au sol. **Abandon sans un mot** si le
+    bouton disparaît ou ne recoupe plus la cible avant l'appui, ou au bout de **6 s** ; attrapé / étourdi : la chasse
+    s'arrête (`check` le voit). **Une tentative par bouton** (`attempted`, remis à zéro quand le bouton disparaît).
+    Une caresse en route : cœurs + `Petted`, il continue.
+  - **Sans bouton, rien ne change** : `check()` lit `snapshot.adSkip` (null) et sort, sans tirage ni décision ; les
+    traces seedées (`BunnyBrainTest`, `MischiefTest`, `MultiPetTest`, `SocialSystemTest`, `PetRulesTest.GOLDEN`)
+    sont **intactes**, et `AdSkipHunterTest` compare image par image (deux animaux, trois graines, état final des
+    `Random`) un monde avec chasseur à un monde sans — et, réglage coupé, avec un bouton à l'écran.
+  - **Réglage** : clé **`ad_skip`** (`Prefs.AD_SKIP`, Boolean, **vrai** par défaut) dans le fichier `pet` ; section
+    « Chasseur de pubs » de l'écran principal (bouton ≥ 48 dp décrit sans emoji, explication) ; relu à
+    `ACTION_RELOAD` ; recopié dans `ScreenSensorHub.adSkipWanted` (coupé ou service arrêté : le service
+    d'accessibilité ne cherche même plus le bouton, et celui qu'on connaissait est oublié). Aucune migration.
+  - detekt : aucune entrée de baseline ajoutée ; `@Suppress("TooGenericExceptionCaught")` local dans
+    `AdSkipAccess` (une lecture d'arbre ratée est journalisée, comme le scan).
+  - Tests : `AdSkipScanTest` (faux arbre du dump YouTube : bouton trouvé même dans un lecteur cliquable ; pièges,
+    « Ignorer » seul hors YouTube, nœud non cliquable / invisible / vide / éditable, deux enfants : non ; libellés ;
+    cible au moment d'appuyer ; hub ; relais), `AdSkipHunterTest` (+ `FakeScreenActions` : traces identiques ; un seul
+    animal, le plus proche, le suivant si celui-ci dort ; course, saut depuis le sol ou une icône, appui unique avec
+    la cible, réplique, retour au sol, pas de deuxième tentative ; abandon — disparu, écarté, en plein saut, 6 s,
+    attrapé, réglage coupé ; port qui refuse : pas de réplique ; endormi / caché / tenu / en jeu / en bêtise / en
+    station / fenêtre retirée / « Cacher » : personne). **540 → 564 tests** (534 dans `:core`, 30 dans `:app`).
+  - **À vérifier sur tablette** : pub YouTube (portrait, paysage, plein écran) — le bouton « Ignorer » apparaît
+    après ~5 s, le lapin y court en moins d'une seconde, se pose dessus (pas à côté, pas au-dessus du lecteur), la
+    pub est passée, réplique ; jamais d'appui sur « Consulter le site de l'annonceur », « Télécharger », « En savoir
+    plus », « Fermer le panneau des annonces » ; deux pubs à la suite (il repart pour la seconde) ; pub sans bouton
+    (non désactivable) : rien ; lapin endormi, en cage, caché, rangé : rien ; deux lapins : un seul part ; réglage
+    coupé (effet immédiat, service lancé) ; batterie / fluidité pendant une longue vidéo (recherche toutes les
+    500 ms) ; texte du service dans Paramètres › Accessibilité ; mise à jour de l'APK par-dessus (le nouveau drapeau
+    `flagReportViewIds` est pris sans réactiver le service ? sinon le désactiver / réactiver).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -1234,7 +1318,8 @@ Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
 
 Fichier **`pet`** (réglages) : `enabled`, `mischief`, `dock_fx`, `dock_fy`, `pageW2_<largeur>`,
 `st_<STATION>_anchor` / `_fx` / `_fy`, `seasonal` (Boolean, thèmes de saison, vrai si absent — évolution 4b),
-`wellbeing` (Boolean, pauses proposées, faux si absent — évolution 4c).
+`wellbeing` (Boolean, pauses proposées, faux si absent — évolution 4c), `ad_skip` (Boolean, chasseur de pubs,
+vrai si absent).
 Valeur inconnue ou absente → défaut (`PetFields.read`).
 
 ### Ajouter une station (ex. : le lit)

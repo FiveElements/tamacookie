@@ -22,12 +22,17 @@ enum class Act {
     /** Bêtises de l'évolution 4a : il tire la langue (réaction à un toucher), il mâchouille le bord de l'écran. */
     TEASE, CHEW_EDGE,
     /** Il va de lui-même à la gamelle (faim, gamelle libre sur sa page) : il y entre en arrivant. */
-    GOTO_BOWL;
+    GOTO_BOWL,
+    /**
+     * Chasseur de pubs : il court vers le bouton « Ignorer l'annonce », saute dessus et appuie (`AdSkipHunter`,
+     * via `ActRegistry`).
+     */
+    SKIP_AD;
 
     companion object {
         /** En mouvement : animation fluide (~60 i/s). */
         val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL, CHEW_EDGE,
-            GOTO_BOWL)
+            GOTO_BOWL, SKIP_AD)
         /** Immobile et endormi : animation très économe (~12 i/s). Dans une station : `ActHandler.slowFrames`. */
         val SLOW: Set<Act> = EnumSet.of(SLEEP)
         /** Il ne suit pas le défilement des pages (il est tenu, ou caché). */
@@ -38,7 +43,8 @@ enum class Act {
         /** Activités qui le font accourir tout de suite sur la page affichée. */
         val RUSH_BACK: Set<Act> = EnumSet.of(KNOCK, SQUAT, GOTO_FOOD, PLAY, CHEW_EDGE)
         /** Occupé : il ne suit pas l'utilisateur dans une autre application. Dans une station : `ActHandler.travel`. */
-        val BUSY_FOR_TRAVEL: Set<Act> = EnumSet.of(DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, AIR, SQUAT, KNOCK, TEASE, CHEW_EDGE)
+        val BUSY_FOR_TRAVEL: Set<Act> = EnumSet.of(DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, AIR, SQUAT, KNOCK, TEASE, CHEW_EDGE,
+            SKIP_AD)
         val HIDING: Set<Act> = EnumSet.of(HIDE_RUN, HIDDEN, PEEK)
         /** Libre de faire une bêtise. */
         val FREE: Set<Act> = EnumSet.of(IDLE, WALK, SIT)

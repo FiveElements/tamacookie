@@ -64,6 +64,11 @@ data class ScreenSnapshot(
     /** Largeur de défilement d'une page du bureau (apprise), 0 = inconnue. */
     val pageW: Float = 0f,
     val scroll: ScrollSamples = ScrollSamples(),
+    /**
+     * Bouton « Ignorer l'annonce » d'une publicité à l'écran (chasseur de pubs : liste blanche stricte de
+     * [ScreenScan.isAdSkip]), null = aucun, ou réglage coupé (il n'est alors même pas cherché).
+     */
+    val adSkip: Box? = null,
 )
 
 /** Ce que fait l'utilisateur (jamais le contenu tapé : seulement « il tape »). */
