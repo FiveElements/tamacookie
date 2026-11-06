@@ -1,6 +1,7 @@
 package com.tamacookie.feature.mischief
 
 import android.graphics.Rect
+import com.tamacookie.PetEvent
 import com.tamacookie.Act
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
@@ -117,7 +118,7 @@ object SquatMischief : Mischief {
 
     /** Une caresse pendant qu'il squatte : il descend. */
     override fun onPet(ctx: MischiefCtx, pet: Pet): Boolean {
-        pet.stats.pet()
+        ctx.on(pet, PetEvent.Petted)
         ctx.emit(pet, PType.HEART, 3)
         pet.express(Expr.HAPPY, 1.5f)
         ctx.say(ctx.pick("Bon d'accord… 😇 je descends", "Un câlin ? Ça marche, je bouge !", "Hihi, gagné ! 💕"), 2f)

@@ -31,7 +31,7 @@ class MenuEntryTest {
         assertEquals(MenuEntries.ALL.size, MenuEntries.ALL.map { it.emoji }.toSet().size)
         for (e in MenuEntries.ALL) {
             val c = FakeMenuCtx()
-            c.pet.stats.energy = 50f
+            c.pet.stats = c.pet.stats.copy(energy = 50f)
             assertTrue(e.text(c.pet.stats).startsWith(e.emoji))
             val before = effects(c)
             e.run(c, c.pet)
@@ -41,7 +41,7 @@ class MenuEntryTest {
 
     @Test
     fun `chaque action est la sienne`() {
-        fun ran(e: MenuEntry) = FakeMenuCtx().also { it.pet.stats.energy = 50f; e.run(it, it.pet) }
+        fun ran(e: MenuEntry) = FakeMenuCtx().also { it.pet.stats = it.pet.stats.copy(energy = 50f); e.run(it, it.pet) }
         assertEquals(1, ran(MenuEntries.STATIONS).stationsPanels)
         assertEquals(1, ran(MenuEntries.HIDE_SEEK).hideSeeks)
         assertEquals(1, ran(MenuEntries.HIDE).base.hideRequests)
@@ -51,7 +51,7 @@ class MenuEntryTest {
     @Test
     fun `dodo - pas fatigue, il refuse`() {
         val c = FakeMenuCtx()
-        c.pet.stats.energy = 95f
+        c.pet.stats = c.pet.stats.copy(energy = 95f)
         MenuEntries.SLEEP.run(c, c.pet)
         assertEquals(0, c.base.sleepRequests)
         assertTrue(c.base.said.single() in Lines.NOT_TIRED)
@@ -60,13 +60,13 @@ class MenuEntryTest {
     @Test
     fun `dodo - s'il dort, le bouton le reveille`() {
         val c = FakeMenuCtx()
-        val st = c.pet.stats
-        assertEquals("💤\nDodo", MenuEntries.SLEEP.text(st))
-        st.sleeping = true
+        assertEquals("💤\nDodo", MenuEntries.SLEEP.text(c.pet.stats))
+        c.pet.stats = c.pet.stats.copy(sleeping = true)
         c.pet.setAct(Act.SLEEP)
-        assertTrue(MenuEntries.SLEEP.text(st).endsWith("Réveil"))
+        assertTrue(MenuEntries.SLEEP.text(c.pet.stats).endsWith("Réveil"))
         MenuEntries.SLEEP.run(c, c.pet)
-        assertFalse(st.sleeping)
+        assertFalse(c.pet.stats.sleeping)
+        assertEquals(listOf(c.pet.id), c.base.saved)       // réveil sauvegardé tout de suite
         assertEquals(Act.IDLE, c.pet.act)
         assertEquals(Expr.SLEEPY, c.pet.mind.exprOverride)
         assertEquals(listOf(Lines.GETTING_UP), c.base.said)
@@ -75,6 +75,6 @@ class MenuEntryTest {
     @Test
     fun `seul le dodo change de texte`() {
         assertEquals(listOf(MenuEntries.SLEEP), MenuEntries.ALL.filter { it.dynamic })
-        for (e in MenuEntries.ALL.filter { !it.dynamic }) assertEquals("${e.emoji}\n${e.label}", e.text(FakePetCtx().stats))
+        for (e in MenuEntries.ALL.filter { !it.dynamic }) assertEquals("${e.emoji}\n${e.label}", e.text(FakePetCtx().pet.stats))
     }
 }

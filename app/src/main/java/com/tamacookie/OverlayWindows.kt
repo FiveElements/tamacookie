@@ -148,6 +148,11 @@ class OverlayWindows(
         bubbles[pet]?.let { overlay.detach(it.id) }
     }
 
+    /** L'animal est parti : sa bulle est oubliée. */
+    fun forgetBubble(pet: PetId) {
+        bubbles.remove(pet)?.let { overlay.release(it.id) }
+    }
+
     // ---------------------------------------------------------------------
     //  Bouton 🏠 : ouvre le panneau des stations ; 🫣 pendant le cache-cache
     // ---------------------------------------------------------------------

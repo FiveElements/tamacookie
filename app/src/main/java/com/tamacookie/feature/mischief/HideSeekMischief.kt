@@ -1,5 +1,6 @@
 package com.tamacookie.feature.mischief
 
+import com.tamacookie.PetEvent
 import com.tamacookie.Act
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
@@ -97,8 +98,7 @@ object HideSeekMischief : Mischief {
         val a = ctx.arena
         end(ctx)
         ctx.noteInteraction()
-        val st = pet.stats
-        st.happiness = (st.happiness + 15f).coerceAtMost(100f)
+        ctx.on(pet, PetEvent.Found)
         ctx.emit(pet, PType.HEART, 5)
         pet.express(Expr.HAPPY, 2.5f)
         ctx.say(ctx.pick("Trouvé !! 🎉", "Oh non, tu m'as trouvé ! 😆", "Tu es trop fort ! On rejoue ?"), 2.5f)
@@ -112,8 +112,7 @@ object HideSeekMischief : Mischief {
         val b = pet.body
         val wasHidden = b.act == Act.HIDDEN
         end(ctx)
-        val st = pet.stats
-        st.happiness = (st.happiness - 3f).coerceAtLeast(0f)
+        ctx.on(pet, PetEvent.NotFound)
         if (wasHidden) {
             b.fx = a.screenW / 2; b.fy = a.topY + Tuning.SPAWN_DROP_DP * a.d; b.phys.stop()
             b.afterAir = Act.IDLE

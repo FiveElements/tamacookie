@@ -2,6 +2,7 @@ package com.tamacookie.feature.station
 
 import android.graphics.Canvas
 import android.graphics.Color
+import com.tamacookie.PetEvent
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
@@ -26,7 +27,7 @@ object BathStation : StationBehavior {
     override fun busyLine(ctx: PetCtx) = "Attends, je prends mon bain ! 🫧"
 
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
-        pet.stats.sleeping = false
+        ctx.on(pet, PetEvent.Woken(grumpy = false))
         if (announce) ctx.say(ctx.pick("Un bain ! 🫧", "Splash ! 💦", "Brrr, elle est froide !"))
     }
 
@@ -36,7 +37,7 @@ object BathStation : StationBehavior {
         if (ctx.rnd.nextFloat() < dt * 14f) ctx.emit(pet, PType.SPARKLE)
         if (ctx.rnd.nextFloat() < dt * 6f) ctx.emit(pet, PType.BUBBLE)
         if (pet.body.actTime > BATH_SECONDS) {
-            pet.stats.clean()
+            ctx.on(pet, PetEvent.Bathed)
             ctx.say(ctx.pick("Tout propre ! ✨", "Ça sent bon la fraise !", "Brrr… mais je brille !"))
             ctx.leaveStation(pet, hopOut = true)
         }

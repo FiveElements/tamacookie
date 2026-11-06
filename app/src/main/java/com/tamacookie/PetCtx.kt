@@ -28,6 +28,19 @@ interface PetCtx {
     /** Quelle fonctionnalité prend en charge l'activité courante d'un animal (stations…). */
     val acts: ActRegistry
 
+    // --- Jauges et sauvegarde (l'hôte est la seule autorité sur l'état des animaux) ---
+    /**
+     * Applique [event] aux jauges de [pet] ([PetRules]) ; s'il compte ([PetEvent.savesNow]) et n'est pas
+     * refusé, l'animal est sauvegardé tout de suite. Seul chemin par lequel une fonctionnalité change les jauges.
+     */
+    fun on(pet: Pet, event: PetEvent): PetRules.Result {
+        val r = pet.on(event, clock.wallMs())
+        if (event.savesNow && !r.refused) save(pet)
+        return r
+    }
+    /** Sauvegarde [pet] (port `PetStore`). */
+    fun save(pet: Pet)
+
     // --- État global ---
     /** Tout est masqué (« Cacher ») : aucune fenêtre. */
     val hidden: Boolean

@@ -110,7 +110,7 @@ open class Panel(context: Context) : LinearLayout(context) {
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class PetMenu(
     context: Context,
-    private val pet: PetState,
+    private val pet: Pet,
     entries: List<MenuEntry>,
     onEntry: (MenuEntry) -> Unit,
     onClose: () -> Unit,
@@ -147,7 +147,7 @@ class PetMenu(
     fun refresh() {
         title.text = "🐰 ${pet.name} · ${pet.personality.emoji} ${pet.personality.label}"
         moodText.text = moodLabel(pet)
-        for ((e, b) in dynamic) b.text = e.text(pet)
+        for ((e, b) in dynamic) b.text = e.text(pet.stats)
     }
 }
 
@@ -209,7 +209,7 @@ class StationsPanel(
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class ChestPanel(
     context: Context,
-    pet: PetState,
+    pet: Pet,
     private val onFood: (Food) -> Unit,
     private val onToy: (Toy) -> Unit,
     private val onClose: () -> Unit,
@@ -227,21 +227,21 @@ class ChestPanel(
     }
 }
 
-fun moodLabel(pet: PetState): String = when (pet.mood) {
-    PetState.Mood.HAPPY -> "Aux anges ✨"
-    PetState.Mood.OK -> "Tranquille"
-    PetState.Mood.HUNGRY -> "A très faim…"
-    PetState.Mood.SLEEPY -> if (pet.sleeping) "Fait dodo… chut" else "Tombe de sommeil"
-    PetState.Mood.DIRTY -> "Aurait bien besoin d'un bain"
-    PetState.Mood.SAD -> "Se sent seul…"
-    PetState.Mood.SICK -> "Est malade 🤒"
+fun moodLabel(pet: Pet): String = when (pet.stats.mood) {
+    Mood.HAPPY -> "Aux anges ✨"
+    Mood.OK -> "Tranquille"
+    Mood.HUNGRY -> "A très faim…"
+    Mood.SLEEPY -> if (pet.stats.sleeping) "Fait dodo… chut" else "Tombe de sommeil"
+    Mood.DIRTY -> "Aurait bien besoin d'un bain"
+    Mood.SAD -> "Se sent seul…"
+    Mood.SICK -> "Est malade 🤒"
 }
 
 /** Fiche du vétérinaire : toutes les statistiques + soin. */
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class VetPanel(
     context: Context,
-    private val pet: PetState,
+    private val pet: Pet,
     private val onHeal: () -> Unit,
     private val onClose: () -> Unit,
 ) : Panel(context) {
@@ -287,19 +287,19 @@ class VetPanel(
 
     fun refresh() {
         title.text = "🩺 Fiche de ${pet.name}"
-        info.text = "${pet.personality.emoji} ${pet.personality.label} · ${pet.ageDays} jour(s) · " +
-            "jouet préféré : ${pet.favoriteToy.emoji} · ${pet.visitedApps} apps visitées"
-        val v = listOf(pet.satiety, pet.happiness, pet.energy, pet.cleanliness, pet.health)
+        info.text = "${pet.personality.emoji} ${pet.personality.label} · ${pet.identity.ageDays(System.currentTimeMillis())} jour(s) · " +
+            "jouet préféré : ${pet.favoriteToy.emoji} · ${pet.stats.visitedApps} apps visitées"
+        val v = pet.stats.let { listOf(it.satiety, it.happiness, it.energy, it.cleanliness, it.health) }
         v.forEachIndexed { i, x -> bars[i].value = x; values[i].text = "${x.toInt()}" }
         val issues = ArrayList<String>()
-        if (pet.isSick) issues += "malade : un vaccin s'impose 💉"
-        else if (pet.health < 70f) issues += "santé fragile"
-        if (pet.satiety < 25f) issues += "il a faim"
-        if (pet.cleanliness < 35f) issues += "un bain serait bien"
-        if (pet.energy < 20f) issues += "il est épuisé"
-        if (pet.happiness < 30f) issues += "il a besoin d'attention"
-        if (pet.poops > 0) issues += "${pet.poops} crotte(s) à ramasser"
+        if (pet.stats.isSick) issues += "malade : un vaccin s'impose 💉"
+        else if (pet.stats.health < 70f) issues += "santé fragile"
+        if (pet.stats.satiety < 25f) issues += "il a faim"
+        if (pet.stats.cleanliness < 35f) issues += "un bain serait bien"
+        if (pet.stats.energy < 20f) issues += "il est épuisé"
+        if (pet.stats.happiness < 30f) issues += "il a besoin d'attention"
+        if (pet.stats.poops > 0) issues += "${pet.stats.poops} crotte(s) à ramasser"
         diag.text = if (issues.isEmpty()) "✅ Diagnostic : en pleine forme !" else "📋 Diagnostic : " + issues.joinToString(", ")
-        healBtn.alpha = if (pet.health < 90f) 1f else 0.45f
+        healBtn.alpha = if (pet.stats.health < 90f) 1f else 0.45f
     }
 }

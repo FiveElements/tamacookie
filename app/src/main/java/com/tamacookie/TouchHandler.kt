@@ -129,17 +129,16 @@ class TouchHandler(
     }
 
     private fun startDrag() {
-        val st = pet.stats
         if (pet.body.act == Act.PEEK) {
             mischief.endHiding()
-            st.happiness = (st.happiness + 15f).coerceAtMost(100f)
+            ctx.on(pet, PetEvent.Found)
             ctx.say(Lines.FOUND_WHILE_DRAGGED, 1.5f)
         } else if (pet.isHiding) mischief.endHiding()
         closeMenu()
         pet.body.platform = null
         pet.body.phys.airLandY = null
         stations.leaveStation(pet, hopOut = false)
-        if (st.sleeping) { st.sleeping = false; st.happiness = (st.happiness - 3f).coerceAtLeast(0f) }
+        if (pet.stats.sleeping) ctx.on(pet, PetEvent.Woken(grumpy = true))
         ctx.world.dropHeldToy()
         ctx.noteInteraction()
         pet.setAct(Act.DRAGGED)
@@ -157,14 +156,12 @@ class TouchHandler(
 
     private fun onPetTap() {
         val now = ctx.clock.wallMs()
-        val st = pet.stats
         ctx.haptic(pet, HapticFeedbackConstants.CONFIRM)
         ctx.noteInteraction()
         // Activité prise en charge par une fonctionnalité (station, bêtise…) : elle réagit à la caresse
         ctx.acts.handlerFor(pet)?.let { if (it.onPet(pet)) return }
-        if (pet.body.act == Act.SLEEP || st.sleeping) {
-            st.sleeping = false
-            st.happiness = (st.happiness - 3f).coerceAtLeast(0f)
+        if (pet.body.act == Act.SLEEP || pet.stats.sleeping) {
+            ctx.on(pet, PetEvent.Woken(grumpy = true))
             pet.express(Expr.ANGRY, 2.5f)
             ctx.speech.sayOneOf(Lines.WOKEN_BY_TAP)
             pet.setActOrAfterAir(Act.IDLE, 3f)
@@ -181,7 +178,7 @@ class TouchHandler(
             pet.setActOrAfterAir(Act.WALK)
             return
         }
-        st.pet()
+        ctx.on(pet, PetEvent.Petted)
         ctx.emit(pet, PType.HEART, 2 + ctx.rnd.nextInt(3))
         pet.express(Expr.HAPPY, 1.6f)
         if (ctx.rnd.nextFloat() < 0.45f) ctx.speech.sayOneOf(Lines.PETTED, 2f)
@@ -201,7 +198,7 @@ class TouchHandler(
         val d = arena.d
         lateinit var m: PetMenu
         // Un seul menu à la fois (id [WindowId.Menu]) : un ancien panneau a déjà été retiré en ouvrant le nouveau
-        m = PetMenu(context, pet.stats, MenuEntries.ALL,
+        m = PetMenu(context, pet, MenuEntries.ALL,
             onEntry = { e ->
                 closeMenu()
                 e.run(menuCtx, pet)

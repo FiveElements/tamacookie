@@ -1,5 +1,7 @@
 package com.tamacookie
 
+import com.tamacookie.persist.Adoption
+import com.tamacookie.persist.Pets
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -87,7 +89,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         // Nom
         val nameRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         nameEdit = EditText(this).apply {
-            setText(PetState(this@MainActivity).load().name)
+            setText(residentName())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
             hint = "Nom du lapin"
@@ -208,7 +210,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         setContentView(scroll)
 
         // Premier lancement : écran d'adoption
-        if (!PetState(this).load().adopted) {
+        if (Pets.repository(this).loadResident()?.adopted != true) {
             startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, true))
         }
     }
@@ -221,9 +223,10 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
     override fun onResume() {
         super.onResume()
-        val pet = PetState(this).load()
-        previewLook = pet.look.copy()
-        nameEdit.setText(pet.name)
+        // Lecture seule : si le service tourne, l'état en mémoire peut être un peu plus récent (jauges)
+        val pet = Pets.repository(this).loadResident()
+        previewLook = pet?.look ?: Look()
+        nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
         refresh()
         Choreographer.getInstance().postFrameCallback(this)
     }
@@ -321,11 +324,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             .show()
     }
 
+    private fun residentName(): String = Pets.repository(this).loadResident()?.identity?.name ?: Identity.DEFAULT_NAME
+
     private fun rename() {
-        val n = nameEdit.text.toString().trim().take(16)
-        if (n.isEmpty()) return
-        Prefs.of(this).edit().putString(Prefs.NAME, n).apply()
-        BunnyService.send(this, BunnyService.ACTION_RELOAD)
+        val n = Adoption.cleanName(nameEdit.text.toString()) ?: return
+        // Commande : le service applique et sauvegarde (plus de course avec sa sauvegarde périodique)
+        PetCommands.rename(this, n)
         refresh()
     }
 

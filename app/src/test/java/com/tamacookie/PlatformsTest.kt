@@ -94,10 +94,10 @@ class CatalogTest {
 
     @Test
     fun `options de personnalisation non vides`() {
-        assertTrue(Options.furs.isNotEmpty())
-        assertEquals(3, Options.ears.size)
-        assertTrue(Options.eyes.isNotEmpty())
-        assertTrue(Options.accessories.first() == "Aucun")
+        assertTrue(Fur.entries.isNotEmpty())
+        assertEquals(3, Ears.entries.size)
+        assertTrue(EyeColor.entries.isNotEmpty())
+        assertEquals(Accessory.NONE, Accessory.entries.first())
     }
 
     @Test

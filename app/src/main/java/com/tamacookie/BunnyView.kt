@@ -90,20 +90,20 @@ class BunnyView(
     private var paintedFood = Food.CARROT
 
     private fun applyLook(look: Look) {
-        val f = Options.furColor(look.fur)
+        val f = Options.color(look.fur)
         fur.color = f
         furShade.color = Options.shade(f, 0.93f)
         darkFur = Options.isDark(f)
         outline.color = if (darkFur) Palette.OUTLINE_DARK else Palette.OUTLINE
         line.color = if (darkFur) Palette.CREAM else Palette.INK
-        eye.color = Options.eyeColor(look.eyes)
+        eye.color = Options.color(look.eyes)
         val lum = 0.299f * Color.red(f) + 0.587f * Color.green(f) + 0.114f * Color.blue(f)
         patch.color = when {
             lum > 190f -> Palette.PATCH_LIGHT
             lum > 110f -> Options.shade(f, 0.55f)
             else -> Palette.CREAM
         }
-        acc.color = Options.accColor(look.accColor)
+        acc.color = Options.color(look.accColor)
         accStroke.color = outline.color
     }
 
@@ -212,7 +212,7 @@ class BunnyView(
         var b2x = headCx + 7f; var b2y = headCy - 15f
         var earLen = 1f
         when (look.ears) {
-            1 -> { // tombantes (bélier)
+            Ears.LOP -> { // tombantes (bélier)
                 val sway = when {
                     dragged -> sin(t * 7f) * 14f
                     pose == Pose.WALK -> sin(walkPhase * 6.28f) * 7f
@@ -223,7 +223,8 @@ class BunnyView(
                 b2x = headCx + 19f; b2y = headCy - 9f
                 earLen = 0.82f
             }
-            2 -> a2 = if (dragged) a2 + 60f else 80f + twitch   // une oreille pliée
+            Ears.ONE_FOLDED -> a2 = if (dragged) a2 + 60f else 80f + twitch   // une oreille pliée
+            Ears.UP -> {}
         }
 
         for (pass in 0..1) {
@@ -243,7 +244,7 @@ class BunnyView(
             // corps
             oval(c, bodyCx, bodyCy, bodyRx, bodyRy, if (o) outline else fur)
             if (!o) oval(c, bodyCx + 6f, bodyCy + 6f, bodyRx * 0.55f, bodyRy * 0.6f, furShade)
-            if (!o && look.pattern == 2) {
+            if (!o && look.pattern == Pattern.DUTCH) {
                 // Hollandais : arrière du corps coloré
                 c.save(); clipOval(c, bodyCx, bodyCy, bodyRx, bodyRy)
                 c.drawRect(bodyCx - bodyRx - 2f, bodyCy - bodyRy - 2f, bodyCx - bodyRx * 0.1f, bodyCy + bodyRy + 2f, patch)
@@ -257,9 +258,9 @@ class BunnyView(
             }
             // tête
             oval(c, headCx, headCy, 22f, 20f, if (o) outline else fur)
-            if (!o && look.pattern != 0) {
+            if (!o && look.pattern != Pattern.PLAIN) {
                 c.save(); clipOval(c, headCx, headCy, 22f, 20f)
-                if (look.pattern == 1) oval(c, headCx - 7f, headCy - 1f, 8.5f, 7.5f, patch)
+                if (look.pattern == Pattern.EYE_PATCH) oval(c, headCx - 7f, headCy - 1f, 8.5f, 7.5f, patch)
                 else {
                     oval(c, headCx - 15f, headCy - 2f, 12f, 15f, patch)
                     oval(c, headCx + 18f, headCy - 2f, 10f, 15f, patch)
@@ -295,7 +296,7 @@ class BunnyView(
         c.translate(x, y)
         c.rotate(angle)
         rect.set(-6.5f, -38f * len, 6.5f, 4f)
-        val furP = if (look.pattern == 2) patch else if (back) furShade else fur
+        val furP = if (look.pattern == Pattern.DUTCH) patch else if (back) furShade else fur
         c.drawOval(rect, if (outlinePass) outline else furP)
         if (!outlinePass) {
             rect.set(-3.2f, -33f * len, 3.2f, -2f)
@@ -309,11 +310,12 @@ class BunnyView(
     // ------------------------------------------------------------------
     private fun drawAccessory(c: Canvas, hx: Float, hy: Float, hr: Float, standing: Boolean) {
         when (look.accessory) {
-            1 -> bow(c, hx + hr * 0.6f, hy - hr * 0.85f)
-            2 -> hat(c, hx + 1f, hy - hr * 0.88f)
-            3 -> if (standing) glasses(c, hx, hy)
-            4 -> if (standing) scarf(c, hx, hy)
-            5 -> flowers(c, hx, hy, hr)
+            Accessory.BOW -> bow(c, hx + hr * 0.6f, hy - hr * 0.85f)
+            Accessory.HAT -> hat(c, hx + 1f, hy - hr * 0.88f)
+            Accessory.GLASSES -> if (standing) glasses(c, hx, hy)
+            Accessory.SCARF -> if (standing) scarf(c, hx, hy)
+            Accessory.FLOWERS -> flowers(c, hx, hy, hr)
+            Accessory.NONE -> {}
         }
     }
 
@@ -410,7 +412,7 @@ class BunnyView(
     }
 
     private fun dotEye(c: Canvas, x: Float, y: Float) {
-        if (darkFur || look.pattern != 0) oval(c, x, y, 4.6f, 5.4f, white)
+        if (darkFur || look.pattern != Pattern.PLAIN) oval(c, x, y, 4.6f, 5.4f, white)
         oval(c, x, y, 3.4f, 4.2f, eye)
         circle(c, x + 1.2f, y - 1.5f, 1.3f, white)
     }

@@ -433,7 +433,7 @@ class StationController(
         val st = pet.stats
         val rnd = ctx.rnd
         val keep = ctx.lastInteraction            // ce n'est pas l'utilisateur qui s'est occupé de lui
-        val glutton = st.personality == Personality.GLUTTON && rnd.nextFloat() < 0.6f
+        val glutton = pet.personality == Personality.GLUTTON && rnd.nextFloat() < 0.6f
         if (st.satiety < 60f || glutton || st.energy < 25f) {
             val f = when {
                 st.health < 60f -> Food.LETTUCE
@@ -443,7 +443,7 @@ class StationController(
             }
             toys.feed(f, from = s)
         } else {
-            val t = if (rnd.nextFloat() < 0.5f) st.favoriteToy else Toy.values()[rnd.nextInt(Toy.values().size)]
+            val t = if (rnd.nextFloat() < 0.5f) pet.favoriteToy else Toy.values()[rnd.nextInt(Toy.values().size)]
             toys.startPlay(t, from = s)
         }
         ctx.lastInteraction = keep
@@ -452,12 +452,11 @@ class StationController(
     // --- Véto ---
     private fun openVetPanel(pet: Pet) {
         closeVetPanel()
-        val st = pet.stats
         panels.openVet(pet, get(StationKind.VET),
             onHeal = {
-                if (st.health >= 90f) ctx.say("Il va très bien ! ✅")
+                if (pet.stats.health >= 90f) ctx.say("Il va très bien ! ✅")
                 else {
-                    st.heal()
+                    ctx.on(pet, PetEvent.Healed)
                     ctx.emit(pet, PType.SPARKLE, 6)
                     pet.express(Expr.SAD, 1.5f)
                     ctx.say(ctx.pick("Aïe ! … merci docteur 💉", "Même pas mal ! (un peu)"))

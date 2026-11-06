@@ -143,7 +143,7 @@ class StationControllerTest {
         assertTrue(panels.chestOpen)
         assertTrue(s.open)
         assertNull(sc.visibleChest())          // ouvert par l'utilisateur : il ne va pas s'y servir
-        pet.stats.satiety = 50f
+        pet.stats = pet.stats.copy(satiety = 50f)
         panels.onFood!!(Food.CARROT)
         assertFalse(panels.chestOpen)
         assertFalse(s.open)

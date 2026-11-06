@@ -1,6 +1,7 @@
 package com.tamacookie.feature.toy
 
 import android.graphics.Canvas
+import com.tamacookie.PetEvent
 import com.tamacookie.Act
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
@@ -41,7 +42,7 @@ object PlushToy : ToySpec {
             hug < 4f -> {
                 pet.body.pose = Pose.IDLE
                 pet.express(Expr.HAPPY, 0.2f)
-                if (rnd.nextFloat() < dt * 2.5f) { ctx.emit(pet, PType.HEART); pet.stats.playHit(Toy.PLUSH, 0.6f) }
+                if (rnd.nextFloat() < dt * 2.5f) { ctx.emit(pet, PType.HEART); ctx.on(pet, PetEvent.PlayHit(Toy.PLUSH, 0.6f)) }
             }
             hug < 10f -> {
                 if (before < 4f) pet.body.targetX = (pet.body.fx + (rnd.nextFloat() * 2f - 1f) * a.screenW * 0.3f).coerceIn(a.minX, a.maxX)

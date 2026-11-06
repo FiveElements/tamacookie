@@ -104,9 +104,6 @@ class AmbientAnimator(private val rnd: Random) {
     companion object {
         /** Échelle du lapin : 1 unité de dessin = UNIT dp. */
         const val UNIT = 0.95f
-        /** Accessoire « écharpe » (flotte au vent) et oreilles tombantes : animés en continu. */
-        private const val SCARF = 4
-        private const val LOP_EARS = 1
 
         /**
          * Le dessin de [s] dépend du temps (respiration au repos, au sommeil, en mangeant, tenu en l'air,
@@ -116,7 +113,7 @@ class AmbientAnimator(private val rnd: Random) {
         fun movesWithTime(s: BunnyRenderState): Boolean =
             (s.pose != Pose.WALK && s.pose != Pose.AIR) ||
                 s.expr == Expr.HAPPY || s.expr == Expr.DIZZY ||
-                s.look.accessory == SCARF ||
-                (s.pose == Pose.AIR && s.look.ears == LOP_EARS)
+                s.look.accessory == Accessory.SCARF ||
+                (s.pose == Pose.AIR && s.look.ears == Ears.LOP)
     }
 }

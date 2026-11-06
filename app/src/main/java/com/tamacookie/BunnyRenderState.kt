@@ -27,7 +27,7 @@ data class BunnyRenderState(
     val look: Look = Look(),
 ) {
     companion object {
-        /** L'état affiché de [pet] (l'apparence est copiée : [Look] est mutable). */
+        /** L'état affiché de [pet] ([Look] est immuable : partagée sans copie). */
         fun of(pet: Pet): BunnyRenderState {
             val b = pet.body
             val st = pet.stats
@@ -41,16 +41,16 @@ data class BunnyRenderState(
                 food = b.eatingFood,
                 dirty = st.cleanliness < 45f || st.poops >= 3,
                 veryDirty = st.cleanliness < 20f,
-                look = pet.look.copy(),
+                look = pet.look,
             )
         }
 
         /** Expression de repos selon l'humeur (sans expression forcée). */
-        fun moodExpr(mood: PetState.Mood): Expr = when (mood) {
-            PetState.Mood.HAPPY, PetState.Mood.OK, PetState.Mood.DIRTY -> Expr.NORMAL
-            PetState.Mood.HUNGRY, PetState.Mood.SAD -> Expr.SAD
-            PetState.Mood.SLEEPY -> Expr.SLEEPY
-            PetState.Mood.SICK -> Expr.SICK
+        fun moodExpr(mood: Mood): Expr = when (mood) {
+            Mood.HAPPY, Mood.OK, Mood.DIRTY -> Expr.NORMAL
+            Mood.HUNGRY, Mood.SAD -> Expr.SAD
+            Mood.SLEEPY -> Expr.SLEEPY
+            Mood.SICK -> Expr.SICK
         }
     }
 }

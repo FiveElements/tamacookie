@@ -5,7 +5,8 @@ import com.tamacookie.BunnyView.Expr
 import com.tamacookie.Lines
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
-import com.tamacookie.PetState
+import com.tamacookie.PetEvent
+import com.tamacookie.PetStats
 
 /** Ce que les entrées du menu peuvent demander, en plus de [PetCtx] (panneaux et jeux pilotés par le toucher). */
 interface MenuCtx : PetCtx {
@@ -23,7 +24,7 @@ interface MenuCtx : PetCtx {
 class MenuEntry(
     val emoji: String,
     val label: String,
-    private val refresh: ((PetState) -> String)? = null,
+    private val refresh: ((PetStats) -> String)? = null,
     val run: (ctx: MenuCtx, pet: Pet) -> Unit,
 ) {
     private val fixed = "$emoji\n$label"
@@ -32,7 +33,7 @@ class MenuEntry(
     val dynamic: Boolean get() = refresh != null
 
     /** Texte du bouton (emoji, retour à la ligne, libellé). */
-    fun text(st: PetState): String = refresh?.invoke(st) ?: fixed
+    fun text(st: PetStats): String = refresh?.invoke(st) ?: fixed
 }
 
 /** Les entrées du menu, dans l'ordre d'affichage (deux par rangée). */
@@ -40,7 +41,7 @@ object MenuEntries {
     val SLEEP = MenuEntry("💤", "Dodo", refresh = { if (it.sleeping) "☀️\nRéveil" else "💤\nDodo" }) { ctx, pet ->
         val st = pet.stats
         if (st.sleeping) {
-            st.sleeping = false; st.save()
+            ctx.on(pet, PetEvent.Woken(grumpy = false))
             pet.express(Expr.SLEEPY, 2f)
             ctx.say(Lines.GETTING_UP)
             pet.setActOrAfterAir(Act.IDLE, 3f)

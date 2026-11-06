@@ -31,8 +31,13 @@ data class PetStats(
     val mood: Mood get() = PetRules.mood(this)
 }
 
-/** Ce qui fait évoluer les jauges. */
+/** Ce qui fait évoluer les jauges. [savesNow] : l'hôte sauvegarde aussitôt (sinon à la prochaine sauvegarde périodique). */
 sealed interface PetEvent {
+    val savesNow: Boolean get() = when (this) {
+        is Fed, PlayStarted, Bathed, PoopRemoved, Healed, FellAsleep, is Woken, Caged, Released -> true
+        is Elapsed, Petted, is PlayHit, AppVisited, HardLanding, Found, NotFound -> false
+    }
+
     /** Le temps passe ([hours] heures ; plafonné à [GameRules.maxElapsedHours]). */
     data class Elapsed(val hours: Float) : PetEvent
     data class Fed(val food: Food = Food.CARROT) : PetEvent

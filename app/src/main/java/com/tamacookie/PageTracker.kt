@@ -174,6 +174,9 @@ class PageTracker(private val ctx: PetCtx) {
         bunnyShift = ScrollMath.offset(bunnyPage, pw, scrollShown)
     }
 
+    /** Nouvel animal : il arrive sur la page affichée. */
+    fun resetBunny() { bunnyPage = 0; bunnyShift = 0f; returnAt = 0L }
+
     /** Ramène ses coordonnées sur la page affichée sans le déplacer à l'écran (au pire, juste au bord). */
     fun rebaseToActivePage() {
         val cp = launcherPage()

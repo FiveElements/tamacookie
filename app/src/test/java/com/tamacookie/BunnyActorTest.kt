@@ -15,7 +15,7 @@ class BunnyActorTest {
     }
     private val actor = BunnyActor(arena)
 
-    private fun pet(x: Float = 500f): Pet = Pet.resident(newPet(), BunnyPhysics(), Random(3)).also {
+    private fun pet(x: Float = 500f): Pet = testPet(BunnyPhysics(), Random(3)).also {
         it.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
         it.body.fx = x; it.body.fy = arena.groundY
     }

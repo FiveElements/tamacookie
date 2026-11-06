@@ -68,7 +68,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
     fun maybeSeekAttention(): Boolean {
         if (ctx.world.stationOf(pet) != null) return false
         val now = ctx.clock.wallMs()
-        val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.stats.personality)
+        val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.personality)
         if (!BunnyBrain.canSeekAttention(now, ctx.lastInteraction, cooldownUntil, thresholdMs)) return false
         if (!pet.mind.brain.rollAttention()) return false
         cooldownUntil = now + BunnyBrain.attentionCooldownMs(level)

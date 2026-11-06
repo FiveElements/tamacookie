@@ -21,10 +21,10 @@ class Speech(
 
     fun pick(vararg s: String): String = s[rnd.nextInt(s.size)]
 
-    fun greeting(name: String, mood: PetState.Mood, hour: Int): String =
-        Lines.greeting(name, hungry = mood == PetState.Mood.HUNGRY, hour = hour)
+    fun greeting(name: String, mood: Mood, hour: Int): String =
+        Lines.greeting(name, hungry = mood == Mood.HUNGRY, hour = hour)
 
-    fun chatterLine(mood: PetState.Mood): String = pickFrom(Lines.chatter(mood))
+    fun chatterLine(mood: Mood): String = pickFrom(Lines.chatter(mood))
 
     fun appComment(label: String, pkg: String, category: Int, isHome: Boolean): String =
         pickFrom(Lines.appComments(label, pkg, category, isHome))

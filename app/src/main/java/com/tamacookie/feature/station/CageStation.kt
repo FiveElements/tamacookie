@@ -1,6 +1,7 @@
 package com.tamacookie.feature.station
 
 import android.graphics.Canvas
+import com.tamacookie.PetEvent
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
@@ -10,7 +11,7 @@ import com.tamacookie.PetCtx
 import com.tamacookie.StationView
 
 /**
- * Cage : il y est enfermé (sauvegardé dans `PetState.caged`, son bonheur chute plus vite), il y dort,
+ * Cage : il y est enfermé (sauvegardé dans `PetStats.caged`, son bonheur chute plus vite), il y dort,
  * la suit d'une vue à l'autre et se plaint de temps en temps. Le sortir (glisser) le libère.
  */
 object CageStation : StationBehavior {
@@ -29,7 +30,7 @@ object CageStation : StationBehavior {
     override fun restores(pet: Pet) = pet.stats.caged
 
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
-        pet.stats.caged = true; pet.stats.save()
+        ctx.on(pet, PetEvent.Caged)
         pet.mind.chatterIn = 20f
         if (announce) {
             pet.express(Expr.SAD, 2f)
@@ -53,7 +54,7 @@ object CageStation : StationBehavior {
     }
 
     override fun onLeave(ctx: StationCtx, pet: Pet) {
-        pet.stats.caged = false; pet.stats.save()
+        ctx.on(pet, PetEvent.Released)
         pet.express(Expr.HAPPY, 2f)
         ctx.emit(pet, PType.HEART, 3)
         ctx.say(ctx.pick("Libre !! 🎉", "Enfin dehors ! Merci !", "Je serai sage, promis 😇"))
@@ -61,7 +62,7 @@ object CageStation : StationBehavior {
     }
 
     override fun onPet(ctx: StationCtx, pet: Pet) {
-        pet.stats.pet()
+        ctx.on(pet, PetEvent.Petted)
         ctx.emit(pet, PType.HEART, 1)
         ctx.speech.sayOneOf(PETTED, 2f)
     }

@@ -30,8 +30,7 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override val pages: PageTracker by lazy { PageTracker(this) }
     override val acts = ActRegistry()
 
-    val stats: PetState = newPet(prefs)
-    override val pet: Pet = Pet.resident(stats, BunnyPhysics(arena.d), rnd).also {
+    override val pet: Pet = testPet(BunnyPhysics(arena.d), rnd).also {
         it.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
         it.body.fx = 500f; it.body.fy = arena.groundY
         world.add(it)
@@ -47,6 +46,8 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     var dockShowsHiding = false
     var sleepRequests = 0
     var hideRequests = 0
+    /** Animaux sauvegardés (dans l'ordre). */
+    val saved = ArrayList<PetId>()
 
     // --- État piloté par le test ---
     override var hidden = false
@@ -66,7 +67,8 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override fun vibrate(pattern: LongArray) { vibrations += pattern }
 
     override var lastInteraction = clock.wallMs()
-    override fun startSleep(pet: Pet) { sleepRequests++; pet.stats.sleeping = true; pet.setActOrAfterAir(Act.SLEEP) }
+    override fun save(pet: Pet) { saved += pet.id }
+    override fun startSleep(pet: Pet) { sleepRequests++; on(pet, PetEvent.FellAsleep); pet.setActOrAfterAir(Act.SLEEP) }
 
     override fun requestFrames() {}
     override fun updateNotification(force: Boolean) { notifications++ }

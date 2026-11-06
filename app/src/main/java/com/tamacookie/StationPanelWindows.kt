@@ -51,7 +51,7 @@ class StationPanelWindows(
 
     override fun openVet(pet: Pet, vet: Station, onHeal: () -> Unit, onClose: () -> Unit) {
         vetAt = vet
-        vetPanel.open(VetPanel(context, pet.stats, onHeal, onClose))
+        vetPanel.open(VetPanel(context, pet, onHeal, onClose))
     }
 
     override fun refreshVet() { vetPanel.view?.refresh() }
@@ -60,7 +60,7 @@ class StationPanelWindows(
 
     override fun openChest(pet: Pet, chest: Station, onFood: (Food) -> Unit, onToy: (Toy) -> Unit, onClose: () -> Unit) {
         chestAt = chest
-        chestPanel.open(ChestPanel(context, pet.stats, onFood, onToy, onClose), onClose)
+        chestPanel.open(ChestPanel(context, pet, onFood, onToy, onClose), onClose)
     }
 
     override fun closeChest() = chestPanel.close()

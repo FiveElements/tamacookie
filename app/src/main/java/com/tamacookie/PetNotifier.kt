@@ -15,7 +15,7 @@ import android.content.Intent
  */
 class PetNotifier(
     private val ctx: Context,
-    private val pet: () -> PetState?,
+    private val pet: () -> Pet?,
     private val hidden: () -> Boolean,
     private val hiding: () -> Boolean,
 ) {
@@ -29,29 +29,29 @@ class PetNotifier(
             "🥕${satiety.toInt()}  💖${happiness.toInt()}  ⚡${energy.toInt()}  🛁${cleanliness.toInt()}"
 
         /** Fin du titre de la notification permanente (« Cookie <moodText> »). */
-        fun moodText(mood: PetState.Mood, sleeping: Boolean, hiding: Boolean): String =
+        fun moodText(mood: Mood, sleeping: Boolean, hiding: Boolean): String =
             if (hiding) "se cache… trouve-le sur une autre page ! 🫣" else when (mood) {
-                PetState.Mood.HAPPY -> "est aux anges"
-                PetState.Mood.OK -> "se promène"
-                PetState.Mood.HUNGRY -> "a faim"
-                PetState.Mood.SLEEPY -> if (sleeping) "dort" else "a sommeil"
-                PetState.Mood.DIRTY -> "a besoin d'un bain"
-                PetState.Mood.SAD -> "se sent seul"
-                PetState.Mood.SICK -> "est malade"
+                Mood.HAPPY -> "est aux anges"
+                Mood.OK -> "se promène"
+                Mood.HUNGRY -> "a faim"
+                Mood.SLEEPY -> if (sleeping) "dort" else "a sommeil"
+                Mood.DIRTY -> "a besoin d'un bain"
+                Mood.SAD -> "se sent seul"
+                Mood.SICK -> "est malade"
             }
 
         /** Texte d'alerte pour une humeur, ou null si cette humeur ne mérite pas d'alerte. */
-        fun alertText(name: String, mood: PetState.Mood): String? = when (mood) {
-            PetState.Mood.HUNGRY -> "$name a faim ! 🥕"
-            PetState.Mood.DIRTY -> "$name a besoin d'un bain 🫧"
-            PetState.Mood.SICK -> "$name est malade 🤒"
-            PetState.Mood.SAD -> "$name s'ennuie de toi 🥺"
+        fun alertText(name: String, mood: Mood): String? = when (mood) {
+            Mood.HUNGRY -> "$name a faim ! 🥕"
+            Mood.DIRTY -> "$name a besoin d'un bain 🫧"
+            Mood.SICK -> "$name est malade 🤒"
+            Mood.SAD -> "$name s'ennuie de toi 🥺"
             else -> null
         }
     }
 
     private var lastNotifText = ""
-    private var lastAlertMood: PetState.Mood? = null
+    private var lastAlertMood: Mood? = null
 
     private val nm: NotificationManager get() = ctx.getSystemService(NotificationManager::class.java)
 
@@ -70,7 +70,7 @@ class PetNotifier(
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
 
-    private fun statusLine(p: PetState): String = statusLine(p.satiety, p.happiness, p.energy, p.cleanliness)
+    private fun statusLine(p: Pet): String = p.stats.let { statusLine(it.satiety, it.happiness, it.energy, it.cleanliness) }
 
     fun build(): Notification {
         val open = PendingIntent.getActivity(
@@ -83,9 +83,9 @@ class PetNotifier(
         // Avant l'initialisation (permission manquante) : notification minimale
         val p = pet() ?: return b.setContentTitle("TamaCookie").build()
         val hidden = hidden()
-        val moodTxt = moodText(p.mood, p.sleeping, hiding())
+        val moodTxt = moodText(p.stats.mood, p.stats.sleeping, hiding())
         return b
-            .setContentTitle("${p.name} $moodTxt" + (if (p.caged) " (en cage 🔒)" else "") + if (hidden) " (caché)" else "")
+            .setContentTitle("${p.name} $moodTxt" + (if (p.stats.caged) " (en cage 🔒)" else "") + if (hidden) " (caché)" else "")
             .setContentText(statusLine(p))
             .addAction(Notification.Action.Builder(null, "🥕 Nourrir", pi(BunnyService.ACTION_FEED, 1)).build())
             .addAction(Notification.Action.Builder(null, if (hidden) "Montrer" else "Cacher", pi(BunnyService.ACTION_TOGGLE, 2)).build())
@@ -96,7 +96,7 @@ class PetNotifier(
     /** Met à jour la notification permanente si son contenu a changé (ou si [force]). */
     fun update(force: Boolean) {
         val p = pet() ?: return
-        val key = statusLine(p) + p.mood + hidden()
+        val key = statusLine(p) + p.stats.mood + hidden()
         if (!force && key == lastNotifText) return
         lastNotifText = key
         nm.notify(NOTIF_ID, build())
@@ -105,7 +105,7 @@ class PetNotifier(
     /** Alerte quand l'humeur bascule vers un besoin (faim, saleté, maladie, ennui). */
     fun checkAlerts() {
         val p = pet() ?: return
-        val m = p.mood
+        val m = p.stats.mood
         if (m == lastAlertMood) return
         lastAlertMood = m
         val txt = alertText(p.name, m) ?: return

@@ -93,15 +93,15 @@ class ToySpecTest {
     fun `toucher le jouet fait plaisir, deux fois plus avec le prefere`() {
         val ctx = FakeToyCtx()
         val pet = ctx.pet
-        pet.stats.favoriteToy = Toy.PLUSH
-        pet.stats.happiness = 50f
+        pet.traits = pet.traits.copy(favoriteToy = Toy.PLUSH)
+        pet.stats = pet.stats.copy(happiness = 50f)
         ctx.hit(pet, Toy.BALL)
         val once = pet.stats.happiness - 50f
         assertTrue(once > 0f)
         assertEquals(1, ctx.base.emitted.size)
         assertTrue(ctx.base.emitted[0] == PType.HEART || ctx.base.emitted[0] == PType.NOTE)
         assertEquals(Expr.HAPPY, pet.mind.exprOverride)
-        pet.stats.happiness = 50f
+        pet.stats = pet.stats.copy(happiness = 50f)
         ctx.hit(pet, Toy.PLUSH)
         assertTrue(pet.stats.happiness - 50f > once)
     }

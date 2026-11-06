@@ -86,6 +86,9 @@ class ToyController(private val ctx: PetCtx) {
         if (p.toy != null) toyHeldByUser = false
     }
 
+    /** Retire tous les objets (nouvel animal). */
+    fun clear() { props.toList().forEach(::removeProp) }
+
     /** Fenêtre de l'objet à sa position (regroupé : au plus un déplacement par image). */
     fun placeProp(p: Prop) = ctx.overlay.move(p.windowId, p.left, p.top)
 
@@ -143,9 +146,8 @@ class ToyController(private val ctx: PetCtx) {
 
     /** Donne à manger. [from] = le coffre d'où sort la nourriture (sinon elle tombe du ciel). */
     fun feed(food: Food = Food.CARROT, from: Station? = null) {
-        val st = pet.stats
         if (refuses(pet, "Chut… il dort 💤", noteFirst = true)) return
-        if (st.satiety > 95f && food != Food.STRAWBERRY) { ctx.say(ctx.speech.pickFrom(FULL)); return }
+        if (pet.wouldRefuse(PetEvent.Fed(food), ctx.clock.wallMs())) { ctx.say(ctx.speech.pickFrom(FULL)); return }
         if (ctx.world.hasFood()) return
         val spec = food.spec
         val c = addProp(spec)
@@ -185,7 +187,7 @@ class ToyController(private val ctx: PetCtx) {
         b.eatProgress = b.actTime / 3f
         if (b.actTime >= 3f) {
             b.eatProgress = 0f
-            pet.stats.feed(b.eatingFood)
+            ctx.on(pet, PetEvent.Fed(b.eatingFood))
             ctx.emit(pet, PType.HEART, 3)
             pet.express(Expr.HAPPY, 2f)
             ctx.speech.sayOneOf(Lines.ATE)
@@ -207,7 +209,7 @@ class ToyController(private val ctx: PetCtx) {
     fun pickUp(p: Prop) {
         if (!p.isPoop || p !in props) return
         removeProp(p)
-        pet.stats.removePoop()
+        ctx.on(pet, PetEvent.PoopRemoved)
         ctx.emit(pet, PType.SPARKLE, 4)
         pet.express(Expr.HAPPY, 1.5f)
         ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
@@ -223,15 +225,14 @@ class ToyController(private val ctx: PetCtx) {
     //  Jouets
     // =====================================================================
     fun startPlay(toy: Toy, from: Station? = null) {
-        val st = pet.stats
         val rnd = ctx.rnd
         if (refuses(pet, "Chut… il dort", noteFirst = false)) return
-        if (!st.startPlay()) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
+        if (ctx.on(pet, PetEvent.PlayStarted).refused) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
         props.filter { it.toy != null }.forEach { removeProp(it) }
         toyHeldByUser = false
         val spec = toy.spec
         val p = addProp(spec)
-        if (spec.randomTint) p.tint = Options.accColor(rnd.nextInt(Options.accColors.size))
+        if (spec.randomTint) p.tint = Options.color(AccColor.entries[rnd.nextInt(AccColor.entries.size)])
         val fx = pet.body.fx; val fy = pet.body.fy; val facing = pet.body.facing
         val launch = spec.launch
         p.x = (fx + facing * 70 * d).coerceIn(arena.minX, arena.maxX)
@@ -241,7 +242,7 @@ class ToyController(private val ctx: PetCtx) {
         placeProp(p)
         pet.mind.playTime = 0f; tctx.holdTime = 0f; tctx.catchCooldown = 0f
         ctx.noteInteraction()
-        val fav = toy == st.favoriteToy
+        val fav = toy == pet.favoriteToy
         ctx.say(
             if (fav) ctx.pick("Mon jouet préféré !! ⭐", "Ouiii, le ${toy.label.lowercase()} !! ⭐")
             else ctx.speech.pickFrom(spec.startLines)
@@ -255,7 +256,7 @@ class ToyController(private val ctx: PetCtx) {
         val p = ctx.world.currentToy()
         pet.mind.playTime += dt
         if (p == null) { pet.setAct(Act.IDLE); return }
-        val limit = if (pet.stats.personality == Personality.PLAYFUL) 50f else 35f
+        val limit = if (pet.personality == Personality.PLAYFUL) 50f else 35f
         if (pet.mind.playTime > limit || pet.stats.energy < 8f) { endPlay(p); return }
         p.toy!!.spec.play(tctx, pet, p, dt)
     }

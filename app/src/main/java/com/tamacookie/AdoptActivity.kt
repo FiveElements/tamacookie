@@ -18,6 +18,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.tamacookie.feature.toy.Toy
+import com.tamacookie.persist.Adoption
+import com.tamacookie.persist.Pets
 import kotlin.random.Random
 
 /**
@@ -32,7 +34,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     private val d by lazy { resources.displayMetrics.density }
     private lateinit var preview: BunnyView
     private lateinit var nameEdit: EditText
-    private val look = Look()
+    private var look = Look()
     private var personality = Personality.CUDDLY
     private var isNew = true
     private var lastNs = 0L
@@ -48,12 +50,13 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
-        val pet = PetState(this).load()
-        isNew = intent.getBooleanExtra(EXTRA_NEW, !pet.adopted)
-        if (!isNew || pet.adopted) {
-            look.fur = pet.look.fur; look.ears = pet.look.ears; look.eyes = pet.look.eyes
-            look.pattern = pet.look.pattern; look.accessory = pet.look.accessory; look.accColor = pet.look.accColor
-            personality = pet.personality
+        // Lecture seule (pas de rattrapage ni d'écriture) : le service ou PetCommands appliqueront le choix
+        val pet = Pets.repository(this).loadResident()
+        val adopted = pet?.adopted == true
+        isNew = intent.getBooleanExtra(EXTRA_NEW, !adopted)
+        if (pet != null && (!isNew || adopted)) {
+            look = pet.look
+            personality = pet.traits.personality
         }
 
         val root = LinearLayout(this).apply {
@@ -78,7 +81,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
         nameEdit = EditText(this).apply {
-            setText(pet.name)
+            setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
             hint = "Nom du lapin"
@@ -88,17 +91,17 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         root.addView(nameEdit, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         section(root, "Pelage")
-        root.addView(swatches(Options.furs.map { it.second }, { look.fur }) { look.fur = it })
+        root.addView(swatches(Fur.entries, { look.fur }) { look = look.copy(fur = it) })
         section(root, "Oreilles")
-        root.addView(chips(Options.ears, { look.ears }) { look.ears = it })
+        root.addView(chips(Ears.entries, { look.ears }) { look = look.copy(ears = it) })
         section(root, "Yeux")
-        root.addView(swatches(Options.eyes.map { it.second }, { look.eyes }) { look.eyes = it })
+        root.addView(swatches(EyeColor.entries, { look.eyes }) { look = look.copy(eyes = it) })
         section(root, "Motif")
-        root.addView(chips(Options.patterns, { look.pattern }) { look.pattern = it })
+        root.addView(chips(Pattern.entries, { look.pattern }) { look = look.copy(pattern = it) })
         section(root, "Accessoire")
-        root.addView(chips(Options.accessories, { look.accessory }) { look.accessory = it })
+        root.addView(chips(Accessory.entries, { look.accessory }) { look = look.copy(accessory = it) })
         section(root, "Couleur de l'accessoire")
-        root.addView(swatches(Options.accColors.map { it.second }, { look.accColor }) { look.accColor = it })
+        root.addView(swatches(AccColor.entries, { look.accColor }) { look = look.copy(accColor = it) })
 
         section(root, "Caractère")
         if (isNew) {
@@ -144,12 +147,12 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         t += dt
         val cycle = t % 7f
         if (cycle < 0.02f) previewFacing = -previewFacing
-        // L'aperçu affiche l'apparence en cours de choix (copiée : [look] est modifié par les boutons)
+        // L'aperçu affiche l'apparence en cours de choix ([Look] est immuable)
         preview.render(BunnyRenderState(
             pose = if (cycle < 2.5f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
             facing = previewFacing,
             walkPhase = (t * 2.2f) % 1f,
-            look = look.copy(),
+            look = look,
         ), dt)
         Choreographer.getInstance().postFrameCallback(this)
     }
@@ -160,43 +163,26 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
     private fun randomize() {
         val r = Random(System.nanoTime())
-        look.fur = r.nextInt(Options.furs.size); look.ears = r.nextInt(Options.ears.size)
-        look.eyes = r.nextInt(Options.eyes.size); look.pattern = r.nextInt(Options.patterns.size)
-        look.accessory = r.nextInt(Options.accessories.size); look.accColor = r.nextInt(Options.accColors.size)
+        look = Look(
+            fur = Fur.entries[r.nextInt(Fur.entries.size)], ears = Ears.entries[r.nextInt(Ears.entries.size)],
+            eyes = EyeColor.entries[r.nextInt(EyeColor.entries.size)], pattern = Pattern.entries[r.nextInt(Pattern.entries.size)],
+            accessory = Accessory.entries[r.nextInt(Accessory.entries.size)], accColor = AccColor.entries[r.nextInt(AccColor.entries.size)],
+        )
         if (isNew) personality = Personality.values()[r.nextInt(Personality.values().size)]
         preview.emit(BunnyView.PType.SPARKLE, 6)
         refreshAll()
     }
 
     private fun validate() {
-        val name = nameEdit.text.toString().trim().take(16).ifEmpty { "Cookie" }
-        val app = applicationContext
-        val chosenLook = look.copy()
-        val chosenPersonality = personality
-        val newPet = isNew
-        val save = {
-            val pet = PetState(app).load()
-            if (newPet) {
-                pet.reset()
-                pet.personality = chosenPersonality
-                pet.favoriteToy = Toy.values()[Random.nextInt(Toy.values().size)]
-            }
-            pet.name = name
-            pet.look = chosenLook
-            pet.adopted = true
-            pet.saveLook()
-            pet.save()
-        }
-        if (BunnyService.running && newPet) {
-            // On arrête l'ancien lapin puis on enregistre le nouveau. Pas de course : reset() change
-            // bornAt, donc la sauvegarde de l'ancien lapin (onDestroy) est ignorée si elle passe après.
-            BunnyService.stop(app)
-            save()
-            BunnyService.start(app)
-        } else {
-            save()
-            if (BunnyService.running) BunnyService.send(app, BunnyService.ACTION_RELOAD)
-        }
+        val name = Adoption.cleanName(nameEdit.text.toString()) ?: Identity.DEFAULT_NAME
+        // Une commande : le service (s'il tourne) remplace le lapin sans redémarrer, sinon le repository est écrit
+        PetCommands.adopt(applicationContext, Adoption(
+            name = name,
+            look = look,
+            personality = personality,
+            favoriteToy = Toy.entries[Random.nextInt(Toy.entries.size)],
+            isNew = isNew,
+        ))
         setResult(RESULT_OK)
         finish()
     }
@@ -217,31 +203,32 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         setStroke((if (selected) 3 * d else 1 * d).toInt(), Color.parseColor(if (selected) "#F07893" else "#E3D6CC"))
     }
 
-    private fun chips(labels: List<String>, get: () -> Int, set: (Int) -> Unit): View {
+    private fun <E : LookOption> chips(options: List<E>, get: () -> E, set: (E) -> Unit): View {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        labels.forEachIndexed { i, label ->
+        options.forEach { o ->
             val c = TextView(this).apply {
-                text = label
+                text = o.label
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(Color.parseColor("#3A2E39"))
                 val p = (10 * d).toInt(); setPadding(p + p / 2, p, p + p / 2, p)
-                setOnClickListener { set(i); refreshAll() }
+                setOnClickListener { set(o); refreshAll() }
             }
-            refreshers += { c.background = chipBg(get() == i) }
+            refreshers += { c.background = chipBg(get() == o) }
             row.addView(c, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { rightMargin = (8 * d).toInt() })
         }
         return HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(row) }
     }
 
-    private fun swatches(colors: List<String>, get: () -> Int, set: (Int) -> Unit): View {
+    private fun <E : ColorOption> swatches(options: List<E>, get: () -> E, set: (E) -> Unit): View {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        colors.forEachIndexed { i, col ->
-            val v = View(this).apply { setOnClickListener { set(i); refreshAll() } }
+        options.forEach { o ->
+            val col = o.hex
+            val v = View(this).apply { setOnClickListener { set(o); refreshAll() } }
             refreshers += {
                 v.background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
                     setColor(Color.parseColor(col))
-                    val sel = get() == i
+                    val sel = get() == o
                     setStroke((if (sel) 4 * d else 1.5f * d).toInt(), Color.parseColor(if (sel) "#F07893" else "#B9ACA3"))
                 }
             }

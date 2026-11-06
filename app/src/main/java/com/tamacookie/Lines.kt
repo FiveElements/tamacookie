@@ -22,14 +22,14 @@ object Lines {
     val SHOWN = arrayOf("Coucou, me revoilà !", "Je suis là ! 🐰", "Hop !")
 
     // --- Bavardage selon l'humeur ---
-    fun chatter(mood: PetState.Mood): Array<String> = when (mood) {
-        PetState.Mood.HUNGRY -> arrayOf("J'ai faim… 🥕", "Mon ventre gargouille…", "Une petite carotte ?")
-        PetState.Mood.SLEEPY -> arrayOf("*bâille*", "Je suis fatigué…", "Une sieste me ferait du bien")
-        PetState.Mood.DIRTY -> arrayOf("Je suis tout sale…", "Un bain ? 🫧", "Ça sent pas très bon ici…")
-        PetState.Mood.SAD -> arrayOf("Je m'ennuie…", "Tu joues avec moi ?", "Un câlin ? 🥺")
-        PetState.Mood.SICK -> arrayOf("Je ne me sens pas bien… 🤒", "Atchoum !", "J'ai besoin d'un médicament")
-        PetState.Mood.HAPPY -> arrayOf("La vie est belle ! ✨", "♪ La la la ♫", "Je t'aime bien 💕", "Tu fais quoi ?", "Il fait beau sur ton écran !")
-        PetState.Mood.OK -> arrayOf("Hmm hmm…", "*renifle*", "Tu fais quoi ?", "Je me promène 🐾")
+    fun chatter(mood: Mood): Array<String> = when (mood) {
+        Mood.HUNGRY -> arrayOf("J'ai faim… 🥕", "Mon ventre gargouille…", "Une petite carotte ?")
+        Mood.SLEEPY -> arrayOf("*bâille*", "Je suis fatigué…", "Une sieste me ferait du bien")
+        Mood.DIRTY -> arrayOf("Je suis tout sale…", "Un bain ? 🫧", "Ça sent pas très bon ici…")
+        Mood.SAD -> arrayOf("Je m'ennuie…", "Tu joues avec moi ?", "Un câlin ? 🥺")
+        Mood.SICK -> arrayOf("Je ne me sens pas bien… 🤒", "Atchoum !", "J'ai besoin d'un médicament")
+        Mood.HAPPY -> arrayOf("La vie est belle ! ✨", "♪ La la la ♫", "Je t'aime bien 💕", "Tu fais quoi ?", "Il fait beau sur ton écran !")
+        Mood.OK -> arrayOf("Hmm hmm…", "*renifle*", "Tu fais quoi ?", "Je me promène 🐾")
     }
 
     // --- Vie quotidienne ---

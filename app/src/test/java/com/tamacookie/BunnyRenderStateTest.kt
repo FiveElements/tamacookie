@@ -15,7 +15,7 @@ import kotlin.random.Random
 class BunnyRenderStateTest {
     private val ctx = FakePetCtx()
     private val pet = ctx.pet
-    private val st = pet.stats
+    private fun st(f: (PetStats) -> PetStats) { pet.stats = f(pet.stats) }
 
     @Test fun `l'etat affiche est tire du corps de l'animal`() {
         val b = pet.body
@@ -32,49 +32,49 @@ class BunnyRenderStateTest {
 
     @Test fun `expression forcee, sinon celle de l'humeur`() {
         assertEquals(Expr.NORMAL, BunnyRenderState.of(pet).expr)
-        st.satiety = 10f
+        st { it.copy(satiety = 10f) }
         assertEquals(Expr.SAD, BunnyRenderState.of(pet).expr)          // affamé
         pet.express(Expr.SURPRISED, 1f)
         assertEquals(Expr.SURPRISED, BunnyRenderState.of(pet).expr)
         pet.mind.tick(2f)
         assertEquals(Expr.SAD, BunnyRenderState.of(pet).expr)
-        st.sleeping = true
+        st { it.copy(sleeping = true) }
         assertEquals(Expr.SLEEPY, BunnyRenderState.of(pet).expr)
     }
 
     @Test fun `humeur vers expression`() {
-        val m = PetState.Mood.entries.associateWith { BunnyRenderState.moodExpr(it) }
-        assertEquals(Expr.NORMAL, m[PetState.Mood.HAPPY])
-        assertEquals(Expr.NORMAL, m[PetState.Mood.OK])
-        assertEquals(Expr.NORMAL, m[PetState.Mood.DIRTY])
-        assertEquals(Expr.SAD, m[PetState.Mood.HUNGRY])
-        assertEquals(Expr.SAD, m[PetState.Mood.SAD])
-        assertEquals(Expr.SLEEPY, m[PetState.Mood.SLEEPY])
-        assertEquals(Expr.SICK, m[PetState.Mood.SICK])
+        val m = Mood.entries.associateWith { BunnyRenderState.moodExpr(it) }
+        assertEquals(Expr.NORMAL, m[Mood.HAPPY])
+        assertEquals(Expr.NORMAL, m[Mood.OK])
+        assertEquals(Expr.NORMAL, m[Mood.DIRTY])
+        assertEquals(Expr.SAD, m[Mood.HUNGRY])
+        assertEquals(Expr.SAD, m[Mood.SAD])
+        assertEquals(Expr.SLEEPY, m[Mood.SLEEPY])
+        assertEquals(Expr.SICK, m[Mood.SICK])
     }
 
     @Test fun `sale et tres sale`() {
-        st.cleanliness = 50f; st.poops = 0
+        st { it.copy(cleanliness = 50f, poops = 0) }
         assertFalse(BunnyRenderState.of(pet).dirty)
-        st.poops = 3
+        st { it.copy(poops = 3) }
         assertTrue(BunnyRenderState.of(pet).dirty)
-        st.poops = 0; st.cleanliness = 40f
+        st { it.copy(poops = 0, cleanliness = 40f) }
         val s = BunnyRenderState.of(pet)
         assertTrue(s.dirty); assertFalse(s.veryDirty)
-        st.cleanliness = 10f
+        st { it.copy(cleanliness = 10f) }
         assertTrue(BunnyRenderState.of(pet).veryDirty)
     }
 
     @Test fun `immuable, comparable d'une image a l'autre, apparence copiee`() {
         val a = BunnyRenderState.of(pet)
         assertEquals(a, BunnyRenderState.of(pet))         // rien n'a changé : rien à redessiner
-        st.look.fur = 3                                    // l'apparence du jeu est mutable…
-        assertEquals(0, a.look.fur)                        // … l'état affiché, non
+        pet.look = pet.look.copy(fur = Fur.CHOCOLATE)      // nouvelle apparence…
+        assertEquals(Fur.SNOW, a.look.fur)                 // … l'état déjà affiché ne change pas
         assertNotEquals(a, BunnyRenderState.of(pet))
     }
 
     @Test fun `chaque animal a son propre etat`() {
-        val other = Pet(Identity(PetId("visiteur")) { "Visiteur" }, newPet(), Body(BunnyPhysics(1f)), Mind(Random(1)))
+        val other = testPet(BunnyPhysics(1f), Random(1), id = "visiteur")
         other.body.facing = -1f; other.body.pose = Pose.SLEEP
         pet.body.facing = 1f
         ctx.world.add(other)
@@ -147,7 +147,7 @@ class BunnyRenderStateTest {
         // la respiration au repos dépend du temps
         assertTrue(a.update(1f / 30f, BunnyRenderState(pose = Pose.IDLE), 120f, 140f, 1f))
         assertTrue(a.update(1f / 30f, still.copy(expr = Expr.HAPPY), 120f, 140f, 1f))
-        assertTrue(a.update(1f / 30f, still.copy(look = Look(accessory = 4)), 120f, 140f, 1f))
+        assertTrue(a.update(1f / 30f, still.copy(look = Look(accessory = Accessory.SCARF)), 120f, 140f, 1f))
         a.emit(PType.NOTE, 1, 120f, 140f, 1f, 1f)
         assertTrue(a.update(1f / 30f, still, 120f, 140f, 1f))
     }

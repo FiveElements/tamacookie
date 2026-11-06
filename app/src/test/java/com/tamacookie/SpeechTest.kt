@@ -35,12 +35,12 @@ class SpeechTest {
 
     @Test fun chatter_couvreToutesLesHumeurs() {
         val sp = speech()
-        for (m in PetState.Mood.values()) {
+        for (m in Mood.values()) {
             val lines = Lines.chatter(m)
             assertTrue(lines.isNotEmpty())
             assertTrue(sp.chatterLine(m) in lines)
         }
-        assertTrue("J'ai faim… 🥕" in Lines.chatter(PetState.Mood.HUNGRY))
+        assertTrue("J'ai faim… 🥕" in Lines.chatter(Mood.HUNGRY))
     }
 
     // --- Lines ---
@@ -86,17 +86,17 @@ class SpeechTest {
     }
 
     @Test fun moodText_cacheEtSommeil() {
-        assertEquals("se cache… trouve-le sur une autre page ! 🫣", PetNotifier.moodText(PetState.Mood.SICK, false, hiding = true))
-        assertEquals("dort", PetNotifier.moodText(PetState.Mood.SLEEPY, sleeping = true, hiding = false))
-        assertEquals("a sommeil", PetNotifier.moodText(PetState.Mood.SLEEPY, sleeping = false, hiding = false))
+        assertEquals("se cache… trouve-le sur une autre page ! 🫣", PetNotifier.moodText(Mood.SICK, false, hiding = true))
+        assertEquals("dort", PetNotifier.moodText(Mood.SLEEPY, sleeping = true, hiding = false))
+        assertEquals("a sommeil", PetNotifier.moodText(Mood.SLEEPY, sleeping = false, hiding = false))
     }
 
     @Test fun alertText_seulementPourLesBesoins() {
-        assertEquals("Cookie a faim ! 🥕", PetNotifier.alertText("Cookie", PetState.Mood.HUNGRY))
-        assertEquals("Cookie s'ennuie de toi 🥺", PetNotifier.alertText("Cookie", PetState.Mood.SAD))
-        assertNull(PetNotifier.alertText("Cookie", PetState.Mood.HAPPY))
-        assertNull(PetNotifier.alertText("Cookie", PetState.Mood.OK))
-        assertNull(PetNotifier.alertText("Cookie", PetState.Mood.SLEEPY))
+        assertEquals("Cookie a faim ! 🥕", PetNotifier.alertText("Cookie", Mood.HUNGRY))
+        assertEquals("Cookie s'ennuie de toi 🥺", PetNotifier.alertText("Cookie", Mood.SAD))
+        assertNull(PetNotifier.alertText("Cookie", Mood.HAPPY))
+        assertNull(PetNotifier.alertText("Cookie", Mood.OK))
+        assertNull(PetNotifier.alertText("Cookie", Mood.SLEEPY))
     }
 
     // --- Palette : mêmes valeurs que les anciens Color.parseColor / Color.argb ---

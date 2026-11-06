@@ -35,7 +35,7 @@ class ToyControllerTest {
     private fun frame() { toys.update(dt); overlay.flush() }
 
     @Test fun `nourrir affiche la nourriture, qui tombe avec au plus un deplacement par image`() {
-        pet.stats.satiety = 50f
+        pet.stats = pet.stats.copy(satiety = 50f)
         toys.feed(Food.CARROT)
         val c = ctx.world.props.single()
         assertTrue(overlay.isAttached(c.windowId))
@@ -56,7 +56,7 @@ class ToyControllerTest {
     }
 
     @Test fun `la rotation vit dans le modele et ne redessine que si elle change`() {
-        pet.stats.satiety = 50f
+        pet.stats = pet.stats.copy(satiety = 50f)
         toys.feed(Food.CARROT)
         val c = ctx.world.props.single()
         frame()
@@ -65,7 +65,7 @@ class ToyControllerTest {
     }
 
     @Test fun `cache, l'objet n'a pas de fenetre et reapparait a Montrer`() {
-        pet.stats.satiety = 50f
+        pet.stats = pet.stats.copy(satiety = 50f)
         ctx.hidden = true
         toys.feed(Food.CARROT)
         val c = ctx.world.props.single()
@@ -80,7 +80,7 @@ class ToyControllerTest {
     }
 
     @Test fun `il mange, la fenetre de la nourriture est liberee et le corps sait ce qu'il mange`() {
-        pet.stats.satiety = 50f
+        pet.stats = pet.stats.copy(satiety = 50f)
         toys.feed(Food.STRAWBERRY)
         val c = ctx.world.props.single()
         c.onGround = true; c.x = pet.body.fx + 10f; c.y = ctx.arena.groundY
@@ -139,7 +139,7 @@ class ToyControllerTest {
     }
 
     @Test fun `ramasser une crotte`() {
-        pet.stats.poops = 1
+        pet.stats = pet.stats.copy(poops = 1)
         toys.spawnPoop(300f)
         val p = ctx.world.props.single()
         assertTrue(p.isPoop)

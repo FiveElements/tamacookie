@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import com.tamacookie.PetEvent
 import com.tamacookie.BunnyPhysics
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
@@ -108,7 +109,7 @@ interface ToyCtx : PetCtx {
 
     /** Il touche le jouet : jauges (double pour le préféré), cœur ou note, sourire. */
     fun hit(pet: Pet, toy: Toy, amount: Float = 2f) {
-        pet.stats.playHit(toy, amount)
+        on(pet, PetEvent.PlayHit(toy, amount))
         emit(pet, if (rnd.nextBoolean()) PType.HEART else PType.NOTE)
         pet.express(Expr.HAPPY, 0.8f)
     }

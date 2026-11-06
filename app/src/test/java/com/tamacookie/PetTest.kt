@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.persist.PetRecord
 import com.tamacookie.BunnyView.Expr
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,7 +12,7 @@ import kotlin.random.Random
 
 class PetTest {
 
-    private fun newResident(prefs: FakePrefs = FakePrefs()) = Pet.resident(newPet(prefs), BunnyPhysics(), Random(1))
+    private fun newResident() = testPet(BunnyPhysics(), Random(1))
 
     @Test
     fun `setAct remet le chrono a zero et retient la duree`() {
@@ -69,15 +70,28 @@ class PetTest {
     }
 
     @Test
-    fun `l'identifiant du resident est stable et le nom suit son etat`() {
-        val prefs = FakePrefs()
-        val stats = newPet(prefs)
-        val a = Pet.resident(stats, BunnyPhysics(), Random(1))
-        val b = Pet.resident(stats, BunnyPhysics(), Random(2))
+    fun `l'identifiant est stable, renommer garde l'identifiant`() {
+        val rec = PetRecord(Identity(PetId("abc"), "Cookie", bornAt = 5L))
+        val a = Pet.fromRecord(rec, BunnyPhysics(), Random(1))
+        val b = Pet.fromRecord(rec, BunnyPhysics(), Random(2))
         assertEquals(a.id, b.id)
         assertEquals(Origin.Resident, a.identity.origin)
-        stats.name = "Noisette"
-        assertEquals("Noisette", a.identity.name)
+        a.rename("Noisette")
+        assertEquals("Noisette", a.name)
+        assertEquals(PetId("abc"), a.id)
+        assertEquals(PetId("abc"), a.identity.id)
+        assertEquals(rec.copy(identity = rec.identity.copy(name = "Noisette")), a.toRecord().copy(lastUpdate = rec.lastUpdate))
+    }
+
+    @Test
+    fun `les jauges ne changent que par les evenements`() {
+        val p = newResident()
+        val r = p.on(PetEvent.Fed(), 0L)
+        assertSame(r.stats, p.stats)
+        assertTrue(p.wouldRefuse(PetEvent.PlayStarted, 0L).not())
+        p.stats = p.stats.copy(energy = 5f)
+        assertTrue(p.wouldRefuse(PetEvent.PlayStarted, 0L))
+        assertEquals(5f, p.stats.energy)
     }
 
     @Test

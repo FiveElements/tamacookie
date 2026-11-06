@@ -61,8 +61,7 @@ class StationBehaviorTest {
     }
 
     private fun otherPet(): Pet {
-        val stats = newPet(FakePrefs()).apply { bornAt = 42L }
-        return Pet.resident(stats, BunnyPhysics(1f), Random(1)).also { ctx.world.add(it) }
+        return testPet(BunnyPhysics(1f), Random(1), id = "seconde").also { ctx.world.add(it) }
     }
 
     // ------------------------------------------------------------------ Exhaustivité et propriétés
@@ -197,8 +196,8 @@ class StationBehaviorTest {
 
     @Test
     fun `bain - il se reveille, mousse puis ressort propre`() {
-        pet.stats.sleeping = true
-        pet.stats.cleanliness = 10f
+        pet.stats = pet.stats.copy(sleeping = true)
+        pet.stats = pet.stats.copy(cleanliness = 10f)
         enter(StationKind.BATH)
         assertFalse(pet.stats.sleeping)
         assertEquals(1, fake.said.size)
@@ -257,7 +256,7 @@ class StationBehaviorTest {
         assertEquals(2, fake.said.size)
         assertTrue(pet.mind.chatterIn in 24f..45f)
         // endormi : il dort sans rien dire
-        pet.stats.sleeping = true
+        pet.stats = pet.stats.copy(sleeping = true)
         repeat(60) { CageStation.update(ctx, pet, 1f) }
         assertEquals(Pose.SLEEP, pet.body.pose)
         assertEquals(2, fake.said.size)
@@ -286,7 +285,7 @@ class StationBehaviorTest {
         assertEquals(listOf(PType.HEART), fake.emitted)
         ctx.world.station(StationKind.BATH).leave(pet.id)
         enter(StationKind.CAGE, announce = false)
-        pet.stats.happiness = 50f
+        pet.stats = pet.stats.copy(happiness = 50f)
         CageStation.onPet(ctx, pet)
         assertTrue(pet.stats.happiness > 50f)
         assertEquals(2, fake.emitted.count { it == PType.HEART })
