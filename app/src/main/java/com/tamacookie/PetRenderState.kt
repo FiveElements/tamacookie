@@ -6,7 +6,7 @@ import com.tamacookie.feature.toy.Food
 enum class Pose { IDLE, WALK, AIR, SLEEP, EAT, DRAGGED, SIT }
 
 /** Expression du visage. */
-enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY }
+enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY, TONGUE }
 
 /** Particules émises au-dessus de la tête (dessinées par [PetView], communes aux espèces). */
 enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE }

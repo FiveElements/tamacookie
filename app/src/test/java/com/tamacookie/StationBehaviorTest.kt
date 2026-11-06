@@ -4,6 +4,8 @@ import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel
 import com.tamacookie.feature.station.BathStation
+import com.tamacookie.feature.station.BedStation
+import com.tamacookie.feature.station.BowlStation
 import com.tamacookie.feature.station.CageStation
 import com.tamacookie.feature.station.ChestStation
 import com.tamacookie.feature.station.Occupancy
@@ -78,7 +80,9 @@ class StationBehaviorTest {
 
     @Test
     fun `ordre et noms des stations inchanges (cles de preferences)`() {
-        assertEquals(listOf("BATH", "VET", "CAGE", "CHEST"), StationKind.entries.map { it.name })
+        assertEquals(listOf("BATH", "VET", "CAGE", "CHEST"), StationKind.entries.take(4).map { it.name })
+        // évolution 4a : ajoutées à la fin
+        assertEquals(listOf("BED", "BOWL", "WHEEL", "GARDEN"), StationKind.entries.drop(4).map { it.name })
         assertEquals("st_CAGE_anchor", Prefs.stationAnchor(StationKind.CAGE))
     }
 
@@ -94,9 +98,13 @@ class StationBehaviorTest {
         assertEquals(Travel.IGNORES, VetStation.travel)
         assertEquals(Travel.IGNORES, CageStation.travel)
         for (k in StationKind.entries) if (k.behavior.acceptsPet) assertTrue("$k", k.behavior.blocksTravel)
-        // seule la cage garde l'animal d'une vue à l'autre ; seule la baignoire est animée
+        // seule la cage garde l'animal d'une vue à l'autre ; décor animé : baignoire et roue (4a)
         assertEquals(listOf(StationKind.CAGE), StationKind.entries.filter { it.behavior.holdsPet })
-        assertEquals(listOf(StationKind.BATH), StationKind.entries.filter { it.behavior.animated })
+        assertEquals(listOf(StationKind.BATH, StationKind.WHEEL), StationKind.entries.filter { it.behavior.animated })
+        // il s'endort dans la cage (qui le garde) et dans le lit
+        assertEquals(listOf(StationKind.CAGE, StationKind.BED), StationKind.entries.filter { it.behavior.sleepsInside })
+        // seul le lit a deux places
+        assertEquals(listOf(StationKind.BED), StationKind.entries.filter { it.behavior.capacity > 1 })
         // places (dp) : celles de l'ancien positionInStation
         assertEquals(12f, VetStation.seat.dxDp); assertEquals(26f, VetStation.seat.aboveBottomDp)
         assertEquals(0f, BathStation.seat.dxDp); assertEquals(14f, BathStation.seat.aboveBottomDp)
@@ -300,5 +308,140 @@ class StationBehaviorTest {
         CageStation.onShownAgain(ctx, pet, onScreen = true)
         assertEquals(1, fake.said.size)
         assertNotNull(fake.said.first())
+    }
+
+    // ------------------------------------------------------------------ Évolution 4a : lit, gamelle, roue, jardin
+
+    /** [n] images de [dt] dans la station [k] (le temps de l'activité avance, comme dans la boucle). */
+    private fun stay(k: StationKind, n: Int, dt: Float = 0.1f, p: Pet = pet) {
+        repeat(n) {
+            if (ctx.world.stationOf(p) != k) return
+            p.body.actTime += dt
+            k.behavior.update(ctx, p, dt)
+        }
+    }
+
+    @Test
+    fun `lit - deux places distinctes, il s'endort et recupere plus vite`() {
+        val other = otherPet()
+        val bed = ctx.world.station(StationKind.BED)
+        assertEquals(2, bed.capacity)
+        assertTrue(BedStation.seatFor(0).dxDp != BedStation.seatFor(1).dxDp)
+        pet.stats = pet.stats.copy(energy = 30f)
+        other.stats = other.stats.copy(energy = 30f)
+        enter(StationKind.BED)
+        enter(StationKind.BED, p = other)
+        assertTrue(bed.isFull)
+        assertTrue(pet.stats.sleeping && other.stats.sleeping)
+        assertTrue(fake.emitted.contains(PType.ZZZ))
+        // une heure de lit : l'énergie du lit en plus (le temps qui passe est compté ailleurs)
+        stay(StationKind.BED, 36, dt = 100f)
+        assertEquals(Pose.SLEEP, pet.body.pose)
+        assertEquals(30f + GameRules.DEFAULT.bedEnergyGainPerH, pet.stats.energy, 0.01f)
+        assertTrue(ctx.leaves.isEmpty())
+    }
+
+    @Test
+    fun `lit - une caresse le reveille en douceur, il sort un peu apres`() {
+        pet.stats = pet.stats.copy(energy = 30f, happiness = 50f)
+        enter(StationKind.BED)
+        BedStation.onPet(ctx, pet)
+        assertFalse(pet.stats.sleeping)
+        assertEquals("réveil sans mauvaise humeur", 50f, pet.stats.happiness, 0f)
+        stay(StationKind.BED, 10)
+        assertEquals(Pose.SIT, pet.body.pose)
+        assertTrue(ctx.leaves.isEmpty())
+        stay(StationKind.BED, 30)
+        assertEquals(listOf(true), ctx.leaves)
+    }
+
+    @Test
+    fun `lit - pas fatigue il ne dort pas, et le sortir le reveille`() {
+        pet.stats = pet.stats.copy(energy = 99f)
+        enter(StationKind.BED)
+        assertFalse(pet.stats.sleeping)
+        stay(StationKind.BED, 40)
+        assertEquals(listOf(true), ctx.leaves)
+        // endormi puis sorti (glisser, changement de vue) : réveillé
+        pet.stats = pet.stats.copy(energy = 20f)
+        enter(StationKind.BED, announce = false)
+        assertTrue(pet.stats.sleeping)
+        ctx.world.station(StationKind.BED).leave(pet.id)
+        BedStation.onLeave(ctx, pet)
+        assertFalse(pet.stats.sleeping)
+        // l'événement du lit n'agit que sur un animal endormi
+        assertEquals(20f, PetRules.apply(PetStats(energy = 20f), PetEvent.Rested(1f), 0L).stats.energy, 0f)
+    }
+
+    @Test
+    fun `gamelle - il renifle puis mange s'il a faim`() {
+        pet.stats = pet.stats.copy(satiety = 30f)
+        enter(StationKind.BOWL)
+        stay(StationKind.BOWL, 5)
+        assertEquals(Pose.IDLE, pet.body.pose)
+        stay(StationKind.BOWL, 10)
+        assertEquals(Pose.EAT, pet.body.pose)
+        assertEquals(BowlStation.FOOD, pet.body.eatingFood)
+        assertTrue(pet.body.eatProgress > 0f)
+        assertEquals(30f, pet.stats.satiety, 0f)
+        stay(StationKind.BOWL, 30)
+        assertEquals(30f + BowlStation.FOOD.satiety, pet.stats.satiety, 0.01f)
+        assertEquals(listOf(true), ctx.leaves)
+        assertEquals(0f, pet.body.eatProgress, 0f)
+        assertEquals(listOf(pet.id), fake.saved)          // repas sauvegardé tout de suite
+    }
+
+    @Test
+    fun `gamelle - pas faim, il ressort sans manger`() {
+        pet.stats = pet.stats.copy(satiety = 85f)
+        enter(StationKind.BOWL)
+        stay(StationKind.BOWL, 15)
+        assertEquals(listOf(true), ctx.leaves)
+        assertEquals(85f, pet.stats.satiety, 0f)
+        assertEquals(2, fake.said.size)
+    }
+
+    @Test
+    fun `roue - il court, se fatigue et s'amuse`() {
+        pet.stats = pet.stats.copy(energy = 60f, happiness = 50f)
+        enter(StationKind.WHEEL)
+        stay(StationKind.WHEEL, 19)
+        assertEquals(Pose.WALK, pet.body.pose)
+        assertTrue(pet.body.walkPhase > 0f)
+        assertTrue(ctx.leaves.isEmpty())
+        stay(StationKind.WHEEL, 50)
+        assertEquals(listOf(true), ctx.leaves)
+        val r = GameRules.DEFAULT
+        assertEquals(60f - r.wheelEnergyCost, pet.stats.energy, 0.01f)
+        assertTrue(pet.stats.happiness > 50f)
+    }
+
+    @Test
+    fun `roue - trop fatigue, il refuse et ressort aussitot`() {
+        pet.stats = pet.stats.copy(energy = 5f, happiness = 50f)
+        enter(StationKind.WHEEL)
+        assertEquals(listOf(true), ctx.leaves)
+        assertEquals(5f, pet.stats.energy, 0f)
+        assertEquals(1, fake.said.size)
+        assertTrue(PetRules.apply(PetStats(sleeping = true), PetEvent.WheelRun, 0L).refused)
+    }
+
+    @Test
+    fun `jardin - il grignote, se roule, un peu de joie et de terre`() {
+        pet.stats = pet.stats.copy(happiness = 50f, satiety = 50f, cleanliness = 80f)
+        enter(StationKind.GARDEN)
+        stay(StationKind.GARDEN, 10)
+        assertEquals(Pose.EAT, pet.body.pose)
+        stay(StationKind.GARDEN, 20)
+        assertEquals(Pose.SIT, pet.body.pose)
+        val facings = HashSet<Float>()
+        repeat(15) { stay(StationKind.GARDEN, 1); facings += pet.body.facing }
+        assertEquals("il se roule d'un côté à l'autre", 2, facings.size)
+        stay(StationKind.GARDEN, 20)
+        assertEquals(listOf(true), ctx.leaves)
+        val r = GameRules.DEFAULT
+        assertEquals(50f + r.gardenJoy, pet.stats.happiness, 0.01f)
+        assertEquals(50f + r.gardenSatiety, pet.stats.satiety, 0.01f)
+        assertEquals(80f - r.gardenCleanlinessCost, pet.stats.cleanliness, 0.01f)
     }
 }

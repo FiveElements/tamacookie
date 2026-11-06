@@ -1,6 +1,8 @@
 package com.tamacookie
 
 import com.tamacookie.feature.Travel
+import com.tamacookie.feature.mischief.ChewEdgeMischief
+import com.tamacookie.feature.mischief.TongueMischief
 import com.tamacookie.feature.mischief.HideSeekMischief
 import com.tamacookie.feature.mischief.KnockMischief
 import com.tamacookie.feature.mischief.Mischief
@@ -254,6 +256,94 @@ class MischiefTest {
         }
         assertTrue(ctx.said.single().let { "écris" in it || "tapes" in it || "coucou" in it })
         assertEquals(Act.IDLE, pet.act)                             // pas de squat au niveau 1
+    }
+
+    // ---------------------------------------------------------------------
+    //  Évolution 4a : mâchouiller le bord, tirer la langue
+    // ---------------------------------------------------------------------
+    @Test
+    fun `nouvelles betises - a leur place, sans changer les tirages d'avant`() {
+        assertEquals(listOf(HideSeekMischief, SquatMischief, ChewEdgeMischief, KnockMischief, ScrollDizzy, TongueMischief),
+            Mischiefs.ALL)
+        // la langue ne fait pas partie de la cascade (réaction seulement), et réagit en dernier
+        for (level in 0..2) assertEquals(0f, TongueMischief.chance(level), 0f)
+        assertSame(TongueMischief, Mischiefs.ALL.last())
+        // au milieu de l'écran (cas des tests seedés d'avant), le bord n'est pas possible : aucun tirage de plus
+        pet.body.fx = ctx.arena.screenW / 2
+        assertFalse(ChewEdgeMischief.canStart(fakeMctx(), pet))
+        val a = Random(3); val b = Random(3)
+        val old = listOf(HideSeekMischief, SquatMischief, KnockMischief)
+        repeat(50) {
+            val m1 = Mischiefs.seek(old, 1, a, { it.canStart(fakeMctx(), pet) }, { true })
+            val m2 = Mischiefs.seek(Mischiefs.ALL, 1, b, { it.canStart(fakeMctx(), pet) }, { true })
+            assertSame(m1, m2)
+        }
+        // voyage : occupé, comme toc-toc
+        assertTrue(Act.CHEW_EDGE in Act.BUSY_FOR_TRAVEL && Act.TEASE in Act.BUSY_FOR_TRAVEL)
+        assertTrue(Act.CHEW_EDGE in Act.MOVING && Act.CHEW_EDGE in Act.RUSH_BACK)
+    }
+
+    @Test
+    fun `bord de l'ecran - il y court, grignote des miettes puis s'arrete`() {
+        pet.body.fx = ctx.arena.minX + 100f
+        assertTrue(ChewEdgeMischief.canStart(fakeMctx(), pet))
+        assertTrue(ChewEdgeMischief.start(fakeMctx(), pet))
+        assertEquals(Act.CHEW_EDGE, pet.act)
+        assertEquals(ctx.arena.minX, pet.body.targetX, 0f)
+        var steps = 0
+        while (!pet.mind.mischief.chewing) {
+            pet.body.actTime += 0.05f
+            ctx.acts.handlerFor(pet)!!.update(pet, 0.05f)
+            assertTrue("il n'arrive jamais", ++steps < 200)
+        }
+        assertEquals(-1f, pet.body.facing, 0f)
+        assertEquals(1, ctx.said.size)
+        repeat(60) { pet.body.actTime += 0.05f; ctx.acts.handlerFor(pet)?.update(pet, 0.05f) }
+        assertEquals(Pose.EAT, pet.body.pose)
+        assertTrue(ctx.emitted.contains(PType.CRUMB))
+        repeat(30) { pet.body.actTime += 0.05f; ctx.acts.handlerFor(pet)?.update(pet, 0.05f) }
+        assertEquals(Act.IDLE, pet.act)
+        assertEquals(0f, pet.body.eatProgress, 0f)
+        assertFalse(pet.mind.mischief.chewing)
+        // loin du bord : impossible
+        pet.body.fx = ctx.arena.screenW / 2
+        assertFalse(ChewEdgeMischief.canStart(fakeMctx(), pet))
+    }
+
+    @Test
+    fun `bord de l'ecran - une caresse l'arrete`() {
+        pet.body.fx = ctx.arena.maxX - 20f
+        ChewEdgeMischief.start(fakeMctx(), pet)
+        assertEquals(ctx.arena.maxX, pet.body.targetX, 0f)
+        assertTrue(ctx.acts.handlerFor(pet)!!.onPet(pet))
+        assertEquals(Act.IDLE, pet.act)
+        assertEquals(Expr.SURPRISED, pet.mind.exprOverride)
+    }
+
+    @Test
+    fun `langue - un toucher a l'ecran, parfois il tire la langue puis se calme`() {
+        mis.level = 1
+        mis.checkUserEvents()                                       // première lecture des signaux
+        var steps = 0
+        while (pet.act != Act.TEASE) {
+            pet.setAct(Act.IDLE)
+            ctx.clock.advance(31_000)                               // au-delà de toute pause
+            ctx.screen.emit(UserSignal.Click(Box(900f, 100f, 1000f, 200f)))
+            mis.checkUserEvents()
+            assertTrue("jamais de langue", ++steps < 2_000)
+        }
+        assertEquals(Expr.TONGUE, pet.mind.exprOverride)
+        assertEquals(1f, pet.body.facing, 0f)                       // tourné vers le doigt
+        assertTrue(ctx.said.last().let { "Bleeeh" in it || "Nananère" in it || "cap" in it })
+        repeat(20) { pet.body.actTime += 0.1f; ctx.acts.handlerFor(pet)?.update(pet, 0.1f) }
+        assertEquals(Pose.SIT, pet.body.pose)
+        repeat(10) { pet.body.actTime += 0.1f; ctx.acts.handlerFor(pet)?.update(pet, 0.1f) }
+        assertEquals(Act.IDLE, pet.act)
+        // une caresse l'arrête tout de suite
+        pet.setAct(Act.TEASE)
+        assertTrue(ctx.acts.handlerFor(pet)!!.onPet(pet))
+        assertEquals(Act.IDLE, pet.act)
+        assertEquals(Expr.HAPPY, pet.mind.exprOverride)
     }
 
     /** Contexte de bêtise minimal (pour appeler une bêtise directement). */

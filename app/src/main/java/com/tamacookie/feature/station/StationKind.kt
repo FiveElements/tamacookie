@@ -15,6 +15,11 @@ enum class StationKind(val label: String, val wDp: Int, val hDp: Int, val behavi
     VET("Véto", 130, 130, VetStation),
     CAGE("Cage", 130, 136, CageStation),
     CHEST("Coffre", 110, 92, ChestStation),
+    // Évolution 4a (à la fin : l'ordre fixe le placement par défaut, le nom les clés `st_<NOM>_*`)
+    BED("Lit", 170, 90, BedStation),
+    BOWL("Gamelle", 110, 70, BowlStation),
+    WHEEL("Roue", 130, 140, WheelStation),
+    GARDEN("Jardin", 150, 80, GardenStation),
 }
 
 /**

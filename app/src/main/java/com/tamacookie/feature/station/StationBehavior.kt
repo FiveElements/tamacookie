@@ -52,9 +52,14 @@ interface StationBehavior {
      * on ne peut pas la ranger avec lui dedans. Sinon, changer de vue le fait sortir.
      */
     val holdsPet: Boolean get() = false
+    /** Il peut s'y endormir (« Dodo » le laisse dedans au lieu de le faire sortir). */
+    val sleepsInside: Boolean get() = holdsPet
     /** Décor animé : redessiné à chaque image quand elle est visible. */
     val animated: Boolean get() = false
     val seat: Seat get() = Seat.CENTER
+
+    /** Place du [rank]-ième occupant (0 = le premier entré) : [seat] pour tous, sauf station à places distinctes. */
+    fun seatFor(rank: Int): Seat = seat
 
     /** Tap sur la station vide : explication (voir [onTap]). */
     val tapHint: String

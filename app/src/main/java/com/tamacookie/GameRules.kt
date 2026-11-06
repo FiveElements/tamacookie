@@ -39,7 +39,7 @@ data class GameRules(
     // --- Interactions ---
     /** Repu au-dessus : il refuse à manger, sauf [alwaysWelcome]. */
     val fullAbove: Float = 95f,
-    val alwaysWelcome: Set<Food> = setOf(Food.STRAWBERRY),
+    val alwaysWelcome: Set<Food> = setOf(Food.STRAWBERRY, Food.TREAT),
     val eatingCleanlinessCost: Float = 3f,
     /** Caresses répétées à moins de [petCooldownMs] : elles rapportent moins. */
     val petCooldownMs: Long = 4000L,
@@ -66,6 +66,23 @@ data class GameRules(
     val foundJoy: Float = 15f,
     /** Personne ne l'a trouvé : il abandonne. */
     val notFoundJoyCost: Float = 3f,
+
+    // --- Stations de l'évolution 4a ---
+    /** Endormi dans le lit : énergie regagnée par heure **en plus** de [energyGainAsleepPerH]. */
+    val bedEnergyGainPerH: Float = 25f,
+    /** Un tour de roue : il se fatigue, ça le rend heureux (×[StatMod.PLAY_JOY]), ça creuse un peu. */
+    val wheelEnergyCost: Float = 10f,
+    val wheelJoy: Float = 10f,
+    val wheelSatietyCost: Float = 3f,
+    /** Le jardin : petite joie, quelques brins d'herbe, un peu de terre sur le pelage. */
+    val gardenJoy: Float = 5f,
+    val gardenSatiety: Float = 3f,
+    val gardenCleanlinessCost: Float = 4f,
+    /** La gamelle : il y mange s'il a faim (satiété sous ce seuil), sinon il renifle et ressort. */
+    val bowlHungryBelow: Float = 70f,
+    /** Brossé (menu 🪥) : propreté, et un peu de joie (×[StatMod.PET_JOY], comme une caresse). */
+    val brushCleanliness: Float = 8f,
+    val brushJoy: Float = 3f,
 
     // --- Humeur (ordre de priorité dans [PetRules.mood]) ---
     val sickBelow: Float = 35f,

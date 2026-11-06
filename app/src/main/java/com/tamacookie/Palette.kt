@@ -56,6 +56,18 @@ object Palette {
     const val FRISBEE_SHINE = 0x5AFFFFFF
     const val WOOD = 0xFFB07A4F.toInt()
     const val PLUSH_LIGHT = 0xFFE8C39E.toInt()
+    const val APPLE = 0xFFD94A3D.toInt()
+    const val APPLE_STEM = 0xFF6B4A2B.toInt()
+    const val HAY = 0xFFE3C46A.toInt()
+    const val HAY_DARK = 0xFFB8963F.toInt()
+    const val TREAT = 0xFFC68642.toInt()
+    const val TREAT_CHIP = 0xFF5A3A22.toInt()
+    const val ROPE = 0xFFE9D3A8.toInt()
+    const val ROPE_STRIPE = 0xFFD9534F.toInt()
+    const val YARN = 0xFFB07CE0.toInt()
+    const val TUNNEL = 0xFF4FA3E0.toInt()
+    const val TUNNEL_RING = 0xFF2F7DB8.toInt()
+    const val TUNNEL_HOLE = 0xFF1C3B57.toInt()
 
     // --- Stations ---
     const val WOOD_DARK = 0xFF7A5236.toInt()
@@ -70,6 +82,19 @@ object Palette {
     const val STETHOSCOPE = 0xFF6E7B8B.toInt()
     const val CAGE_BASE = 0xFF8C5F3F.toInt()
     const val CAGE_BARS = 0xFF7A7480.toInt()
+    const val BED_WOOD = 0xFFA9744F.toInt()
+    const val BED_PILLOW = 0xFFFFFFFF.toInt()
+    const val BED_BLANKET = 0xFF8FB8F2.toInt()
+    const val BED_BLANKET_DOT = 0xFFFFF3B0.toInt()
+    const val BOWL = 0xFFE86F5A.toInt()
+    const val BOWL_RIM = 0xFFF6B7A8.toInt()
+    const val WHEEL = 0xFF5BBF8A.toInt()
+    const val WHEEL_SPOKE = 0xFF9AA0A8.toInt()
+    const val WHEEL_STAND = 0xFF8A8F98.toInt()
+    const val SOIL = 0xFF8B5E3C.toInt()
+    const val GRASS = 0xFF5CB85C.toInt()
+    const val FLOWER_A = 0xFFFF8FB1.toInt()
+    const val FLOWER_B = 0xFFB9A2FF.toInt()
 
     // --- Jauges ---
     const val BAR_BG = 0xFFEFE7E1.toInt()

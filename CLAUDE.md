@@ -113,9 +113,15 @@ Principes :
 | 5 | `PetStats` + `PetRules` + `PetRepository` versionné par `PetId`, look par ids stables (migration) | ✅ |
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
 | 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ✅ |
-| — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins | ⏳ |
+| — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins — voir « Évolutions » | ⏳ |
 | 8 | Module `:core` (JVM pur), detekt, chaînes dans `strings.xml`, accessibilité | |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
+
+### Évolutions (contenu sur les plugins : comportement existant inchangé, seulement des ajouts)
+
+| # | Évolution | État |
+|---|---|---|
+| 4a | Contenu peu coûteux : stations lit / gamelle / roue / jardin, jouets corde / pelote / tunnel, nourritures pomme / foin / friandise, bêtises bord de l'écran / langue, menu chanter / brosser | ✅ |
 
 ### Écarts et décisions
 
@@ -567,6 +573,78 @@ Principes :
     dedans) ; un seul au coffre ; une seule bulle à la fois ; toucher / menu / glisser du **bon** animal ; cage et
     changement de page avec deux animaux ; nouveau lapin qui garde les compagnons.
 
+- **Évolution 4a** (contenu peu coûteux ; recettes « Ajouter… » suivies, ajouts **à la fin** des enums) — 4 commits
+  (jouets + nourritures ; stations ; bêtises + menu ; ce fichier) :
+  - **Stations** (`StationKind` : `BED`, `BOWL`, `WHEEL`, `GARDEN` ; clés `st_<NOM>_*` créées d'elles-mêmes) :
+    - 🛏️ **Lit** (`BedStation`, `capacity = 2`, `slowFrames`) : il s'y endort (pas fatigué — énergie > `notTiredAbove`
+      — il s'assoit 3 s et ressort) ; endormi, **`PetEvent.Rested(hours)`** chaque image (énergie
+      `bedEnergyGainPerH` = 25/h **en plus** du temps qui passe ; sans effet éveillé ; pas de sauvegarde immédiate).
+      Une caresse le réveille **sans** mauvaise humeur (`Woken(grumpy = false)`), il sort 3 s après ; le sortir
+      (glisser, changement de vue) le réveille. Deux places : `StationBehavior.seatFor(rang)` (rang d'arrivée dans
+      `Occupancy`, lu par `positionInStation`) — le premier garde sa place quand le second sort.
+      **`StationBehavior.sleepsInside`** (défaut = `holdsPet`) : « Dodo » (`BunnyService.startSleep`) le laisse dans
+      le lit comme dans la cage. Le lit n'est **pas** `holdsPet` (il ne suit pas l'animal d'une vue à l'autre).
+    - 🥣 **Gamelle** (`BowlStation`, nourriture `Food.HAY`) : il renifle 1 s ; s'il a faim (satiété <
+      `bowlHungryBelow` = 70 et repas non refusé), il mange 3 s (`Pose.EAT`, `eatProgress`) puis
+      `PetEvent.Fed(HAY)` — un repas ordinaire ; sinon il ressort. **Écart** : il n'y va pas tout seul (on l'y dépose) ;
+      aller à la gamelle de lui-même demanderait une décision du cerveau (comme `GOTO_CHEST`) — à faire avec une
+      évolution « cerveau ».
+    - 🎡 **Roue** (`WheelStation`, `animated` : les rayons tournent quand elle est occupée) : il court 6 s
+      (`Pose.WALK`), puis **`PetEvent.WheelRun`** (énergie −10, bonheur +10 × `PLAY_JOY`, satiété −3 ; refusé sous
+      `playMinEnergy` ou endormi : il le dit et ressort aussitôt).
+    - 🌱 **Jardin** (`GardenStation`) : il grignote 2,5 s puis se roule 2,5 s (il change de côté), puis
+      **`PetEvent.Grazed`** (bonheur +5, satiété +3, propreté −4).
+    - Gamelle, roue, jardin : `Travel.BUSY` (il commente l'app où l'on va, comme au bain).
+    - **Placement par défaut** : quatre stations par rangée (`i % 4`, rangée `i / 4`) ; la première rangée est
+      celle d'origine (avant, les stations 5 à 8 se seraient empilées au bord droit).
+  - **Jouets** (`Toy` : `ROPE`, `YARN`, `TUNNEL`) : 🪢 **corde** (il la prend dans la gueule, la mâchouille 5 s
+    en secouant la tête — un `PlayHit` toutes les 0,6 s —, puis la relance ; `complainsWhenTaken` : on « tire à la
+    corde ») ; 🧶 **pelote** (`randomTint` ; coup de patte au ras du sol, rebond 0,18 et frottement 1,2 : elle roule
+    loin et rebondit à peine) ; 🕳️ **tunnel** (posé au sol, il va à l'entrée la plus proche puis le traverse d'un
+    bout à l'autre, encore et encore ; la fenêtre de l'objet est au-dessus de celle de l'animal — `WindowLayer` —
+    donc le tunnel le cache pendant la traversée ; phase dans `ToyCtx.holdTime`, bout visé dans `Body.targetX`,
+    pause dans `Mind.kickCooldown`).
+  - **Nourritures** (`Food` : `APPLE`, `HAY`, `TREAT`) : pomme (22 / 6 / santé 3), foin (25 / 1 / santé 4),
+    🍪 **friandise** (satiété 4, bonheur 18 : la plus forte joie, la plus faible satiété) ajoutée à
+    `GameRules.alwaysWelcome` (acceptée même repu, comme la fraise).
+  - Coffre : `ChestPanel` en rangées de 4 (`ChestPanel.PER_ROW` ; trois nourritures / quatre jouets = la rangée
+    d'avant). Le tirage « jouet au hasard » du coffre et le jouet préféré à l'adoption incluent les nouveaux jouets
+    (même nombre de tirages, valeurs plus variées).
+  - **Trace de référence** (`PetRulesTest`) : le générateur tire ses nourritures / jouets parmi ceux **d'origine**
+    (`TRACE_FOODS`, `TRACE_TOYS`) — sinon l'ajout aux enums changeait l'empreinte sans que les règles changent.
+    `GOLDEN` est inchangé ; les nouveaux événements ont leurs propres tests.
+  - **Bêtises** : `Mischiefs.ALL` = cache-cache, bouton, **bord de l'écran**, toc-toc, tournis, **langue**.
+    - `ChewEdgeMischief` (`Act.CHEW_EDGE` ∈ `MOVING`, `RUSH_BACK`, `BUSY_FOR_TRAVEL`) : dans la cascade **avant
+      toc-toc** (0,3 / 0,4 au niveau 2), mais `canStart` exige d'être à moins de 160 dp d'un bord (sans aléatoire) :
+      loin d'un bord, la cascade consomme le `Random` exactement comme avant (testé : même choix, même graine) ; tous
+      les tests seedés d'avant passent sans retouche. Il court au bord, s'y tourne, mâchouille 4 s (`Pose.EAT`,
+      miettes) ; une caresse l'arrête. État : `MischiefState.chewing`. **Écart assumé** : près d'un bord, toc-toc
+      devient un peu moins fréquent (une bêtise de plus avant lui).
+    - `TongueMischief` (`Act.TEASE` ∈ `BUSY_FOR_TRAVEL`, **`Expr.TONGUE`** : clin d'œil + langue dans
+      `RabbitRenderer`) : **réaction** à un clic (5 % / 8 %), pas dans la cascade ; **dernière** de la liste : elle
+      ne tire au sort qu'après toutes les autres (le tournis ne consomme rien sans défilement), donc les tirages
+      existants ne changent pas. Il se tourne vers le doigt, tire la langue 2,5 s, pause de 30 s ; une caresse le
+      fait rire et arrêter.
+  - **Menu** : 🎵 **Chanter** (4 notes, danse s'il est libre — même initialisation que `PetBehavior.startDance` ;
+    endormi : berceuse, il ne se réveille pas) et 🪥 **Brosser** (**`PetEvent.Brushed`** : propreté +8, bonheur +3 ×
+    `PET_JOY`, sauvegardé ; refusé endormi). Six entrées = trois rangées.
+  - `PetEvent` (+ branches dans `apply` et `savesNow`) : `Rested` (non sauvegardé), `WheelRun`, `Grazed`, `Brushed`
+    (sauvegardés) ; taux dans `GameRules` (`bed*`, `wheel*`, `garden*`, `bowlHungryBelow`, `brush*`). Anciens
+    événements inchangés ; **aucune migration** (aucune clé ni nom changé).
+  - Couleurs dans `Palette` (objets et stations). `Species.accepts` : le lapin accepte tout (rien à faire).
+  - Tests : `ToySpecTest` (ajouts à la fin, friandise, rebond de la pelote vs balle, corde, tunnel),
+    `StationBehaviorTest` (lit à deux, réveil, gamelle avec / sans faim, roue, refus, jardin), `StationControllerTest`
+    (deux places dans le lit, troisième refusé, placement par défaut), `MischiefTest` (ordre, tirages inchangés loin
+    des bords, bord de l'écran, langue), `MenuEntryTest` (chanter, brosser), `PetRulesTest` (nouveaux événements).
+    424 → 447 tests ; couverture **48,3 → 50,0 % des lignes** (49,0 → 49,9 % des instructions, 47,7 → 48,9 % des
+    branches) ; bêtises et entrées de menu 100 %, stations 52–74 % et jouets 61–70 % (le dessin, Android, n'est
+    pas couvert).
+  - **À vérifier sur tablette** : dessin des quatre stations (le lapin est **sous** la station : couverture du lit,
+    bol, rayons de la roue, herbe) et leurs places (deux lapins dans le lit) ; « Dodo » dans le lit ; caresse au
+    lit ; roue qui tourne ; gamelle repu / affamé ; panneau 🏠 avec huit stations (hauteur) et placement par défaut
+    sur deux rangées ; coffre sur deux rangées ; corde dans la gueule (position, secousse), pelote, tunnel qui cache
+    le lapin ; bêtise du bord (près d'un bord) et langue (au toucher de l'écran) ; menu à six boutons.
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -604,8 +682,9 @@ suivent. Avant 3a il fallait toucher ~10 endroits (enum + `when` du dessin, `pos
 `leaveStation`, `busyInStation`, tap, `Act` + `SLOW`/`BUSY_FOR_TRAVEL`, `updateBehavior`, `onAppChanged`,
 `startSleep`, `onPetTap`, noms du menu). Seules exceptions : une station avec **son propre panneau** (ajouter une
 méthode à `StationCtx` et le `FloatingPanel` dans `StationController`). Plusieurs animaux : `capacity` suffit (chacun
-s'assoit à `seat` ; pour deux places distinctes, décaler selon le rang de l'occupant) ; une espèce peut la refuser
-(`Species.accepts`).
+s'assoit à `seat` ; pour des places distinctes, `seatFor(rang)` — voir `BedStation`) ; une espèce peut la refuser
+(`Species.accepts`). Il peut s'y endormir : `sleepsInside = true`. Une nouvelle règle de jauges : un `PetEvent`
+(recette « Ajouter une stat », étape 1).
 
 ### Ajouter un jouet (ex. : le cerf-volant)
 

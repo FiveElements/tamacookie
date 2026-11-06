@@ -62,6 +62,9 @@ class MischiefState {
     // Toc-toc
     var knockDone = false
 
+    // Mâchouiller le bord de l'écran : arrivé au bord, il grignote
+    var chewing = false
+
     // Cache-cache
     /** Vue où il s'est caché (null = pas de cache-cache). */
     var hidingView: String? = null
@@ -94,7 +97,7 @@ class UserEvents {
 /** Les bêtises enregistrées, et le choix de la bêtise. */
 object Mischiefs {
     /** Dans l'ordre de la cascade (attention) et des réactions (clic, frappe, défilement). */
-    val ALL: List<Mischief> = listOf(HideSeekMischief, SquatMischief, KnockMischief, ScrollDizzy)
+    val ALL: List<Mischief> = listOf(HideSeekMischief, SquatMischief, ChewEdgeMischief, KnockMischief, ScrollDizzy, TongueMischief)
 
     /**
      * Cascade sur [list] : chaque bêtise ([Mischief.chance] > 0) possible ([possible]), dans l'ordre, est

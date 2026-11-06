@@ -18,11 +18,13 @@ enum class Act {
      * Avec un autre animal (suivre, câlin, dispute…) : l'update et les propriétés sont celles de l'interaction
      * en cours (`SocialInteraction`), via `ActRegistry`.
      */
-    SOCIAL;
+    SOCIAL,
+    /** Bêtises de l'évolution 4a : il tire la langue (réaction à un toucher), il mâchouille le bord de l'écran. */
+    TEASE, CHEW_EDGE;
 
     companion object {
         /** En mouvement : animation fluide (~60 i/s). */
-        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL)
+        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL, CHEW_EDGE)
         /** Immobile et endormi : animation très économe (~12 i/s). Dans une station : `ActHandler.slowFrames`. */
         val SLOW: Set<Act> = EnumSet.of(SLEEP)
         /** Il ne suit pas le défilement des pages (il est tenu, ou caché). */
@@ -31,9 +33,9 @@ enum class Act {
         val CAN_COME_BACK: Set<Act> = EnumSet.of(IDLE, WALK, SIT, DANCE)
         val CAN_COME_BACK_OR_PAGE_OUT: Set<Act> = EnumSet.of(IDLE, WALK, SIT, DANCE, PAGE_OUT)
         /** Activités qui le font accourir tout de suite sur la page affichée. */
-        val RUSH_BACK: Set<Act> = EnumSet.of(KNOCK, SQUAT, GOTO_FOOD, PLAY)
+        val RUSH_BACK: Set<Act> = EnumSet.of(KNOCK, SQUAT, GOTO_FOOD, PLAY, CHEW_EDGE)
         /** Occupé : il ne suit pas l'utilisateur dans une autre application. Dans une station : `ActHandler.travel`. */
-        val BUSY_FOR_TRAVEL: Set<Act> = EnumSet.of(DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, AIR, SQUAT, KNOCK)
+        val BUSY_FOR_TRAVEL: Set<Act> = EnumSet.of(DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, AIR, SQUAT, KNOCK, TEASE, CHEW_EDGE)
         val HIDING: Set<Act> = EnumSet.of(HIDE_RUN, HIDDEN, PEEK)
         /** Libre de faire une bêtise. */
         val FREE: Set<Act> = EnumSet.of(IDLE, WALK, SIT)

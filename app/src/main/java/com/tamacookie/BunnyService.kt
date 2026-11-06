@@ -787,7 +787,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         on(pet, PetEvent.FellAsleep)
         speech.sayOneOf(pet.species.lines.GOING_TO_SLEEP)
         val k = world.stationOf(pet)
-        if (k != null && k.behavior.holdsPet) return@asPet   // il dort dans sa cage
+        if (k != null && k.behavior.sleepsInside) return@asPet   // il dort dans sa cage, dans le lit
         if (k != null) stations.leaveStation(pet, hopOut = false)
         pet.setActOrAfterAir(Act.SLEEP)
     }

@@ -67,6 +67,67 @@ object StrawberryFood : FoodSpec {
     }
 }
 
+object AppleFood : FoodSpec {
+    override val food get() = Food.APPLE
+    override val restSpin = 20f
+    override val lines = arrayOf("Une pomme ! 🍎", "Croc croc en vue !", "Elle a l'air juteuse !")
+
+    override fun draw(c: Canvas, v: PropView, w: Float, h: Float) {
+        val pen = v.pen
+        val p = pen.p; val stroke = pen.stroke; val r = pen.r; val d = pen.d
+        c.save(); c.rotate(v.spin * 0.3f, w / 2, h / 2)
+        p.color = Palette.APPLE
+        r.set(w * 0.12f, h * 0.26f, w * 0.56f, h * 0.94f); c.drawOval(r, p)
+        r.set(w * 0.44f, h * 0.26f, w * 0.88f, h * 0.94f); c.drawOval(r, p)
+        r.set(w * 0.12f, h * 0.26f, w * 0.88f, h * 0.94f); c.drawOval(r, stroke)
+        p.color = Color.WHITE
+        c.drawCircle(w * 0.34f, h * 0.44f, 2.4f * d, p)
+        p.color = Palette.APPLE_STEM
+        r.set(w * 0.47f, h * 0.08f, w * 0.53f, h * 0.32f); c.drawRect(r, p)
+        p.color = Palette.LEAF
+        r.set(w * 0.53f, h * 0.08f, w * 0.78f, h * 0.22f); c.drawOval(r, p)
+        c.restore()
+    }
+}
+
+object HayFood : FoodSpec {
+    override val food get() = Food.HAY
+    override val lines = arrayOf("Du foin ! 🌾 Ça sent l'été !", "Mon plat de tous les jours !", "Ça gratte, j'adore !")
+
+    override fun draw(c: Canvas, v: PropView, w: Float, h: Float) {
+        val pen = v.pen
+        val p = pen.p; val stroke = pen.stroke; val r = pen.r
+        c.save(); c.rotate(v.spin * 0.2f, w / 2, h / 2)
+        p.color = Palette.HAY
+        r.set(w * 0.08f, h * 0.40f, w * 0.92f, h * 0.95f); c.drawOval(r, p); c.drawOval(r, stroke)
+        stroke.color = Palette.HAY_DARK
+        for (i in 0..6) {
+            val x = w * (0.18f + i * 0.11f)
+            c.drawLine(x, h * 0.52f, x + (i % 3 - 1) * w * 0.08f, h * 0.20f + (i % 2) * h * 0.08f, stroke)
+        }
+        stroke.color = Palette.OUTLINE
+        c.restore()
+    }
+}
+
+object TreatFood : FoodSpec {
+    override val food get() = Food.TREAT
+    override val restSpin = 15f
+    override val lines = arrayOf("UNE FRIANDISE ?! 🍪😍", "C'est jour de fête ?", "Juste une, promis !")
+    private val CHIPS = arrayOf(0.35f to 0.40f, 0.62f to 0.36f, 0.48f to 0.58f, 0.32f to 0.66f, 0.66f to 0.64f)
+
+    override fun draw(c: Canvas, v: PropView, w: Float, h: Float) {
+        val pen = v.pen
+        val p = pen.p; val stroke = pen.stroke; val d = pen.d
+        c.save(); c.rotate(v.spin, w / 2, h / 2)
+        p.color = Palette.TREAT
+        c.drawCircle(w / 2, h / 2, w * 0.42f, p); c.drawCircle(w / 2, h / 2, w * 0.42f, stroke)
+        p.color = Palette.TREAT_CHIP
+        for ((sx, sy) in CHIPS) c.drawCircle(w * sx, h * sy, 1.8f * d, p)
+        c.restore()
+    }
+}
+
 /** Crotte : ramassée d'un tap ; reste sur la vue où elle est tombée (voir `ToyController.spawnPoop`). */
 object Poop : PropSpec {
     override val wDp = 34

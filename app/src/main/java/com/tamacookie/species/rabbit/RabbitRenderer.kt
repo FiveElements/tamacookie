@@ -350,6 +350,7 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         val closed = ambient.blinking
         when {
             expr == Expr.HAPPY -> { arcEye(c, e1x, ey, up = true); arcEye(c, e2x, ey, up = true) }
+            expr == Expr.TONGUE -> { arcEye(c, e1x, ey, up = true); dotEye(c, e2x, ey) }   // clin d'œil
             expr == Expr.SURPRISED || pose == Pose.DRAGGED -> { bigEye(c, e1x, ey); bigEye(c, e2x, ey) }
             expr == Expr.DIZZY -> { spiralEye(c, e1x, ey); spiralEye(c, e2x, ey) }
             expr == Expr.SLEEPY || expr == Expr.SICK -> { lidEye(c, e1x, ey); lidEye(c, e2x, ey) }
@@ -376,6 +377,11 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         if (pose == Pose.EAT) {
             val open = (sin(t * 14f) + 1f) * 1.5f
             oval(c, nx, ny + 6f, 2.5f, 1f + open, eye)
+        } else if (expr == Expr.TONGUE) {
+            // il tire la langue (qui frétille un peu)
+            c.drawLine(nx - 4f, ny + 5f, nx + 4f, ny + 5f, line)
+            oval(c, nx, ny + 9f + sin(t * 10f) * 0.6f, 3f, 4f, pink)
+            c.drawLine(nx, ny + 6f, nx, ny + 10f, line)
         } else if (expr == Expr.HAPPY || expr == Expr.SURPRISED) {
             oval(c, nx, ny + 6.5f, 3f, 3f, eye)
             oval(c, nx, ny + 7.5f, 2f, 1.6f, pink)

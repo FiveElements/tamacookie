@@ -5,6 +5,9 @@ import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.FrisbeeToy
 import com.tamacookie.feature.toy.Launch
 import com.tamacookie.feature.toy.Poop
+import com.tamacookie.feature.toy.RopeToy
+import com.tamacookie.feature.toy.TunnelToy
+import com.tamacookie.feature.toy.YarnToy
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.feature.toy.ToyCtx
 import org.junit.Assert.assertEquals
@@ -102,5 +105,113 @@ class ToySpecTest {
         pet.stats = pet.stats.copy(happiness = 50f)
         ctx.hit(pet, Toy.PLUSH)
         assertTrue(pet.stats.happiness - 50f > once)
+    }
+
+    // ------------------------------------------------------------------ Évolution 4a : nouveaux objets
+
+    @Test
+    fun `nouveaux jouets et nourritures ajoutes a la fin`() {
+        assertEquals(listOf("ROPE", "YARN", "TUNNEL"), Toy.entries.drop(4).map { it.name })
+        assertEquals(listOf("APPLE", "HAY", "TREAT"), Food.entries.drop(3).map { it.name })
+        assertTrue(RopeToy.complainsWhenTaken)
+        assertTrue(YarnToy.randomTint)
+        assertFalse(TunnelToy.randomTint || TunnelToy.complainsWhenTaken)
+    }
+
+    @Test
+    fun `la friandise - beaucoup de joie, peu de satiete, toujours acceptee`() {
+        val treat = Food.TREAT
+        for (f in Food.entries) if (f != treat) {
+            assertTrue("$f", treat.happiness > f.happiness)
+            assertTrue("$f", treat.satiety < f.satiety)
+        }
+        val full = PetStats(satiety = 99f)
+        assertFalse(PetRules.apply(full, PetEvent.Fed(treat), 0L).refused)
+        assertTrue(PetRules.apply(full, PetEvent.Fed(Food.APPLE), 0L).refused)
+        assertTrue(PetRules.apply(full, PetEvent.Fed(Food.HAY), 0L).refused)
+        // le foin nourrit et fait du bien, sans grande fête
+        assertTrue(Food.HAY.satiety > Food.APPLE.satiety && Food.HAY.health > 0f && Food.HAY.happiness < Food.APPLE.happiness)
+    }
+
+    /** Une balle d'un spec, posée en [x] au-dessus du sol. */
+    private fun prop(ctx: FakeToyCtx, t: Toy, x: Float, above: Float = 0f) =
+        Prop(ctx.world.newPropId(), t.spec, t.spec.wDp, t.spec.hDp).also {
+            it.x = x; it.y = ctx.arena.groundY - above; it.onGround = above == 0f
+            ctx.world.props.add(it)
+        }
+
+    /** Hauteur du premier rebond d'un jouet lâché de 400 px. */
+    private fun firstBounce(t: Toy): Float {
+        val ctx = FakeToyCtx()
+        val p = prop(ctx, t, 500f, above = 400f)
+        val g = ctx.arena.groundY
+        var landed = false
+        var apex = g
+        repeat(600) {
+            t.spec.step(ctx, ctx.pet, p, 1f / 60f)
+            if (!landed && p.y >= g - 1f) landed = true
+            else if (landed) apex = minOf(apex, p.y)
+        }
+        return g - apex
+    }
+
+    @Test
+    fun `la pelote rebondit bien moins que la balle et roule loin`() {
+        val ball = firstBounce(Toy.BALL)
+        val yarn = firstBounce(Toy.YARN)
+        assertTrue("balle $ball, pelote $yarn", yarn < ball / 4f)
+        // un coup de patte : elle part au ras du sol, il ne saute pas
+        val ctx = FakeToyCtx()
+        val pet = ctx.pet
+        val p = prop(ctx, Toy.YARN, pet.body.fx + 10f)
+        YarnToy.play(ctx, pet, p, 1f / 60f)
+        assertTrue(p.vx != 0f && p.vy < 0f && p.vy > -300f)
+        assertEquals(Act.IDLE, pet.act)
+        assertTrue(pet.mind.kickCooldown > 0f)
+    }
+
+    @Test
+    fun `corde - il l'attrape, la machouille puis la relance`() {
+        val ctx = FakeToyCtx()
+        val pet = ctx.pet
+        pet.stats = pet.stats.copy(happiness = 50f)
+        val p = prop(ctx, Toy.ROPE, pet.body.fx + 100f)
+        var t = 0f
+        while (!p.held) { RopeToy.play(ctx, pet, p, 0.05f); t += 0.05f; assertTrue("jamais attrapée", t < 5f) }
+        val grabbed = pet.stats.happiness
+        assertTrue(grabbed > 50f)
+        // il la mâchouille : un peu de joie à chaque coup de dents, la corde reste dans sa gueule
+        repeat(40) { RopeToy.play(ctx, pet, p, 0.05f); RopeToy.step(ctx, pet, p, 0.05f) }
+        assertTrue(p.held)
+        assertTrue(pet.stats.happiness > grabbed)
+        assertEquals(pet.body.fy - 18f, p.y, 0.01f)
+        // au bout de CHEW_SECONDS, il la relance et ne la rattrape pas tout de suite
+        while (p.held) { RopeToy.play(ctx, pet, p, 0.05f); assertTrue(ctx.holdTime < RopeToy.CHEW_SECONDS + 1f) }
+        assertTrue(p.vy < 0f && !p.onGround)
+        assertTrue(ctx.catchCooldown > 0f)
+        assertTrue(ctx.base.said.size >= 2)
+    }
+
+    @Test
+    fun `tunnel - il entre d'un cote et ressort de l'autre, encore et encore`() {
+        val ctx = FakeToyCtx()
+        val pet = ctx.pet
+        pet.stats = pet.stats.copy(happiness = 40f)
+        pet.body.fx = 200f
+        val p = prop(ctx, Toy.TUNNEL, 600f)
+        val (left, right) = TunnelToy.ends(ctx, p)
+        assertTrue(left < p.x - p.w / 2f && right > p.x + p.w / 2f)
+        var crossings = 0
+        var side = 0               // -1 à gauche du tunnel, 1 à droite
+        repeat(60 * 30) {
+            TunnelToy.play(ctx, pet, p, 1f / 60f)
+            pet.mind.tick(1f / 60f)
+            val now = when { pet.body.fx <= left + 3f -> -1; pet.body.fx >= right - 3f -> 1; else -> side }
+            if (side != 0 && now != side) crossings++
+            side = now
+        }
+        assertTrue("traversées : $crossings", crossings >= 4)
+        assertTrue(pet.stats.happiness > 40f + crossings)        // chaque traversée fait plaisir
+        assertEquals(0f, p.spin, 0f)
     }
 }
