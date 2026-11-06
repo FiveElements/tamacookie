@@ -9,7 +9,7 @@ enum class Pose { IDLE, WALK, AIR, SLEEP, EAT, DRAGGED, SIT }
 enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY, TONGUE }
 
 /** Particules émises au-dessus de la tête (dessinées par [PetView], communes aux espèces). */
-enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE }
+enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE, SNOW, PETAL }
 
 /**
  * Ce qu'affiche la fenêtre d'un animal à une image donnée (immuable). Produit à chaque tick à partir
@@ -32,10 +32,24 @@ data class PetRenderState(
     val dirty: Boolean = false,
     val veryDirty: Boolean = false,
     val look: Look = Look(),
+    /** Thème saisonnier : décor ajouté au dessin, l'apparence ([look]) n'est pas modifiée. */
+    val season: Season = Season.NONE,
 ) {
+    /** Noël et aucun accessoire : il porte un bonnet rouge (ajout du rendu, son [look] reste « aucun »). */
+    val seasonHat: Boolean get() = season == Season.CHRISTMAS && look.accessory == Accessory.NONE
+
+    /** Posé au sol (ni en vol ni tenu) : le décor de saison (citrouille, fleurs) est à ses pieds. */
+    private val grounded: Boolean get() = pose != Pose.AIR && pose != Pose.DRAGGED
+
+    /** Halloween : une petite citrouille à côté de lui. */
+    val seasonPumpkin: Boolean get() = season == Season.HALLOWEEN && grounded
+
+    /** Printemps : quelques fleurs à ses pieds. */
+    val seasonFlowers: Boolean get() = season == Season.SPRING && grounded
+
     companion object {
-        /** L'état affiché de [pet] ([Look] est immuable : partagée sans copie). */
-        fun of(pet: Pet, rules: GameRules = GameRules.DEFAULT): PetRenderState {
+        /** L'état affiché de [pet] ([Look] est immuable : partagée sans copie) ; [season] : thème du moment. */
+        fun of(pet: Pet, rules: GameRules = GameRules.DEFAULT, season: Season = Season.NONE): PetRenderState {
             val b = pet.body
             val st = pet.stats
             return PetRenderState(
@@ -49,6 +63,7 @@ data class PetRenderState(
                 dirty = st.cleanliness < rules.looksDirtyBelow || st.poops >= rules.dirtyPoops,
                 veryDirty = st.cleanliness < rules.looksVeryDirtyBelow,
                 look = pet.look,
+                season = season,
             )
         }
 

@@ -1,6 +1,7 @@
 package com.tamacookie.species
 
 import com.tamacookie.Mood
+import com.tamacookie.Season
 
 /**
  * Répliques d'une espèce dites par la boucle (bavardage, accueil, voyage, chutes) et le toucher.
@@ -16,6 +17,9 @@ interface SpeciesLines {
 
     // --- Bavardage selon l'humeur ---
     fun chatter(mood: Mood): Array<String>
+
+    /** Répliques de saison (évolution 4b), glissées dans le bavardage ; vide = aucune ([Season.NONE]). */
+    fun seasonal(season: Season): Array<String>
 
     // --- Vie quotidienne ---
     val POOPED: Array<String>

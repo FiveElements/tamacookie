@@ -1,6 +1,7 @@
 package com.tamacookie.species.rabbit
 
 import com.tamacookie.Mood
+import com.tamacookie.Season
 import com.tamacookie.species.SpeciesLines
 
 /**
@@ -31,6 +32,13 @@ object RabbitLines : SpeciesLines {
         Mood.SICK -> arrayOf("Je ne me sens pas bien… 🤒", "Atchoum !", "J'ai besoin d'un médicament")
         Mood.HAPPY -> arrayOf("La vie est belle ! ✨", "♪ La la la ♫", "Je t'aime bien 💕", "Tu fais quoi ?", "Il fait beau sur ton écran !")
         Mood.OK -> arrayOf("Hmm hmm…", "*renifle*", "Tu fais quoi ?", "Je me promène 🐾")
+    }
+
+    override fun seasonal(season: Season): Array<String> = when (season) {
+        Season.CHRISTMAS -> arrayOf("Joyeux Noël ! 🎄", "Il neige sur ton écran ! ❄️", "Le Père Noël aime les carottes ? 🎅")
+        Season.HALLOWEEN -> arrayOf("Bouh ! 🎃", "Des bonbons ou une carotte ! 👻")
+        Season.SPRING -> arrayOf("Ça sent le printemps ! 🌸", "Les fleurs sont de sortie 🌷")
+        Season.NONE -> emptyArray()
     }
 
     // --- Vie quotidienne ---

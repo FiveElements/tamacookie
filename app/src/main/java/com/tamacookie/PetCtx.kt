@@ -30,6 +30,8 @@ interface PetCtx {
     val acts: ActRegistry
     /** L'arbitre global entre animaux (une bêtise à la fois, le coffre, la nourriture, les bulles). */
     val director: Director
+    /** Thème saisonnier du moment (évolution 4b ; [Season.NONE] si coupé dans les réglages ou hors saison). */
+    val season: Season get() = Season.NONE
 
     // --- Jauges et sauvegarde (l'hôte est la seule autorité sur l'état des animaux) ---
     /**

@@ -43,6 +43,19 @@ object Palette {
     const val DROP = 0xFF6EC6FF.toInt()
     const val STAR = 0xFFFFC83D.toInt()
     const val DIRT_BUBBLE = 0xFF8DA05A.toInt()
+    /** Saisons (évolution 4b) : flocon, pétale. */
+    const val SNOW = 0xFFB9DCF7.toInt()
+    const val PETAL = 0xFFFFB3C9.toInt()
+
+    // --- Décor de saison (évolution 4b) ---
+    const val SANTA_RED = 0xFFD93A3A.toInt()
+    const val SANTA_WHITE = 0xFFFFFFFF.toInt()
+    const val PUMPKIN = 0xFFF28C28.toInt()
+    const val PUMPKIN_DARK = 0xFFC2621A.toInt()
+    const val PUMPKIN_STEM = 0xFF6B8E3A.toInt()
+    const val PUMPKIN_FACE = 0xFF4A2A12.toInt()
+    const val SPRING_FLOWER = 0xFFFF8FB1.toInt()
+    const val SPRING_FLOWER_2 = 0xFFB59CFF.toInt()
 
     // --- Nourriture et objets ---
     const val CARROT = 0xFFF28C28.toInt()

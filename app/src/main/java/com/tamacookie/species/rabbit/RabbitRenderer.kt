@@ -78,6 +78,8 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
     private val spot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR_SPOT }
     private val gold = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CROWN_GOLD }
     private val goldLight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CROWN_SHINE }
+    // --- Saisons (décor ajouté au dessin : l'apparence sauvegardée n'est pas touchée) ---
+    private val seasonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var darkFur = false
     /** Nourriture dont la couleur est dans [carrot] (parseColor seulement quand elle change). */
     private var paintedFood = Food.CARROT
@@ -125,6 +127,8 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         c.save()
         c.translate(cx, fy)
         c.scale(facing * s, s)
+        if (state.seasonFlowers) groundFlowers(c)
+        if (state.seasonPumpkin) pumpkin(c, -50f, 0f)
 
         // --- squash & stretch ---
         var yOff = 0f
@@ -302,6 +306,7 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
     //  Accessoires
     // ------------------------------------------------------------------
     private fun drawAccessory(c: Canvas, hx: Float, hy: Float, hr: Float, standing: Boolean) {
+        if (state.seasonHat) { santaHat(c, hx + 1f, hy - hr * 0.86f); return }
         when (look.accessory) {
             Accessory.BOW -> bow(c, hx + hr * 0.6f, hy - hr * 0.85f)
             Accessory.HAT -> hat(c, hx + 1f, hy - hr * 0.88f)
@@ -349,6 +354,56 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         rect.set(-4f, 0f, 4f, 17f)
         c.drawRoundRect(rect, 3f, 3f, acc); c.drawRoundRect(rect, 3f, 3f, accStroke)
         c.restore()
+    }
+
+    // ------------------------------------------------------------------
+    //  Saisons
+    // ------------------------------------------------------------------
+    /** Noël : bonnet rouge à pompon (seulement sans accessoire, voir [PetRenderState.seasonHat]). */
+    private fun santaHat(c: Canvas, x: Float, y: Float) {
+        c.save(); c.translate(x, y); c.rotate(-12f)
+        seasonPaint.color = Palette.SANTA_RED
+        path.reset()
+        path.moveTo(-13f, 0f); path.quadTo(-4f, -22f, 14f, -16f); path.quadTo(6f, -10f, 13f, 0f); path.close()
+        c.drawPath(path, seasonPaint); c.drawPath(path, accStroke)
+        seasonPaint.color = Palette.SANTA_WHITE
+        rect.set(-15f, -3.5f, 15f, 4f)
+        c.drawRoundRect(rect, 4f, 4f, seasonPaint); c.drawRoundRect(rect, 4f, 4f, accStroke)
+        c.drawCircle(15f, -16f, 4f, seasonPaint); c.drawCircle(15f, -16f, 4f, accStroke)
+        c.restore()
+    }
+
+    /** Halloween : petite citrouille posée au sol à ([x], [y]), avec son visage. */
+    private fun pumpkin(c: Canvas, x: Float, y: Float) {
+        seasonPaint.color = Palette.PUMPKIN_STEM
+        rect.set(x - 1.8f, y - 22f, x + 1.8f, y - 15f); c.drawRect(rect, seasonPaint)
+        seasonPaint.color = Palette.PUMPKIN_DARK
+        oval(c, x - 6f, y - 8f, 7f, 8f, seasonPaint); oval(c, x + 6f, y - 8f, 7f, 8f, seasonPaint)
+        seasonPaint.color = Palette.PUMPKIN
+        oval(c, x, y - 8.5f, 8f, 8.5f, seasonPaint)
+        rect.set(x - 13f, y - 17f, x + 13f, y); c.drawOval(rect, accStroke)
+        seasonPaint.color = Palette.PUMPKIN_FACE
+        path.reset()
+        path.moveTo(x - 7f, y - 11f); path.lineTo(x - 3f, y - 11f); path.lineTo(x - 5f, y - 14f); path.close()
+        path.moveTo(x + 3f, y - 11f); path.lineTo(x + 7f, y - 11f); path.lineTo(x + 5f, y - 14f); path.close()
+        c.drawPath(path, seasonPaint)
+        rect.set(x - 6f, y - 8f, x + 6f, y - 3f); c.drawArc(rect, 0f, 180f, true, seasonPaint)
+    }
+
+    /** Printemps : trois fleurs dans l'herbe, à ses pieds. */
+    private fun groundFlowers(c: Canvas) {
+        val spots = floatArrayOf(-44f, 0f, 36f, 2f, -30f, 3f)
+        for (i in 0 until 3) {
+            val x = spots[i * 2]; val y = spots[i * 2 + 1]
+            seasonPaint.color = Palette.LEAF
+            rect.set(x - 0.9f, y - 9f, x + 0.9f, y); c.drawRect(rect, seasonPaint)
+            seasonPaint.color = if (i == 1) Palette.SPRING_FLOWER_2 else Palette.SPRING_FLOWER
+            for (k in 0..4) {
+                val a = k * 1.2566f
+                c.drawCircle(x + cos(a) * 2.6f, y - 10f + sin(a) * 2.6f, 2.3f, seasonPaint)
+            }
+            c.drawCircle(x, y - 10f, 1.6f, flowerCenter)
+        }
     }
 
     /** Couronne dorée à trois pointes, une pierre de la couleur de l'accessoire. */

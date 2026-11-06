@@ -33,6 +33,8 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override val screen = FakeScreenSensor()
     override val acts = ActRegistry()
     override val director = Director(world)
+    /** Thème saisonnier (évolution 4b) : aucun par défaut, comme toutes les traces seedées d'avant. */
+    override var season: Season = Season.NONE
 
     /** Le résident. */
     val first: Pet = testPet(BunnyPhysics(arena.d), Random(seed)).also {

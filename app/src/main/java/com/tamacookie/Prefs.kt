@@ -21,6 +21,9 @@ object Prefs {
     /** Position du bouton 🏠 en fraction de la largeur / de la hauteur utile. */
     const val DOCK_FX = "dock_fx"
     const val DOCK_FY = "dock_fy"
+    /** Thèmes de saison (Noël, Halloween, printemps) : activés par défaut ([SEASONAL_DEFAULT]). */
+    const val SEASONAL = "seasonal"
+    const val SEASONAL_DEFAULT = true
 
     /** Largeur apprise d'une page du bureau, par largeur d'écran (portrait / paysage). */
     fun pageWidth(screenW: Int) = "pageW2_$screenW"

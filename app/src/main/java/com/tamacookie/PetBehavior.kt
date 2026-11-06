@@ -235,7 +235,11 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
     }
 
     private fun chatter(p: Pet) {
-        speech.at(SpeechPriority.LOW) { ctx.say(speech.chatterLine(p.stats.mood, p.species.lines)) }
+        // saison (évolution 4b) : parfois une réplique de saison ; hors saison, aucun tirage de plus
+        val seasonal = p.species.lines.seasonal(ctx.season)
+        val line = if (seasonal.isNotEmpty() && rnd.nextFloat() < SEASON_LINE_CHANCE) speech.pickFrom(seasonal)
+        else speech.chatterLine(p.stats.mood, p.species.lines)
+        speech.at(SpeechPriority.LOW) { ctx.say(line) }
         if (p.stats.mood == Mood.HAPPY && rnd.nextFloat() < 0.3f) startDance(p)
     }
 
@@ -277,5 +281,8 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
         // Valeurs de android.content.pm.ApplicationInfo.CATEGORY_* (copiées pour rester en Kotlin pur)
         const val CATEGORY_AUDIO = 1
         const val CATEGORY_VIDEO = 2
+
+        /** Part du bavardage consacrée aux répliques de saison. */
+        const val SEASON_LINE_CHANCE = 0.3f
     }
 }
