@@ -75,6 +75,9 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
     private val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.HAT }
     private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.YELLOW }
     private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LENS }
+    private val spot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR_SPOT }
+    private val gold = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CROWN_GOLD }
+    private val goldLight = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CROWN_SHINE }
     private var darkFur = false
     /** Nourriture dont la couleur est dans [carrot] (parseColor seulement quand elle change). */
     private var paintedFood = Food.CARROT
@@ -227,6 +230,14 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
                 c.drawRect(bodyCx - bodyRx - 2f, bodyCy - bodyRy - 2f, bodyCx - bodyRx * 0.1f, bodyCy + bodyRy + 2f, patch)
                 c.restore()
             }
+            if (!o && look.fur.spotted) {
+                // Tacheté : quelques taches sur le dos et le flanc
+                c.save(); clipOval(c, bodyCx, bodyCy, bodyRx, bodyRy)
+                oval(c, bodyCx - 12f, bodyCy - 9f, 8f, 6.5f, spot)
+                oval(c, bodyCx + 4f, bodyCy - 14f, 5f, 4f, spot)
+                oval(c, bodyCx - 18f, bodyCy + 7f, 5.5f, 5f, spot)
+                c.restore()
+            }
             // patte avant
             if (!dragged) oval(c, 12f, -5f, 10f, 5f, if (o) outline else fur)
             else {
@@ -242,6 +253,11 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
                     oval(c, headCx - 15f, headCy - 2f, 12f, 15f, patch)
                     oval(c, headCx + 18f, headCy - 2f, 10f, 15f, patch)
                 }
+                c.restore()
+            }
+            if (!o && look.fur.spotted) {
+                c.save(); clipOval(c, headCx, headCy, 22f, 20f)
+                oval(c, headCx - 14f, headCy - 12f, 6f, 5f, spot)
                 c.restore()
             }
             // oreille avant
@@ -292,6 +308,9 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
             Accessory.GLASSES -> if (standing) glasses(c, hx, hy)
             Accessory.SCARF -> if (standing) scarf(c, hx, hy)
             Accessory.FLOWERS -> flowers(c, hx, hy, hr)
+            Accessory.CROWN -> crown(c, hx + 1f, hy - hr * 0.86f)
+            Accessory.BANDANA -> if (standing) bandana(c, hx, hy)
+            Accessory.BOW_TIE -> if (standing) bowTie(c, hx + 1f, hy + 20f)
             Accessory.NONE -> {}
         }
     }
@@ -330,6 +349,37 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
         rect.set(-4f, 0f, 4f, 17f)
         c.drawRoundRect(rect, 3f, 3f, acc); c.drawRoundRect(rect, 3f, 3f, accStroke)
         c.restore()
+    }
+
+    /** Couronne dorée à trois pointes, une pierre de la couleur de l'accessoire. */
+    private fun crown(c: Canvas, x: Float, y: Float) {
+        c.save(); c.translate(x, y); c.rotate(-8f)
+        path.reset()
+        path.moveTo(-11f, 2f); path.lineTo(-12f, -10f); path.lineTo(-6f, -4f); path.lineTo(0f, -13f)
+        path.lineTo(6f, -4f); path.lineTo(12f, -10f); path.lineTo(11f, 2f); path.close()
+        c.drawPath(path, gold); c.drawPath(path, accStroke)
+        rect.set(-10f, -2f, 10f, 2f); c.drawRect(rect, goldLight)
+        c.drawCircle(0f, -1f, 2.4f, acc); c.drawCircle(0f, -1f, 2.4f, accStroke)
+        c.drawCircle(-12f, -10f, 1.6f, goldLight); c.drawCircle(12f, -10f, 1.6f, goldLight); c.drawCircle(0f, -13f, 1.6f, goldLight)
+        c.restore()
+    }
+
+    /** Bandana noué au cou : un triangle qui pointe vers le bas, avec des pois. */
+    private fun bandana(c: Canvas, hx: Float, hy: Float) {
+        path.reset()
+        path.moveTo(hx - 17f, hy + 14f); path.lineTo(hx + 15f, hy + 14f); path.lineTo(hx - 2f, hy + 30f); path.close()
+        c.drawPath(path, acc); c.drawPath(path, accStroke)
+        c.drawCircle(hx - 8f, hy + 18f, 1.4f, white); c.drawCircle(hx + 5f, hy + 18f, 1.4f, white)
+        c.drawCircle(hx - 2f, hy + 24f, 1.4f, white)
+    }
+
+    /** Nœud papillon sous le menton. */
+    private fun bowTie(c: Canvas, x: Float, y: Float) {
+        path.reset()
+        path.moveTo(0f + x, y); path.lineTo(x - 8f, y - 5f); path.lineTo(x - 8f, y + 5f); path.close()
+        path.moveTo(0f + x, y); path.lineTo(x + 8f, y - 5f); path.lineTo(x + 8f, y + 5f); path.close()
+        c.drawPath(path, acc); c.drawPath(path, accStroke)
+        c.drawCircle(x, y, 2.4f, acc); c.drawCircle(x, y, 2.4f, accStroke)
     }
 
     private fun flowers(c: Canvas, hx: Float, hy: Float, hr: Float) {
@@ -465,6 +515,11 @@ class RabbitRenderer(private val d: Float) : PetRenderer {
             c.save(); c.translate(12f, -36f); c.rotate(-82f)
             rect.set(-6f, -36f, 6f, 3f); c.drawOval(rect, if (o) outline else fur)
             if (!o) { rect.set(-3f, -31f, 3f, -2f); c.drawOval(rect, pink) }
+            c.restore()
+        }
+        if (look.fur.spotted) {
+            c.save(); clipOval(c, -4f, -17f, 29f, 17f)
+            oval(c, -16f, -24f, 7f, 5.5f, spot); oval(c, -2f, -8f, 5f, 4f, spot)
             c.restore()
         }
         if (dirty) { circle(c, -12f, -20f, 3f, dirt); circle(c, 2f, -10f, 2.4f, dirt) }

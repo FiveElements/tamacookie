@@ -24,6 +24,20 @@ enum class Fur(override val id: String, override val label: String, override val
     GREY("grey", "Gris", "#B8B4BE"),
     LICORICE("licorice", "Réglisse", "#3E363B"),
     PINK("pink", "Rose", "#F8D2DC"),
+    // --- Évolution 4b (à la fin : l'ordre des sept premiers est celui des index du schéma 0) ---
+    GINGER("ginger", "Roux", "#E08A4B"),
+    /** Crème avec des taches caramel (dessinées par le renderer, voir [Fur.spotted]). */
+    SPOTTED_CREAM("spotted_cream", "Tacheté crème", "#F7EAD3"),
+    BLUE_GREY("blue_grey", "Bleu-gris", "#8D9AB0"),
+    ;
+
+    /** Pelage tacheté : le renderer ajoute des taches ([Palette.FUR_SPOT]). */
+    val spotted: Boolean get() = this == SPOTTED_CREAM
+
+    companion object {
+        /** Pelages du schéma 0 (index 0..6), pour la migration. */
+        const val LEGACY_COUNT = 7
+    }
 }
 
 enum class Ears(override val id: String, override val label: String) : LookOption {
@@ -53,6 +67,16 @@ enum class Accessory(override val id: String, override val label: String) : Look
     GLASSES("glasses", "Lunettes"),
     SCARF("scarf", "Écharpe"),
     FLOWERS("flowers", "Fleurs"),
+    // --- Évolution 4b (à la fin) ---
+    CROWN("crown", "Couronne"),
+    BANDANA("bandana", "Bandana"),
+    BOW_TIE("bow_tie", "Nœud papillon"),
+    ;
+
+    companion object {
+        /** Accessoires du schéma 0 (index 0..5), pour la migration. */
+        const val LEGACY_COUNT = 6
+    }
 }
 
 enum class AccColor(override val id: String, override val label: String, override val hex: String) : ColorOption {
@@ -79,14 +103,16 @@ data class Look(
 
         /**
          * Ancien format (index entiers, schéma 0) : les couleurs étaient bornées à la liste
-         * (comme `Options.furColor`), les autres options hors liste retombaient sur la première.
+         * (comme `Options.furColor`), les autres options hors liste retombaient sur la première. Les listes
+         * sont celles du schéma 0 ([Fur.LEGACY_COUNT], [Accessory.LEGACY_COUNT]) : les options ajoutées depuis
+         * ne changent pas ce que donne un vieil index (même hors bornes).
          */
         fun fromLegacyIndexes(fur: Int, ears: Int, eyes: Int, pattern: Int, accessory: Int, accColor: Int) = Look(
-            fur = Fur.entries[fur.coerceIn(0, Fur.entries.lastIndex)],
+            fur = Fur.entries[fur.coerceIn(0, Fur.LEGACY_COUNT - 1)],
             ears = Ears.entries.getOrElse(ears) { Ears.UP },
             eyes = EyeColor.entries[eyes.coerceIn(0, EyeColor.entries.lastIndex)],
             pattern = Pattern.entries.getOrElse(pattern) { Pattern.PLAIN },
-            accessory = Accessory.entries.getOrElse(accessory) { Accessory.NONE },
+            accessory = if (accessory in 0 until Accessory.LEGACY_COUNT) Accessory.entries[accessory] else Accessory.NONE,
             accColor = AccColor.entries[accColor.coerceIn(0, AccColor.entries.lastIndex)],
         )
     }

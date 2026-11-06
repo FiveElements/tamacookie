@@ -29,6 +29,11 @@ object Palette {
     const val YELLOW = 0xFFFFD54A.toInt()
     /** `Color.argb(60, 255, 255, 255)` */
     const val LENS = 0x3CFFFFFF
+    /** Taches du pelage tacheté crème (évolution 4b). */
+    const val FUR_SPOT = 0xFFC9935F.toInt()
+    /** Couronne : or et reflet. */
+    const val CROWN_GOLD = 0xFFF2C14E.toInt()
+    const val CROWN_SHINE = 0xFFFFE9A8.toInt()
 
     // --- Particules ---
     const val HEART = 0xFFFF5C8A.toInt()

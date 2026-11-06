@@ -9,11 +9,13 @@ class LookTest {
 
     @Test
     fun `identifiants figes`() {
-        assertEquals(listOf("snow", "cream", "caramel", "chocolate", "grey", "licorice", "pink"), Fur.entries.map { it.id })
+        assertEquals(listOf("snow", "cream", "caramel", "chocolate", "grey", "licorice", "pink",
+            "ginger", "spotted_cream", "blue_grey"), Fur.entries.map { it.id })
         assertEquals(listOf("up", "lop", "one_folded"), Ears.entries.map { it.id })
         assertEquals(listOf("hazel", "blue", "green", "ruby"), EyeColor.entries.map { it.id })
         assertEquals(listOf("plain", "eye_patch", "dutch"), Pattern.entries.map { it.id })
-        assertEquals(listOf("none", "bow", "hat", "glasses", "scarf", "flowers"), Accessory.entries.map { it.id })
+        assertEquals(listOf("none", "bow", "hat", "glasses", "scarf", "flowers",
+            "crown", "bandana", "bow_tie"), Accessory.entries.map { it.id })
         assertEquals(listOf("pink", "blue", "yellow", "violet", "red", "green"), AccColor.entries.map { it.id })
     }
 
@@ -38,8 +40,22 @@ class LookTest {
             Look.fromLegacyIndexes(6, 2, 3, 2, 5, 5),
         )
         // Anciennes listes Options (libellés dans l'ordre des index)
-        assertEquals(listOf("Neige", "Crème", "Caramel", "Chocolat", "Gris", "Réglisse", "Rose"), Fur.entries.map { it.label })
-        assertEquals(listOf("Aucun", "Nœud", "Chapeau", "Lunettes", "Écharpe", "Fleurs"), Accessory.entries.map { it.label })
+        assertEquals(listOf("Neige", "Crème", "Caramel", "Chocolat", "Gris", "Réglisse", "Rose"),
+            Fur.entries.take(Fur.LEGACY_COUNT).map { it.label })
+        assertEquals(listOf("Aucun", "Nœud", "Chapeau", "Lunettes", "Écharpe", "Fleurs"),
+            Accessory.entries.take(Accessory.LEGACY_COUNT).map { it.label })
+        // hors bornes : comme avant l'évolution 4b (dernier pelage d'alors, pas d'accessoire), jamais une option ajoutée
+        assertEquals(Look(Fur.PINK, accessory = Accessory.NONE), Look.fromLegacyIndexes(9, 0, 0, 0, 7, 0))
+        assertEquals(Look(Fur.PINK), Look.fromLegacyIndexes(99, 0, 0, 0, -1, 0))
+    }
+
+    @Test
+    fun `evolution 4b - nouvelles options a la fin, relues par leur id`() {
+        assertEquals(listOf(Fur.GINGER, Fur.SPOTTED_CREAM, Fur.BLUE_GREY), Fur.entries.drop(Fur.LEGACY_COUNT))
+        assertEquals(listOf(Accessory.CROWN, Accessory.BANDANA, Accessory.BOW_TIE), Accessory.entries.drop(Accessory.LEGACY_COUNT))
+        assertEquals(Fur.SPOTTED_CREAM, Look.byId(Fur.entries, "spotted_cream", Fur.SNOW))
+        assertEquals(Accessory.BOW_TIE, Look.byId(Accessory.entries, "bow_tie", Accessory.NONE))
+        assertEquals(listOf(Fur.SPOTTED_CREAM), Fur.entries.filter { it.spotted })
     }
 
     @Test
