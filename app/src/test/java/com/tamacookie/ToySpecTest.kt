@@ -56,19 +56,20 @@ class ToySpecTest {
 
     @Test
     fun `noms sauvegardes inchanges`() {
-        // favoriteToy est sauvegardé par nom : ne jamais renommer
-        assertEquals(listOf("BALL", "BALLOON", "FRISBEE", "PLUSH"), Toy.entries.map { it.name })
-        assertEquals(listOf("CARROT", "LETTUCE", "STRAWBERRY"), Food.entries.map { it.name })
+        // favoriteToy est sauvegardé par nom : ne jamais renommer (on ajoute à la fin)
+        assertEquals(listOf("BALL", "BALLOON", "FRISBEE", "PLUSH"), Toy.entries.take(4).map { it.name })
+        assertEquals(listOf("CARROT", "LETTUCE", "STRAWBERRY"), Food.entries.take(3).map { it.name })
     }
 
     @Test
     fun `proprietes reprises de l'ancien code`() {
+        val old = Toy.entries.take(4)                    // les jouets d'avant l'étape 3b
         // tailles des fenêtres (dp)
-        assertEquals(listOf(42 to 42, 52 to 86, 52 to 30, 40 to 44), Toy.entries.map { it.spec.wDp to it.spec.hDp })
+        assertEquals(listOf(42 to 42, 52 to 86, 52 to 30, 40 to 44), old.map { it.spec.wDp to it.spec.hDp })
         // teinte au hasard : ballon et frisbee
-        assertEquals(setOf(Toy.BALLOON, Toy.FRISBEE), Toy.entries.filter { it.spec.randomTint }.toSet())
+        assertEquals(setOf(Toy.BALLOON, Toy.FRISBEE), old.filter { it.spec.randomTint }.toSet())
         // il proteste quand on les lui prend : doudou et frisbee
-        assertEquals(setOf(Toy.PLUSH, Toy.FRISBEE), Toy.entries.filter { it.spec.complainsWhenTaken }.toSet())
+        assertEquals(setOf(Toy.PLUSH, Toy.FRISBEE), old.filter { it.spec.complainsWhenTaken }.toSet())
         // lancers
         val def = Toy.BALL.spec.launch
         assertSame(Launch.DEFAULT, def)

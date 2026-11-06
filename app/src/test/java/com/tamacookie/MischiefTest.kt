@@ -104,7 +104,7 @@ class MischiefTest {
     fun `chaque activite de betise a son gestionnaire, une seule fois`() {
         val acts = Mischiefs.ALL.flatMap { it.acts }
         assertEquals("une activité revendiquée deux fois", acts.size, acts.toSet().size)
-        assertEquals(setOf(Act.SQUAT, Act.KNOCK, Act.HIDE_RUN, Act.HIDDEN, Act.PEEK), acts.toSet())
+        assertTrue(acts.containsAll(setOf(Act.SQUAT, Act.KNOCK, Act.HIDE_RUN, Act.HIDDEN, Act.PEEK)))
         assertTrue(acts.containsAll(Act.HIDING))
         for (a in acts) {
             pet.setAct(a)
@@ -113,8 +113,8 @@ class MischiefTest {
         // Le registre refuse qu'on enregistre deux fois les bêtises
         try { mis.registerActs(ctx.acts); throw AssertionError("double enregistrement accepté") }
         catch (_: IllegalStateException) {}
-        // Seule la réaction au défilement ne pilote aucune activité (le tournis est une activité commune)
-        assertEquals(listOf(ScrollDizzy), Mischiefs.ALL.filter { it.acts.isEmpty() })
+        // La réaction au défilement ne pilote aucune activité (le tournis est une activité commune)
+        assertTrue(ScrollDizzy.acts.isEmpty())
     }
 
     @Test
@@ -128,10 +128,16 @@ class MischiefTest {
     }
 
     @Test
-    fun `ordre de la cascade - cache-cache, bouton, toc-toc`() {
-        val level = 1
-        assertEquals(listOf(0.35f, 0.35f, 1f), Mischiefs.ALL.filter { it.chance(level) > 0f }.map { it.chance(level) })
-        assertEquals(listOf(HideSeekMischief, SquatMischief, KnockMischief), Mischiefs.ALL.filter { it.chance(level) > 0f })
+    fun `ordre de la cascade - cache-cache, bouton, toc-toc en dernier recours`() {
+        for (level in 0..2) {
+            val cascade = Mischiefs.ALL.filter { it.chance(level) > 0f }
+            assertTrue(cascade.indexOf(HideSeekMischief) < cascade.indexOf(SquatMischief))
+            // une bêtise sans tirage (probabilité 1) rend les suivantes inaccessibles : elle ferme la cascade
+            assertSame(KnockMischief, cascade.last())
+            assertEquals(listOf(KnockMischief), cascade.filter { it.chance(level) >= 1f })
+        }
+        assertEquals(0.35f, HideSeekMischief.chance(1), 0f)
+        assertEquals(0.35f, SquatMischief.chance(1), 0f)
         assertEquals(0.6f, SquatMischief.chance(2), 0f)
     }
 

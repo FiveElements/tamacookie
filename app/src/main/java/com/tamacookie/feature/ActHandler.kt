@@ -38,7 +38,8 @@ interface ActHandler {
  * Registre `Act → fonctionnalité` : la boucle, le toucher et les règles globales (voyage, cadence)
  * le consultent au lieu de connaître chaque fonctionnalité.
  *
- * Étape 3a : seules les stations y sont ([Act.IN_STATION]) ; les jouets, bêtises… y viendront (3b).
+ * Inscrits : stations ([Act.IN_STATION], aller au coffre), jouets et repas (`PLAY`, `GOTO_FOOD`, `EAT`),
+ * bêtises (`SQUAT`, `KNOCK`, `HIDE_RUN`, `HIDDEN`, `PEEK`). Le reste (locomotion, sommeil…) est dans la boucle.
  */
 class ActRegistry {
     private val resolvers = EnumMap<Act, (Pet) -> ActHandler?>(Act::class.java)
