@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.view.HapticFeedbackConstants
 import org.junit.Assert.assertEquals
@@ -26,5 +27,11 @@ class AndroidConstantsTest {
         assertEquals(ApplicationInfo.CATEGORY_NEWS, AppCategory.NEWS)
         assertEquals(ApplicationInfo.CATEGORY_MAPS, AppCategory.MAPS)
         assertEquals(ApplicationInfo.CATEGORY_PRODUCTIVITY, AppCategory.PRODUCTIVITY)
+    }
+
+    @Test
+    fun `broadcasts de relance`() {
+        assertEquals(Intent.ACTION_BOOT_COMPLETED, AutoRestart.BOOT_COMPLETED)
+        assertEquals(Intent.ACTION_MY_PACKAGE_REPLACED, AutoRestart.MY_PACKAGE_REPLACED)
     }
 }
