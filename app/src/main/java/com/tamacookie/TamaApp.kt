@@ -38,6 +38,9 @@ class AppGraph(private val app: Context) {
     /** Ce que voit le service d'accessibilité (remplace l'ancien objet global `Platforms`). Unique. */
     val screen = ScreenSensorHub()
 
+    /** Ce que le cœur peut faire sur l'écran (chasseur de pubs) : garde-fou devant le service d'accessibilité. */
+    val screenActions = AdSkipRelay(screen)
+
     /** Nos propres écrans visibles (tenu par [TamaApp], lu par `BunnyService`). Unique. */
     val ownApp = OwnAppScreens()
 

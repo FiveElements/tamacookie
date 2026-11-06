@@ -26,6 +26,17 @@ class ScreenSensorHub : ScreenSensor {
 
     override fun observe(listener: (ScreenSnapshot) -> Unit) = state.observe(listener)
 
+    /**
+     * Chasseur de pubs voulu (réglage `Prefs.AD_SKIP`, tenu par `BunnyService` : faux quand il ne tourne pas).
+     * Faux = le service d'accessibilité ne cherche pas le bouton, et celui qu'on connaissait est oublié.
+     */
+    var adSkipWanted = false
+        set(v) {
+            field = v
+            if (!v) update { copy(adSkip = null) }
+        }
+
+
     override fun takeSignals(): List<UserSignal> {
         if (signals.isEmpty()) return emptyList()
         val out = ArrayList(signals)
@@ -53,12 +64,12 @@ class ScreenSensorHub : ScreenSensor {
 
     fun onDisconnected() {
         epoch++
-        update { copy(connected = false, screenOn = true).withPlatforms(emptyList()) }
+        update { copy(connected = false, screenOn = true, adSkip = null).withPlatforms(emptyList()) }
     }
 
     fun onScreenOff() {
         epoch++
-        update { copy(screenOn = false).withPlatforms(emptyList()) }
+        update { copy(screenOn = false, adSkip = null).withPlatforms(emptyList()) }
     }
 
     fun onScreenOn() = update { copy(screenOn = true) }
@@ -94,7 +105,7 @@ class ScreenSensorHub : ScreenSensor {
         if (!snapshot.screenOn) return
         val fresh = startedAt == epoch
         update {
-            var s = copy(ime = r.ime)
+            var s = copy(ime = r.ime, adSkip = r.adSkip.takeIf { adSkipWanted })
             val pkg = r.pkg
             if (pkg == null) return@update s.withPlatforms(emptyList())
             s = s.copy(foregroundPkg = pkg)
@@ -105,6 +116,15 @@ class ScreenSensorHub : ScreenSensor {
             if (page != null && pkg == s.launcherPkg) s = s.settle(page, r.screenW, now)
             if (fresh) s.withPlatforms(r.platforms) else s
         }
+    }
+
+    /**
+     * Recherche légère du bouton « Ignorer l'annonce » (entre deux scans, sur un changement de contenu) :
+     * [box] = le bouton, null = plus de bouton. Ignorée écran éteint ou réglage coupé.
+     */
+    fun onAdProbe(box: Box?) {
+        if (!snapshot.screenOn || !adSkipWanted) return
+        update { copy(adSkip = box) }
     }
 
     /** Bureau au repos sur [page] : apprendre la largeur d'une page et recaler le défilement. */
@@ -143,4 +163,6 @@ data class ScanResult(
     val platforms: List<Platform> = emptyList(),
     val page: Pair<Int, Int>? = null,
     val screenW: Int = 0,
+    /** Bouton « Ignorer l'annonce » ([ScreenScan.findAdSkip]), null = aucun ou pas cherché. */
+    val adSkip: Box? = null,
 )

@@ -36,7 +36,11 @@ import android.view.accessibility.AccessibilityWindowInfo
  *  - le nom court (description, sinon libellé) des icônes et boutons NON éditables,
  *    jamais le contenu d'un champ de saisie ni d'un mot de passe ;
  *  - le nom du package au premier plan et l'indicateur de page du bureau ;
- *  - le fait qu'un bouton soit touché, qu'on fasse défiler ou qu'on tape (sans le texte).
+ *  - le fait qu'un bouton soit touché, qu'on fasse défiler ou qu'on tape (sans le texte) ;
+ *  - (chasseur de pubs, réglage actif) la présence et la position du bouton « Ignorer / Passer l'annonce »
+ *    d'une publicité ([ScreenScan.findAdSkip] : identifiant `…:id/skip_ad_button` ou libellé exact).
+ * Ce qu'il fait, et seulement cela : appuyer (`ACTION_CLICK`) sur ce bouton-là quand Cookie saute dessus
+ * ([pressAdSkip]) — jamais ailleurs, jamais un geste à une coordonnée.
  * Rien n'est stocké ni envoyé : tout reste en mémoire dans le processus de l'app.
  */
 class ScreenSensorService : AccessibilityService() {
@@ -61,6 +65,8 @@ class ScreenSensorService : AccessibilityService() {
     /** Instant du dernier scan complet (uptime ms) : au plus un scan toutes les [MIN_SCAN_INTERVAL_MS]. */
     private var lastScanAt = 0L
     private var lastWindowChangeAt = 0L
+    /** Chasseur de pubs : recherche légère du bouton « Ignorer l'annonce », et appui (port [ScreenActions]). */
+    private val adSkip by lazy { AdSkipAccess(this, hub, handler, ::worker) }
     private var receiverRegistered = false
     /** Fil du parcours de l'arbre (créé au premier scan, arrêté dans [onDestroy]). */
     private var scanThread: HandlerThread? = null
@@ -106,6 +112,7 @@ class ScreenSensorService : AccessibilityService() {
         } catch (e: Exception) {
             Log.w("TamaCookie", "screen receiver", e)
         }
+        AppGraph.of(this).screenActions.presser = { target -> adSkip.press(target) }
         scheduleScan(100)
     }
 
@@ -119,7 +126,11 @@ class ScreenSensorService : AccessibilityService() {
             // Les changements de fenêtre eux-mêmes (TYPE_WINDOW_STATE_CHANGED…) scannent toujours.
             if (evPkg != hub.snapshot.launcherPkg &&
                 SystemClock.uptimeMillis() - lastWindowChangeAt > WINDOW_SETTLE_MS
-            ) return
+            ) {
+                // …mais le bouton « Ignorer l'annonce » apparaît en cours de vidéo : recherche légère (4 IPC)
+                adSkip.schedule()
+                return
+            }
         } else if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
         ) {
@@ -163,6 +174,8 @@ class ScreenSensorService : AccessibilityService() {
             receiverRegistered = false
         }
         destroyed = true
+        AppGraph.of(this).screenActions.presser = null
+        adSkip.stop()
         handler.removeCallbacksAndMessages(null)
         scanThread?.quit()             // les scans en attente sont abandonnés ; celui en cours ne publiera pas
         scanThread = null; scanHandler = null
@@ -184,11 +197,12 @@ class ScreenSensorService : AccessibilityService() {
         lastScanAt = now
         val epoch = hub.epoch
         val launcherPkg = hub.snapshot.launcherPkg
+        val adWanted = hub.adSkipWanted
         val bounds = getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
         val g = ScreenScan.Geometry(bounds.width(), bounds.height(), resources.displayMetrics.density)
         scanInFlight = true
         worker().post {
-            val result = try { doScan(launcherPkg, g) } catch (e: Exception) {
+            val result = try { doScan(launcherPkg, g, adWanted) } catch (e: Exception) {
                 Log.w("TamaCookie", "scan", e); null
             }
             handler.post { onScanDone(result, epoch) }
@@ -213,7 +227,7 @@ class ScreenSensorService : AccessibilityService() {
      * **Fil du scan** : lit l'arbre de la fenêtre active (appels IPC) ; [launcherPkg] = bureau déjà reconnu.
      * Ne touche à aucun état partagé (tout est passé en paramètre ou renvoyé dans le [ScanResult]).
      */
-    private fun doScan(launcherPkg: String?, g: ScreenScan.Geometry): ScanResult {
+    private fun doScan(launcherPkg: String?, g: ScreenScan.Geometry, adWanted: Boolean): ScanResult {
         // Clavier affiché ?
         val ime = try {
             windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
@@ -226,12 +240,16 @@ class ScreenSensorService : AccessibilityService() {
         // Notre propre app et le volet de notifications ne changent pas la "vue"
         if (pkg == null || ScreenScan.ignoredPkg(pkg, packageName)) return ScanResult(ime, null)
         val mayBeHome = pkg == launcherPkg || pkg in homePkgs
-        val walk = ScreenScan.walk(root, NodeInfoReader(), g, mayBeHome)
-        return ScanResult(ime, pkg, walk.platforms, walk.page, g.width)
+        val reader = NodeInfoReader()
+        val walk = ScreenScan.walk(root, reader, g, mayBeHome)
+        // Chasseur de pubs : quelques recherches ciblées, indépendantes du parcours (et de ses limites)
+        val ad = if (!adWanted) null
+        else ScreenScan.findAdSkip(root, reader, NodeInfoFinder, pkg)?.let { reader.bounds(it) }
+        return ScanResult(ime, pkg, walk.platforms, walk.page, g.width, ad)
     }
 
     /** [ScreenScan.NodeReader] sur `AccessibilityNodeInfo` (minSdk 33 : plus de recyclage à faire). */
-    private class NodeInfoReader : ScreenScan.NodeReader<AccessibilityNodeInfo> {
+    internal class NodeInfoReader : ScreenScan.NodeReader<AccessibilityNodeInfo> {
         private val r = Rect()
         override fun isVisible(n: AccessibilityNodeInfo) = n.isVisibleToUser
         override fun isEditable(n: AccessibilityNodeInfo) = n.isEditable

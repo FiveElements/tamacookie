@@ -1,5 +1,7 @@
 package com.tamacookie
 
+import java.util.Locale
+
 /**
  * Lecture de l'arbre d'accessibilité, **sans Android** : quels éléments deviennent des plateformes,
  * quelle page du bureau est affichée. L'arbre est lu au travers de [NodeReader] (adaptateur :
@@ -80,6 +82,97 @@ object ScreenScan {
         fun bounds(n: N): Box
         fun childCount(n: N): Int
         fun child(n: N, i: Int): N?
+    }
+
+    /**
+     * Ce qu'il faut en plus pour trouver le bouton d'une publicité ([findAdSkip]) : identifiant de ressource,
+     * parent, et recherches faites **par l'application** (une IPC chacune côté Android). Les faux arbres des tests
+     * cherchent par [collect].
+     */
+    interface NodeFinder<N> {
+        /** Identifiant de ressource (« pkg:id/nom » : `viewIdResourceName`), null si inconnu. */
+        fun viewId(n: N): String?
+        /** Parent de [n] (null = racine, ou inconnu). */
+        fun parent(n: N): N?
+        /** Nœuds sous [root] dont le texte ou la description **contient** [text], sans tenir compte de la casse. */
+        fun findByText(root: N, text: String): List<N>
+        /** Nœuds sous [root] d'identifiant [id] (« pkg:id/nom »). */
+        fun findByViewId(root: N, id: String): List<N>
+    }
+
+    /** Parcours en profondeur (au plus [MAX_NODES] nœuds) : les nœuds qui vérifient [pred]. */
+    fun <N> collect(root: N, r: NodeReader<N>, pred: (N) -> Boolean): List<N> {
+        val out = ArrayList<N>()
+        val stack = ArrayDeque<N>()
+        stack.addLast(root)
+        var visited = 0
+        while (stack.isNotEmpty() && visited < MAX_NODES) {
+            val n = stack.removeLast()
+            visited++
+            if (pred(n)) out += n
+            for (i in r.childCount(n) - 1 downTo 0) r.child(n, i)?.let { stack.addLast(it) }
+        }
+        return out
+    }
+
+    // =====================================================================
+    //  Chasseur de pubs : le bouton « Ignorer l'annonce » (liste blanche stricte)
+    // =====================================================================
+    /** Fin de l'identifiant du bouton « Ignorer » des pubs YouTube (`com.google.android.youtube:id/skip_ad_button`). */
+    const val AD_SKIP_ID_SUFFIX = ":id/skip_ad_button"
+
+    /**
+     * Libellés **exacts** (casse, espaces et apostrophe typographique mis à part) d'un bouton qui passe une
+     * publicité. Rien d'autre : ni « Fermer », ni « Ignorer » seul, ni « En savoir plus ».
+     */
+    val AD_SKIP_LABELS: Set<String> =
+        setOf("ignorer l'annonce", "passer l'annonce", "skip ad", "ignorer les annonces")
+
+    /** Ce que l'on demande à l'app de chercher (contenu, sans casse) : chaque libellé de [AD_SKIP_LABELS] en a un. */
+    private val AD_SKIP_SEARCH = listOf("Ignorer l", "Passer l", "Skip ad")
+
+    /** [s] est exactement un libellé de [AD_SKIP_LABELS]. */
+    fun isAdSkipLabel(s: CharSequence?): Boolean {
+        if (s.isNullOrBlank() || s.length > MAX_LABEL) return false
+        val norm = s.toString().trim().replace(APOSTROPHE, '\'').replace(WHITESPACE, " ").lowercase(Locale.ROOT)
+        return norm in AD_SKIP_LABELS
+    }
+
+    private val WHITESPACE = Regex("\\s+")
+    /** Apostrophe typographique (U+2019), ramenée à l'apostrophe simple. */
+    private const val APOSTROPHE = '\u2019'
+
+    /**
+     * [n] est un bouton « passer la publicité » : visible, **cliquable**, non éditable, de taille non nulle, et
+     * soit d'identifiant `…:id/skip_ad_button`, soit de texte / description exactement dans [AD_SKIP_LABELS]
+     * (ou ceux de son **unique** enfant, non cliquable).
+     */
+    fun <N> isAdSkip(n: N, r: NodeReader<N>, f: NodeFinder<N>): Boolean {
+        if (!r.isVisible(n) || !r.isClickable(n)) return false
+        if (r.isEditable(n) || r.isPassword(n) || r.bounds(n).isEmpty) return false
+        return f.viewId(n)?.endsWith(AD_SKIP_ID_SUFFIX) == true || labelled(n, r) || labelledChild(n, r)
+    }
+
+    private fun <N> labelled(n: N, r: NodeReader<N>) = isAdSkipLabel(r.description(n)) || isAdSkipLabel(r.text(n))
+
+    /** Son unique enfant, non cliquable, porte le libellé (le bouton YouTube : cadre cliquable → conteneur décrit). */
+    private fun <N> labelledChild(n: N, r: NodeReader<N>): Boolean {
+        val c = (if (r.childCount(n) == 1) r.child(n, 0) else null) ?: return false
+        return !r.isClickable(c) && labelled(c, r)
+    }
+
+    /**
+     * Le bouton « passer la publicité » de l'arbre [root] (application [pkg]), null s'il n'y en a pas ; avec
+     * [near], seulement un bouton dont les bornes recoupent ce rectangle (au moment d'appuyer : c'est
+     * **encore** le bouton visé). Quelques recherches ciblées (identifiant, puis libellés — faites seulement si
+     * besoin), pas un parcours : rien ne dépend des plateformes ni de leurs limites.
+     */
+    fun <N> findAdSkip(root: N, r: NodeReader<N>, f: NodeFinder<N>, pkg: String?, near: Box? = null): N? {
+        val byId = if (pkg != null) f.findByViewId(root, pkg + AD_SKIP_ID_SUFFIX).asSequence() else emptySequence()
+        val byText = AD_SKIP_SEARCH.asSequence().flatMap { q ->
+            f.findByText(root, q).asSequence().flatMap { n -> sequence { yield(n); f.parent(n)?.let { yield(it) } } }
+        }
+        return (byId + byText).firstOrNull { isAdSkip(it, r, f) && (near == null || r.bounds(it).intersects(near)) }
     }
 
     /** Résultat du parcours : plateformes et (page, nombre de pages) du bureau si lue. */
