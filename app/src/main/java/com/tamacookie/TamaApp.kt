@@ -41,6 +41,12 @@ class AppGraph(private val app: Context) {
     /** Ce que le cœur peut faire sur l'écran (chasseur de pubs) : garde-fou devant le service d'accessibilité. */
     val screenActions = AdSkipRelay(screen)
 
+    /**
+     * Chasseur de pubs : rend nos fenêtres overlay qui recouvrent la zone transparentes et traversables un court
+     * instant (le toucher simulé doit atteindre le bouton de l'app). Branché par `BunnyService`, null sans lui.
+     */
+    var clearOverlayArea: ((Box) -> Unit)? = null
+
     /** Nos propres écrans visibles (tenu par [TamaApp], lu par `BunnyService`). Unique. */
     val ownApp = OwnAppScreens()
 

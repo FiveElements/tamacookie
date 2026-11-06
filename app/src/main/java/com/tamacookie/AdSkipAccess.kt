@@ -1,6 +1,8 @@
 package com.tamacookie
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.os.Handler
 import android.os.SystemClock
 import android.util.Log
@@ -12,8 +14,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  * le scan complet ignore hors du bureau), et l'**appui** demandé par le port [ScreenActions] ([AdSkipRelay]).
  *
  * Tout passe par [ScreenScan.findAdSkip] (liste blanche stricte) ; l'appui **relit** l'arbre sur le fil du scan et
- * n'envoie `ACTION_CLICK` qu'à un nœud de la liste blanche qui recoupe encore la cible — jamais un geste à une
- * coordonnée. Fil principal, sauf [find] (fil du scan, [worker]).
+ * n'envoie `ACTION_CLICK` qu'à un nœud de la liste blanche qui recoupe encore la cible ; refusé (YouTube), un toucher
+ * simulé au centre de ce nœud ([tap]), jamais ailleurs. Fil principal, sauf [find] (fil du scan, [worker]).
  */
 internal class AdSkipAccess(
     private val service: AccessibilityService,
@@ -77,13 +79,33 @@ internal class AdSkipAccess(
         if (!active || !hub.snapshot.screenOn) return false
         worker().post {
             try {
-                find(target)?.node?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                val f = find(target)
+                val clicked = f?.node?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+                // YouTube refuse le clic d'accessibilité sur ce bouton : vrai toucher simulé en son centre
+                val box = f?.box
+                if (!clicked && box != null) main.post { if (!stopped) tap(box) }
             } catch (e: Exception) {
                 Log.w("TamaCookie", "ad skip", e)
             }
             main.post { schedule(RECHECK_MS) }
         }
         return true
+    }
+
+    /**
+     * Fil principal : toucher bref au centre de [box] (bornes du nœud **relu** à l'instant, liste blanche). Nos
+     * fenêtres qui recouvrent le bouton (le lapin perché dessus) sont d'abord rendues traversables, sinon le
+     * toucher tomberait sur elles ; le geste part une image plus tard, une fois la mise en page appliquée.
+     */
+    private fun tap(box: Box) {
+        val graph = AppGraph.of(service)
+        graph.clearOverlayArea?.invoke(box)
+        main.postDelayed({
+            if (stopped) return@postDelayed
+            val path = Path().apply { moveTo(box.centerX, box.centerY) }
+            val stroke = GestureDescription.StrokeDescription(path, 0L, TAP_MS)
+            service.dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
+        }, CLEAR_DELAY_MS)
     }
 
     /** Service détruit : plus de recherche ni d'appui. */
@@ -97,6 +119,10 @@ internal class AdSkipAccess(
         const val PROBE_INTERVAL_MS = 500L
         /** Après un appui : on revérifie que le bouton a disparu (ms). */
         const val RECHECK_MS = 400L
+        /** Délai (ms) entre « fenêtres traversables » et le toucher simulé (une mise en page). */
+        const val CLEAR_DELAY_MS = 60L
+        /** Durée (ms) du toucher simulé (un tap). */
+        const val TAP_MS = 50L
     }
 }
 
