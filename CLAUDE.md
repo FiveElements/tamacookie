@@ -123,6 +123,7 @@ Principes :
 |---|---|---|
 | 4a | Contenu peu coûteux : stations lit / gamelle / roue / jardin, jouets corde / pelote / tunnel, nourritures pomme / foin / friandise, bêtises bord de l'écran / langue, menu chanter / brosser | ✅ |
 | 4b | Caractère et apparence : personnalités peureux / farceur / explorateur, pelages roux / tacheté crème / bleu-gris, accessoires couronne / bandana / nœud papillon, thèmes de saison (Noël, Halloween, printemps) | ✅ |
+| 4c | Bien-être numérique (pause proposée, bouderie ; réglage, coupé par défaut), widget d'écran d'accueil (humeur, jauges, Nourrir, Appeler), tuile Réglages rapides (montrer / cacher) | ✅ |
 
 ### Écarts et décisions
 
@@ -719,6 +720,77 @@ Principes :
     saisons (changer la date du téléphone : bonnet sans accessoire, flocons, citrouille, fleurs et pétales,
     répliques) et le bouton « Thèmes de saison » (effet immédiat, service lancé).
 
+- **Évolution 4c** (bien-être, widget, tuile ; comportement existant inchangé : tout est coupé ou absent tant
+  qu'on ne l'active / ne le pose pas) — 4 commits (bien-être ; widget ; tuile ; ce fichier) :
+  - **Bien-être numérique** (`feature/wellbeing/`, pur) : **`WellbeingTracker`** (`Clock.uptimeMs` injectée) compte le
+    temps passé **d'affilée** dans la même app. Il est alimenté par **`ForegroundAppWatcher.lastSeen`** (nouveau :
+    dernière app vue, ignorées comprises ; `poll` et `currentPkg` inchangés) au relevé de `appPoll` (toutes les
+    1,5 s, écran allumé et lapin montré). Seuils **`GameRules.breakSuggestAfterMin` = 30** (`Cue.BREAK`) et
+    **`breakSulkAfterMin` = 45** (`Cue.SULK`), chacun une fois par séance. Remise à zéro : autre app (`RELIEVED`
+    s'il boudait), notre app ou le lanceur (`exempt` : `packageName`, lanceurs vus — `AppInfo.isHome` — et
+    `ScreenSnapshot.launcherPkg` ; ils ne comptent pas), écran éteint, « Cacher », réglage coupé (sans réplique).
+    Le volet (`com.android.systemui`) et une réponse nulle de la source (UsageStats entre deux requêtes) ne
+    coupent pas la séance. Une caresse du résident (`PetEvent.Petted`, interceptée par **`BunnyService.on`**, qui
+    appelle `super.on`) met fin à la bouderie (`MADE_UP`) et relance le compte.
+  - **`WellbeingCoach`** (pur, `PetCtx`) : pause = `Expr.SLEEPY` 2,5 s, il s'assoit (`Act.SIT` 3 s s'il était
+    `IDLE` / `WALK` : « s'étire ») et « *bâille* Et si on faisait une pause ? ☕ » ; bouderie = `Expr.ANGRY`
+    **maintenue** à chaque relevé (`maintain`, sans écraser une autre expression) + réplique ; pardon = cœurs ;
+    soulagement = réplique. **Jamais de jauge** (aucun `ctx.on`, testé), jamais de blocage. Muet s'il dort, est
+    caché ou hors écran (le signal passe ; la bouderie reste un état). **Seul le résident** (« l'animal du
+    téléphone ») réagit. Répliques dans le fichier (contenu, pas d'espèce).
+  - Réglage : clé **`wellbeing`** (`Prefs.WELLBEING`, Boolean, **faux** par défaut) dans le fichier `pet` ; bouton
+    « Pauses proposées » (section « Bien-être », écran principal) ; `ACTION_RELOAD` le relit. Coupé = aucun
+    tirage, aucune réplique : les traces seedées ne changent pas.
+  - **Widget** (`widget/PetWidget.kt`, `AppWidgetProvider` + `RemoteViews`, layout `widget_pet.xml`, info
+    `xml/pet_widget_info.xml` 3 × 2, redimensionnable) : titre « emoji d'humeur + nom », sous-titre
+    `PetNotifier.moodText` (+ « en cage »), quatre barres (`ProgressBar`) et valeurs des jauges de la notification
+    (description d'accessibilité = `PetNotifier.statusLine`), ligne « Rangé » si le service ne tourne pas, ni
+    jauges ni boutons avant le premier lancement (`WidgetTexts.NO_PET`). Textes purs : **`WidgetTexts`**.
+    **Lecture** par `Pets.repository(ctx).loadResident()` seulement (état sauvegardé, sans rattrapage hors-ligne,
+    comme les activités) ; **écriture** jamais : « Nourrir » = `ACTION_FEED` (le chemin de la notification),
+    « Appeler » = nouvelle **`BunnyService.ACTION_SHOW`** (montré s'il était caché — `show()`, « me revoilà »
+    compris —, sinon « Je suis là ! 👋 », sauf dans les 3 s qui suivent le démarrage pour laisser l'accueil).
+  - **Démarrage depuis le widget / la tuile** : `BunnyService.userCommand(ctx, action)` = intent marqué
+    `EXTRA_FOREGROUND`, envoyé par `PendingIntent.getForegroundService` (widget) ou `startForegroundService`
+    (tuile) — un toucher sur un widget ou une tuile autorise le démarrage au premier plan. Le service rappelle
+    `startForeground` pour **chaque** commande de ce type (le système l'attend même service lancé) et remet
+    `Prefs.ENABLED` à vrai (relancé au redémarrage, comme par l'écran principal). Sans permission de
+    surimpression, les boutons ouvrent l'app.
+  - **Mises à jour du widget** : à chaque sauvegarde **du résident** (`BunnyService.save`), au plus **une par
+    minute** (**`UpdateThrottle`**, pur : une demande trop tôt est **reportée** à la fin de la minute par
+    `Handler.postDelayed`, une seule en attente ; annulée à `onDestroy`) ; au démarrage et à l'arrêt du service
+    (immédiat : « Rangé ») ; après `PetCommands.adopt` / `rename` service arrêté ; `updatePeriodMillis` = 30 min
+    (minimum du système). Coût : ≤ 1 `updateAppWidget` par minute en jeu.
+  - **Tuile** (`tile/PetTileService.kt`, `BIND_QUICK_SETTINGS_TILE`, icône `drawable/ic_tile.xml`, mode non actif :
+    `onStartListening` à chaque ouverture du volet) : libellé = nom du résident (repository ; repli
+    `@string/tile_label` « Cookie »), **active = service lancé et lapin affiché** (`BunnyService.visible`, nouveau
+    `@Volatile` statique tenu par le service), sous-titre « Sur l'écran » / « Caché » / « Rangé » (**`TileTexts`**,
+    pur). Toucher : service lancé → `ACTION_TOGGLE` (le « Cacher » / « Montrer » de la notification), état affiché
+    tout de suite puis confirmé ; arrêté → démarré avec `ACTION_SHOW` ; sans surimpression ou démarrage refusé →
+    l'app s'ouvre (`startActivityAndCollapse` : `PendingIntent` à partir d'Android 14, `Intent` sur 13 —
+    `@SuppressLint("StartActivityAndCollapseDeprecated")`, erreur lint sinon). Le service appelle
+    `requestListeningState` à chaque changement (démarrage, arrêt, cacher, montrer).
+  - Manifeste : `receiver .widget.PetWidget` (`exported="false"`, `APPWIDGET_UPDATE`), `service .tile.PetTileService`
+    (`exported="true"`, permission `BIND_QUICK_SETTINGS_TILE`, action `QS_TILE`). Chaînes `widget_description`,
+    `widget_feed`, `widget_call`, `tile_label`. Pas de Glance, aucune dépendance. Le layout du widget n'a aucun
+    attribut RTL (le manifeste ne déclare pas `supportsRtl` : lint `RtlEnabled`), et l'espace entre les boutons est
+    un `FrameLayout` (une `View` nue n'est pas permise dans un `RemoteViews`).
+  - Tests : `WellbeingTest` (seuils, une fois chacun, changement d'app, notre app / lanceur, volet et réponse vide,
+    écran éteint, caresse, réglage coupé, seuils des règles, gestes et répliques sans jauge, muet endormi / caché /
+    hors écran), `HomeShortcutsTest` (textes du widget = ceux de la notification, bornes, emoji par humeur, cadence
+    reportée, état de la tuile), `ForegroundAppSourceTest` (`lastSeen`). 461 → 479 tests ; couverture **49,8 → 49,6 %
+    des lignes** (49,7 → 49,5 % des instructions, 49,4 → 49,2 % des branches) — `PetWidget` et `PetTileService`
+    (Android) ne sont pas couverts ; `WellbeingTracker` 97 %, `WellbeingCoach` 94 %, `WidgetTexts`,
+    `UpdateThrottle`, `TileTexts`, `ForegroundAppWatcher` 100 %.
+  - **À vérifier sur tablette** : ajouter le widget (aperçu dans le sélecteur, redimensionnement, textes et barres,
+    emoji d'humeur), « Nourrir » service lancé / arrêté (il démarre et mange), « Appeler » caché / affiché /
+    arrêté, widget à jour en moins d'une minute après un repas, « Rangé » après « Ranger » ; la tuile (l'ajouter au
+    volet, nom du lapin, état allumé / éteint, toucher qui cache / montre, démarrage service arrêté, permission de
+    surimpression retirée → l'app s'ouvre) ; le bien-être (activer, rester 30 min dans une app — ou baisser
+    `GameRules.breakSuggestAfterMin` dans un build de test —, bâillement et réplique, bouderie à 45 min, caresse
+    ou changement d'app, écran éteint qui remet à zéro, notre app et le bureau qui ne comptent pas, réglage coupé =
+    rien), avec et sans service d'accessibilité (UsageStats).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -739,7 +811,8 @@ Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
 | `pet.<id>.poopAcc` | Float | fraction de la prochaine crotte |
 
 Fichier **`pet`** (réglages) : `enabled`, `mischief`, `dock_fx`, `dock_fy`, `pageW2_<largeur>`,
-`st_<STATION>_anchor` / `_fx` / `_fy`, `seasonal` (Boolean, thèmes de saison, vrai si absent — évolution 4b).
+`st_<STATION>_anchor` / `_fx` / `_fy`, `seasonal` (Boolean, thèmes de saison, vrai si absent — évolution 4b),
+`wellbeing` (Boolean, pauses proposées, faux si absent — évolution 4c).
 Valeur inconnue ou absente → défaut (`PetFields.read`).
 
 ### Ajouter une station (ex. : le lit)
