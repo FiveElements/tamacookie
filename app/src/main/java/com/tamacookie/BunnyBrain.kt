@@ -105,7 +105,8 @@ class BunnyBrain(private val rnd: Random) {
         // Sur une icône : redescendre, sauter sur une autre, ou rester perché
         if (s.platform != null) {
             if (r < 0.30f) return Decision.JumpDown((s.x + (rnd.nextFloat() * 2f - 1f) * 160 * d).coerceIn(s.minX, s.maxX))
-            if (r < 0.60f && s.energy > 20f) pickPlatform(s)?.let { return it }
+            // Sur une autre page, les icônes listées sont celles de la page affichée : pas de saut.
+            if (r < 0.60f && s.energy > 20f && !s.elsewhere) pickPlatform(s)?.let { return it }
             if (r < 0.75f) return Decision.TurnAround(2f + rnd.nextFloat() * 3f)
             return Decision.Idle(3f + rnd.nextFloat() * 5f)
         }
