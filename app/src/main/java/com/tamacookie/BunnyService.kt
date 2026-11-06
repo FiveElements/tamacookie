@@ -252,9 +252,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         behavior = PetBehavior(this, behaviorHooks)
         touch = TouchHandler(this, windows, this, stations, mischief)
         val entities = EntityWindows(this, windows, world, toys, stations,
-            forwardToPet = { s, ev ->
+            occupantTouch = { s ->
                 val view = stations.occupantOf(s)?.let { petWindows[it.id]?.view }
-                if (view != null) touch.forward(view, ev) else false
+                view?.let { v -> { ev -> touch.forward(v, ev) } }
             },
             // Lecteur d'écran : la station occupée « touchée » caresse son occupant
             caressOccupant = { s -> stations.occupantOf(s)?.let { touch.accessibility.caress(it); true } ?: false },
