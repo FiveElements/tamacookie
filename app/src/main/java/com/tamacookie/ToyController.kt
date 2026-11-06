@@ -245,7 +245,7 @@ class ToyController(private val ctx: PetCtx) {
         toyHeldByUser = false
         val spec = toy.spec
         val p = addProp(spec)
-        if (spec.randomTint) p.tint = Options.color(AccColor.entries[rnd.nextInt(AccColor.entries.size)])
+        if (spec.randomTint) p.tint = AccColor.entries[rnd.nextInt(AccColor.entries.size)].argb
         val fx = pet.body.fx; val fy = pet.body.fy; val facing = pet.body.facing
         val launch = spec.launch
         p.x = (fx + facing * 70 * d).coerceIn(arena.minX, arena.maxX)

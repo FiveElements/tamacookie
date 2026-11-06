@@ -64,4 +64,11 @@ class LookTest {
         assertEquals(Fur.SNOW, Look.byId(Fur.entries, "licorne", Fur.SNOW))
         assertEquals(Fur.SNOW, Look.byId(Fur.entries, null, Fur.SNOW))
     }
+
+    @Test
+    fun `couleur ARGB opaque calculee en Kotlin pur`() {
+        assertEquals(0xFFFF6F9C.toInt(), AccColor.PINK.argb)
+        assertEquals(0xFF3E363B.toInt(), Fur.LICORICE.argb)
+        assertEquals(0xFFFFFBF5.toInt(), Fur.SNOW.argb)
+    }
 }

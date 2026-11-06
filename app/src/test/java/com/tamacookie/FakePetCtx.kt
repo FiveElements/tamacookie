@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import android.content.SharedPreferences
 import com.tamacookie.feature.ActRegistry
 import kotlin.random.Random
 
@@ -19,7 +18,7 @@ class FakeClock(var uptime: Long = 1_000_000L, var wall: Long = 1_700_000_000_00
  * vibrations…). Les fenêtres passent par un [FakeOverlayHost]. [pet] est l'animal courant
  * ([World.current]), comme dans le service.
  */
-class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : PetCtx {
+class FakePetCtx(seed: Int = 42, override val prefs: FakeSettings = FakeSettings()) : PetCtx {
     override val world = World()
     override val arena = Arena().apply {
         d = 1f; bw = 120; bh = 140

@@ -119,7 +119,7 @@ class PageTrackerTest {
     @Test
     fun `largeur de page memorisee - envoyee au capteur, puis la largeur apprise est memorisee`() {
         val key = Prefs.pageWidth(1080)
-        ctx.prefs.edit().putFloat(key, 1000f).apply()
+        ctx.prefs.edit { putFloat(key, 1000f) }
         pages.refresh()
         assertEquals(1000f, ctx.screen.snapshot.pageW, 0f)
         ctx.screen.setPageWidth(1070f)                               // apprise par le service d'accessibilité
@@ -129,7 +129,7 @@ class PageTrackerTest {
 
     @Test
     fun `largeur memorisee invraisemblable ignoree, rotation - largeur oubliee`() {
-        ctx.prefs.edit().putFloat(Prefs.pageWidth(1080), 300f).apply()
+        ctx.prefs.edit { putFloat(Prefs.pageWidth(1080), 300f) }
         pages.refresh()
         assertEquals(0f, ctx.screen.snapshot.pageW, 0f)
         desktop()

@@ -1,13 +1,13 @@
 package com.tamacookie.widget
 
 import com.tamacookie.Mood
-import com.tamacookie.PetNotifier
+import com.tamacookie.NotifierTexts
 import com.tamacookie.PetStats
 
 /**
  * Textes du widget d'écran d'accueil (évolution 4c, Kotlin pur) : ce qu'affiche [PetWidget], calculé à partir
- * de ce que le repository a sauvegardé. Reprend les textes de la notification ([PetNotifier.moodText],
- * [PetNotifier.statusLine]).
+ * de ce que le repository a sauvegardé. Reprend les textes de la notification ([NotifierTexts.moodText],
+ * [NotifierTexts.statusLine]).
  */
 object WidgetTexts {
     /** Une jauge du widget : emoji, nom (lu par l'accessibilité), valeur 0..100. */
@@ -50,13 +50,13 @@ object WidgetTexts {
 
     /** Contenu pour l'animal [name] (jauges [s]) ; [running] : le service tourne (sinon il est « rangé »). */
     fun content(name: String, s: PetStats, running: Boolean): Content {
-        val mood = PetNotifier.moodText(s.mood, s.sleeping, hiding = false)
+        val mood = NotifierTexts.moodText(s.mood, s.sleeping, hiding = false)
             .replaceFirstChar { it.uppercaseChar() } + if (s.caged) " (en cage 🔒)" else ""
         return Content(
             title = "${moodEmoji(s.mood, s.sleeping)} $name",
             subtitle = mood,
             gauges = gauges(s),
-            statusLine = PetNotifier.statusLine(s.satiety, s.happiness, s.energy, s.cleanliness),
+            statusLine = NotifierTexts.statusLine(s.satiety, s.happiness, s.energy, s.cleanliness),
             status = if (running) "" else STOPPED,
         )
     }

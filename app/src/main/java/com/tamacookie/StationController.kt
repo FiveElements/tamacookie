@@ -1,7 +1,5 @@
 package com.tamacookie
 
-import android.content.SharedPreferences
-import android.view.HapticFeedbackConstants
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.station.StationBehavior
@@ -112,10 +110,10 @@ class StationController(
     }
 
     /** Placement par défaut : quatre par rangée (les quatre premières : la rangée d'origine). */
-    private fun savedCx(prefs: SharedPreferences, k: StationKind, i: Int): Float =
+    private fun savedCx(prefs: SettingsStore, k: StationKind, i: Int): Float =
         prefs.getFloat(Prefs.stationFx(k), -1f).let { if (it < 0) arena.screenW * (0.2f + 0.2f * (i % 4)) else it * arena.screenW }
 
-    private fun savedCy(prefs: SharedPreferences, k: StationKind, i: Int): Float =
+    private fun savedCy(prefs: SettingsStore, k: StationKind, i: Int): Float =
         prefs.getFloat(Prefs.stationFy(k), -1f).let {
             if (it < 0) arena.topY + (arena.groundY - arena.topY) * (0.32f + 0.3f * (i / 4)) else it * arena.groundY
         }
@@ -135,13 +133,14 @@ class StationController(
     }
 
     private fun saveAnchor(s: Station) {
-        ctx.prefs.edit().putString(Prefs.stationAnchor(s.kind), s.anchor).apply()
+        ctx.prefs.edit { putString(Prefs.stationAnchor(s.kind), s.anchor) }
     }
 
     private fun saveStationPos(s: Station) {
-        ctx.prefs.edit()
-            .putFloat(Prefs.stationFx(s.kind), s.cx / arena.screenW)
-            .putFloat(Prefs.stationFy(s.kind), s.cy / arena.groundY).apply()
+        ctx.prefs.edit {
+            putFloat(Prefs.stationFx(s.kind), s.cx / arena.screenW)
+            putFloat(Prefs.stationFy(s.kind), s.cy / arena.groundY)
+        }
     }
 
     fun anchoredHere(k: StationKind): Boolean {
@@ -224,7 +223,7 @@ class StationController(
             hoverStation = found
             found?.let {
                 setHighlight(get(it), true)
-                ctx.haptic(pet, HapticFeedbackConstants.KEYBOARD_TAP)
+                ctx.haptic(pet, Haptic.KEYBOARD_TAP)
             }
         }
     }
@@ -430,7 +429,7 @@ class StationController(
         val phys = pet.body.phys
         phys.vx = -phys.vx * 0.35f; phys.vy = max(phys.vy, 150 * d)
         phys.airLandY = null
-        ctx.haptic(pet, HapticFeedbackConstants.KEYBOARD_TAP)
+        ctx.haptic(pet, Haptic.KEYBOARD_TAP)
         pet.express(Expr.SURPRISED, 1f)
         if (ctx.world.hasToyOrFood()) {
             ctx.say(ctx.pick("Bonk ! 😵", "Aïe, le coffre !"), 1.5f)

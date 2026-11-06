@@ -409,7 +409,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             val sleeping = if (i >= Tuning.MAX_PETS_SHOWN) "  💤 dort hors écran" else ""
             row.addView(TextView(this).apply {
                 text = "${r.identity.name}  " + (if (r === resident) "🏠 résident" else "💞 compagnon") + sleeping + "\n" +
-                    PetNotifier.statusLine(st.satiety, st.happiness, st.energy, st.cleanliness) + "  🩺${st.health.toInt()}"
+                    NotifierTexts.statusLine(st.satiety, st.happiness, st.energy, st.cleanliness) + "  🩺${st.health.toInt()}"
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Color.parseColor("#3A2E39"))
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             if (r !== resident) row.addView(smallButton("Retirer") { confirmRemove(r.identity.id, r.identity.name) })

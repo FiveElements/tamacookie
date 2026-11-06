@@ -184,8 +184,8 @@ class DirectorTest {
         assertEquals("${a.name} se promène", dir.title { "se promène" })
         assertEquals("L", dir.statusLine { "L" })
         a.stats = a.stats.copy(satiety = 5f)
-        assertEquals(PetNotifier.alertText(a.name, a.stats.mood), dir.alerts { PetNotifier.alertText(it.name, it.stats.mood) })
-        assertNull(dir.alerts { PetNotifier.alertText(it.name, it.stats.mood) })   // même humeur : pas de nouvelle alerte
+        assertEquals(NotifierTexts.alertText(a.name, a.stats.mood), dir.alerts { NotifierTexts.alertText(it.name, it.stats.mood) })
+        assertNull(dir.alerts { NotifierTexts.alertText(it.name, it.stats.mood) })   // même humeur : pas de nouvelle alerte
     }
 
     @Test fun notifications_agregees() {
@@ -198,7 +198,7 @@ class DirectorTest {
         dir.alerts { null }                                       // humeurs de départ
         a.stats = a.stats.copy(satiety = 5f)
         b.stats = b.stats.copy(satiety = 5f)
-        val txt = dir.alerts { PetNotifier.alertText(it.name, it.stats.mood) }!!
+        val txt = dir.alerts { NotifierTexts.alertText(it.name, it.stats.mood) }!!
         assertTrue(txt, txt.contains(a.name) && txt.contains("Noisette") && " · " in txt)
     }
 }

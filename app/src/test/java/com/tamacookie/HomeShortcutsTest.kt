@@ -17,12 +17,12 @@ class HomeShortcutsTest {
         val c = WidgetTexts.content("Cookie", s, running = true)
         assertEquals("${WidgetTexts.moodEmoji(s.mood, s.sleeping)} Cookie", c.title)
         assertEquals(
-            PetNotifier.moodText(s.mood, s.sleeping, hiding = false).replaceFirstChar { it.uppercaseChar() },
+            NotifierTexts.moodText(s.mood, s.sleeping, hiding = false).replaceFirstChar { it.uppercaseChar() },
             c.subtitle,
         )
         assertEquals(listOf("🥕", "💖", "⚡", "🛁"), c.gauges.map { it.emoji })
         assertEquals(listOf(80, 90, 55, 70), c.gauges.map { it.value })
-        assertEquals(PetNotifier.statusLine(80.6f, 90f, 55.2f, 70f), c.statusLine)
+        assertEquals(NotifierTexts.statusLine(80.6f, 90f, 55.2f, 70f), c.statusLine)
         assertEquals("", c.status)
     }
 

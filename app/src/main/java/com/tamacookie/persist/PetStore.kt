@@ -20,7 +20,7 @@ data class PetRecord(
 }
 
 /**
- * Port de persistance des animaux. Seul [PetRepository] l'implémente : c'est la **seule** classe qui lit
+ * Port de persistance des animaux. Seul `PetRepository` (Android) l'implémente : c'est la **seule** classe qui lit
  * ou écrit l'état des animaux. Les lectures n'ont pas d'effet de bord (le rattrapage hors-ligne est un
  * `PetRules.apply(Elapsed)` explicite de l'appelant).
  */
@@ -51,4 +51,13 @@ interface PetStore {
     }
 
     fun remove(id: PetId)
+
+    companion object {
+        /** Un identifiant valide : pas de séparateur de liste ni de clé. */
+        fun isValidId(s: String) = s.isNotEmpty() && s.length <= 64 && s.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+
+        /** Valeur d'enum sauvegardée / reçue par son nom, ou [default] si inconnue (autre version, pair…). */
+        inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
+            enumValues<E>().firstOrNull { it.name == name } ?: default
+    }
 }

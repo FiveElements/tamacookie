@@ -130,7 +130,7 @@ data class PetSnapshot(
                 if (f.put(k, v) != null) return reject(Reason.DUPLICATE_FIELD)
             }
 
-            val id = f[ID]?.takeIf(PetRepository::isValidId) ?: return reject(Reason.BAD_ID)
+            val id = f[ID]?.takeIf(PetStore::isValidId) ?: return reject(Reason.BAD_ID)
             val species = f[SPECIES]?.takeIf { it in SPECIES_KNOWN } ?: return reject(Reason.UNKNOWN_SPECIES)
             val d = PetStats()
             val dl = Look()
@@ -150,8 +150,8 @@ data class PetSnapshot(
                     name = cleanName(f[NAME]),
                     bornAt = (f[BORN_AT]?.toLongOrNull() ?: 0L).coerceAtLeast(0L),
                     traits = Traits(
-                        personality = PetFields.enumOr(f[PERSONALITY], Personality.CUDDLY),
-                        favoriteToy = PetFields.enumOr(f[FAVORITE_TOY], Toy.BALL),
+                        personality = PetStore.enumOr(f[PERSONALITY], Personality.CUDDLY),
+                        favoriteToy = PetStore.enumOr(f[FAVORITE_TOY], Toy.BALL),
                     ),
                     look = Look(
                         fur = Look.byId(Fur.entries, f[FUR], dl.fur),

@@ -85,7 +85,7 @@ class PageTracker(private val ctx: PetCtx) {
             val pw = screen.pageW
             if (pw <= 0f || pw == savedPageW) return
             savedPageW = pw
-            ctx.prefs.edit().putFloat(key, savedPageW).apply()
+            ctx.prefs.edit { putFloat(key, savedPageW) }
         }
     }
 

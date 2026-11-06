@@ -3,6 +3,7 @@ package com.tamacookie.persist
 import android.content.Context
 import com.tamacookie.AndroidClock
 import com.tamacookie.Prefs
+import com.tamacookie.of
 
 /** Accès au [PetRepository] de l'application (un par processus ; migrations jouées à la première ouverture). */
 object Pets {

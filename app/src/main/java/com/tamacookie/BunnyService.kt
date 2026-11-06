@@ -235,7 +235,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         watcher = graph.foregroundWatcher()
         wm = getSystemService(WindowManager::class.java)
         overlayManager = OverlayManager(wm)
-        windows = OverlayWindows(this, arena, { prefs }, overlayManager, bubbleAnchor)
+        windows = OverlayWindows(this, arena, { sharedPrefs }, overlayManager, bubbleAnchor)
         pages = PageTracker(this)
         toys = ToyController(this)
         toys.registerActs(acts)
@@ -454,7 +454,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             // Envoyée par startForegroundService (widget, tuile) : le système attend startForeground à chaque fois
             tryStartForeground()
             // Démarré ainsi, le lapin doit revenir au redémarrage du téléphone, comme par l'écran principal
-            if (!prefs.getBoolean(Prefs.ENABLED, false)) prefs.edit().putBoolean(Prefs.ENABLED, true).apply()
+            if (!sharedPrefs.getBoolean(Prefs.ENABLED, false)) sharedPrefs.edit().putBoolean(Prefs.ENABLED, true).apply()
         }
         return speech.at(SpeechPriority.HIGH) { command(intent) }
     }
@@ -946,7 +946,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     // =====================================================================
     //  PetCtx : le reste de la façade (délégations vers les domaines)
     // =====================================================================
-    override val prefs: SharedPreferences get() = Prefs.of(this)
+    /** Réglages côté Android (dock, activation) ; le cœur les lit par [prefs]. */
+    private val sharedPrefs: SharedPreferences get() = Prefs.of(this)
+    override val prefs: SettingsStore by lazy { SharedPrefsSettings(sharedPrefs) }
 
     override fun save(pet: Pet) {
         repo.save(pet.toRecord())

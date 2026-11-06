@@ -26,30 +26,6 @@ class PetNotifier(
         private const val ALERT_ID = 2
         private const val CH_PET = "pet"
         private const val CH_ALERT = "alerts"
-
-        fun statusLine(satiety: Float, happiness: Float, energy: Float, cleanliness: Float): String =
-            "🥕${satiety.toInt()}  💖${happiness.toInt()}  ⚡${energy.toInt()}  🛁${cleanliness.toInt()}"
-
-        /** Fin du titre de la notification permanente (« Cookie <moodText> »). */
-        fun moodText(mood: Mood, sleeping: Boolean, hiding: Boolean): String =
-            if (hiding) "se cache… trouve-le sur une autre page ! 🫣" else when (mood) {
-                Mood.HAPPY -> "est aux anges"
-                Mood.OK -> "se promène"
-                Mood.HUNGRY -> "a faim"
-                Mood.SLEEPY -> if (sleeping) "dort" else "a sommeil"
-                Mood.DIRTY -> "a besoin d'un bain"
-                Mood.SAD -> "se sent seul"
-                Mood.SICK -> "est malade"
-            }
-
-        /** Texte d'alerte pour une humeur, ou null si cette humeur ne mérite pas d'alerte. */
-        fun alertText(name: String, mood: Mood): String? = when (mood) {
-            Mood.HUNGRY -> "$name a faim ! 🥕"
-            Mood.DIRTY -> "$name a besoin d'un bain 🫧"
-            Mood.SICK -> "$name est malade 🤒"
-            Mood.SAD -> "$name s'ennuie de toi 🥺"
-            else -> null
-        }
     }
 
     private var lastNotifText = ""
@@ -71,7 +47,7 @@ class PetNotifier(
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
     )
 
-    private fun statusLine(p: Pet): String = p.stats.let { statusLine(it.satiety, it.happiness, it.energy, it.cleanliness) }
+    private fun statusLine(p: Pet): String = p.stats.let { NotifierTexts.statusLine(it.satiety, it.happiness, it.energy, it.cleanliness) }
 
     fun build(): Notification {
         val open = PendingIntent.getActivity(
@@ -84,7 +60,7 @@ class PetNotifier(
         // Avant l'initialisation (permission manquante) : notification minimale
         val p = pet() ?: return b.setContentTitle("TamaCookie").build()
         val hidden = hidden()
-        val moodTxt = moodText(p.stats.mood, p.stats.sleeping, hiding())
+        val moodTxt = NotifierTexts.moodText(p.stats.mood, p.stats.sleeping, hiding())
         return b
             .setContentTitle(director().title { "$moodTxt" + (if (p.stats.caged) " (en cage 🔒)" else "") } + if (hidden) " (caché)" else "")
             .setContentText(director().statusLine(::statusLine))
@@ -106,7 +82,7 @@ class PetNotifier(
     /** Alerte quand l'humeur bascule vers un besoin (faim, saleté, maladie, ennui). */
     fun checkAlerts() {
         pet() ?: return
-        val txt = director().alerts { alertText(it.name, it.stats.mood) } ?: return
+        val txt = director().alerts { NotifierTexts.alertText(it.name, it.stats.mood) } ?: return
         val n = Notification.Builder(ctx, CH_ALERT)
             .setSmallIcon(R.drawable.ic_bunny)
             .setContentTitle(txt)

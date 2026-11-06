@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import android.content.SharedPreferences
 import com.tamacookie.feature.ActRegistry
 import kotlin.random.Random
 
@@ -21,7 +20,8 @@ interface PetCtx {
     val clock: Clock
     /** Aléatoire de l'animal courant ([Mind.rnd] : répliques, objets, décisions) — chaque animal a le sien. */
     val rnd: Random
-    val prefs: SharedPreferences
+    /** Réglages (port [SettingsStore] : SharedPreferences du fichier [Prefs.FILE] en jeu). */
+    val prefs: SettingsStore
     /** Vues / pages du bureau et défilement (où se trouve chaque chose). */
     val pages: PageTracker
     /** Ce que voit le service d'accessibilité : plateformes, clavier, pages du bureau, signaux de l'utilisateur. */

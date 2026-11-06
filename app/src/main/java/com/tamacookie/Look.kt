@@ -1,7 +1,5 @@
 package com.tamacookie
 
-import android.graphics.Color
-
 /**
  * Une option d'apparence. [id] est **sauvegardé** et échangé ([com.tamacookie.persist.PetSnapshot]) :
  * ne jamais le changer (le nom d'enum et le libellé peuvent changer, l'ordre aussi).
@@ -14,6 +12,8 @@ interface LookOption {
 /** Une option d'apparence qui est une couleur (`#RRGGBB`). */
 interface ColorOption : LookOption {
     val hex: String
+    /** La couleur en ARGB opaque (`0xFFRRGGBB`, comme `Color.parseColor(hex)`), calculée en Kotlin pur. */
+    val argb: Int get() = (0xFF000000L or hex.removePrefix("#").toLong(16)).toInt()
 }
 
 enum class Fur(override val id: String, override val label: String, override val hex: String) : ColorOption {
@@ -116,19 +116,4 @@ data class Look(
             accColor = AccColor.entries[accColor.coerceIn(0, AccColor.entries.lastIndex)],
         )
     }
-}
-
-object Options {
-    fun color(o: ColorOption) = Color.parseColor(o.hex)
-
-    fun isDark(color: Int): Boolean {
-        val l = 0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)
-        return l < 110
-    }
-
-    fun shade(color: Int, f: Float): Int = Color.rgb(
-        (Color.red(color) * f).toInt().coerceIn(0, 255),
-        (Color.green(color) * f).toInt().coerceIn(0, 255),
-        (Color.blue(color) * f).toInt().coerceIn(0, 255),
-    )
 }

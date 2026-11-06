@@ -83,21 +83,21 @@ class SpeechTest {
     // --- PetNotifier (textes purs) ---
 
     @Test fun statusLine_tronqueLesJauges() {
-        assertEquals("🥕12  💖99  ⚡0  🛁50", PetNotifier.statusLine(12.9f, 99.99f, 0.4f, 50f))
+        assertEquals("🥕12  💖99  ⚡0  🛁50", NotifierTexts.statusLine(12.9f, 99.99f, 0.4f, 50f))
     }
 
     @Test fun moodText_cacheEtSommeil() {
-        assertEquals("se cache… trouve-le sur une autre page ! 🫣", PetNotifier.moodText(Mood.SICK, false, hiding = true))
-        assertEquals("dort", PetNotifier.moodText(Mood.SLEEPY, sleeping = true, hiding = false))
-        assertEquals("a sommeil", PetNotifier.moodText(Mood.SLEEPY, sleeping = false, hiding = false))
+        assertEquals("se cache… trouve-le sur une autre page ! 🫣", NotifierTexts.moodText(Mood.SICK, false, hiding = true))
+        assertEquals("dort", NotifierTexts.moodText(Mood.SLEEPY, sleeping = true, hiding = false))
+        assertEquals("a sommeil", NotifierTexts.moodText(Mood.SLEEPY, sleeping = false, hiding = false))
     }
 
     @Test fun alertText_seulementPourLesBesoins() {
-        assertEquals("Cookie a faim ! 🥕", PetNotifier.alertText("Cookie", Mood.HUNGRY))
-        assertEquals("Cookie s'ennuie de toi 🥺", PetNotifier.alertText("Cookie", Mood.SAD))
-        assertNull(PetNotifier.alertText("Cookie", Mood.HAPPY))
-        assertNull(PetNotifier.alertText("Cookie", Mood.OK))
-        assertNull(PetNotifier.alertText("Cookie", Mood.SLEEPY))
+        assertEquals("Cookie a faim ! 🥕", NotifierTexts.alertText("Cookie", Mood.HUNGRY))
+        assertEquals("Cookie s'ennuie de toi 🥺", NotifierTexts.alertText("Cookie", Mood.SAD))
+        assertNull(NotifierTexts.alertText("Cookie", Mood.HAPPY))
+        assertNull(NotifierTexts.alertText("Cookie", Mood.OK))
+        assertNull(NotifierTexts.alertText("Cookie", Mood.SLEEPY))
     }
 
     // --- Palette : mêmes valeurs que les anciens Color.parseColor / Color.argb ---

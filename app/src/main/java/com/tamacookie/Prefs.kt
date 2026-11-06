@@ -1,12 +1,10 @@
 package com.tamacookie
 
 import com.tamacookie.feature.station.StationKind
-import android.content.Context
-import android.content.SharedPreferences
 
 /**
  * Fichiers et clés SharedPreferences des **réglages**, centralisés. Les animaux sont dans un fichier à part
- * ([PETS_FILE]), lu et écrit seulement par [com.tamacookie.persist.PetRepository].
+ * ([PETS_FILE]), lu et écrit seulement par `PetRepository`. Lus par le cœur via le port [SettingsStore] ; côté Android : `Prefs.of(context)`.
  */
 object Prefs {
     /** Réglages (nom historique : il contenait aussi l'animal jusqu'au schéma 0). */
@@ -36,6 +34,4 @@ object Prefs {
     /** Centre d'une station en fraction de la largeur / de groundY. */
     fun stationFx(k: StationKind) = "st_${k}_fx"
     fun stationFy(k: StationKind) = "st_${k}_fy"
-
-    fun of(ctx: Context): SharedPreferences = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 }

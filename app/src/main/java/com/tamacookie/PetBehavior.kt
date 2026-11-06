@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import android.view.HapticFeedbackConstants
 import com.tamacookie.feature.Travel
 import kotlin.math.abs
 import kotlin.math.sign
@@ -195,7 +194,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
         if (b.phys.facing != 0f) b.facing = b.phys.facing
         when (ev) {
             AirEvent.ForcedLanded -> p.setAct(b.afterAir, 3f)
-            AirEvent.Bounced -> ctx.haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
+            AirEvent.Bounced -> ctx.haptic(p, Haptic.KEYBOARD_TAP)
             is AirEvent.Landed -> onLanded(p, ev, set)
             AirEvent.Flying, AirEvent.HitWall -> {}
         }
@@ -209,7 +208,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
             b.platform = set.boxes[ev.platform]
             b.platformLabel = set.items.getOrNull(ev.platform)?.label
             b.platVersionSeen = set.version
-            ctx.haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
+            ctx.haptic(p, Haptic.KEYBOARD_TAP)
         }
         if (ev.hard) {
             if (ev.onPlatform) speech.sayOneOf(lines.HARD_LANDING_PLATFORM)
