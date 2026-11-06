@@ -9,18 +9,25 @@ on:
         description: "Version à publier (ex. 1.2.0) — crée le tag v<version>"
         required: true
 
-permissions:
-  contents: write
+# Aucun droit par défaut : chaque job déclare le strict nécessaire.
+permissions: {}
 
 jobs:
-  release:
-    name: release
+  # Construit, teste, signe et vérifie l'APK — lecture seule sur le dépôt.
+  build:
+    name: build
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # Les valeurs fournies par l'utilisateur passent par env: (jamais interpolées dans le script)
       - name: Version
@@ -53,7 +60,10 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Cache en lecture seule : une release ne doit pas alimenter le cache partagé.
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: true
 
       - name: Tests unitaires
         run: ./gradlew --no-daemon testDebugUnitTest
@@ -113,11 +123,40 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "dist/tamacookie-$VERSION_NAME.apk"
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
 
+      - name: Artefact release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Publie la release — seul job avec le droit d'écriture, sans checkout ni secret de signature.
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Récupérer l'artefact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-dist
+          path: dist
+
+      # Le fichier publié doit être exactement celui qui a été vérifié dans le job build.
+      - name: Contrôler les empreintes
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+
       - name: Publication GitHub
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: TamaCookie ${{ steps.version.outputs.name }}
+          tag_name: ${{ needs.build.outputs.tag }}
+          name: TamaCookie ${{ needs.build.outputs.name }}
           target_commitish: ${{ github.sha }}
           generate_release_notes: true
           files: |
