@@ -170,10 +170,8 @@ class StationController(
             ctx.setBunnyAway(true)
         } else if (vis && ctx.bunnyAway) {
             positionInStation(p, k)
-            // le lapin doit rester SOUS la station
-            overlay.detach(st.windowId)
+            // le lapin reste SOUS la station : ordre des couches garanti par l'OverlayHost (WindowLayer)
             ctx.setBunnyAway(false)
-            overlay.attach(st.windowId, st.x, st.y)
             k.behavior.onShownAgain(sctx, p, onScreen = off == 0f)
         }
         pages.split(st.anchor ?: "").second?.let { pages.bunnyPage = it }

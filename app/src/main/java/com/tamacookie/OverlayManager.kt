@@ -65,6 +65,10 @@ class OverlayManager(private val wm: WindowManager) : WindowTable<Win>(Backend(w
             }
         }
 
+        /** Taille affichée (ou demandée, avant la première mise en page) ; ≤ 0 si encore inconnue. */
+        override fun width(w: Win): Int = if (w.view.width > 0) w.view.width else w.lp.width
+        override fun height(w: Win): Int = if (w.view.height > 0) w.view.height else w.lp.height
+
         override fun redraw(w: Win) {
             val v = w.view
             if (v is Refreshable) v.refresh() else v.invalidate()

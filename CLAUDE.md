@@ -375,6 +375,16 @@ Principes :
   `FrameScheduler` = Choreographer + Handler) et `AmbientAnimator.frame` décide du redessin ; `FrameLoopTest`
   simule les images (faux Choreographer à horloge virtuelle) : un animal visible qui dort reçoit ≈ 12 i/s, chaque
   image redessine, le temps avance, des Zzz apparaissent ; idem IDLE / SIT / EAT / tenu.
+- **Ordre des fenêtres** (bug : la station coffre, rajoutée à un changement de page, recouvrait le panneau 🏠) :
+  `WindowLayer` (`OverlayHost.kt`) **PET < STATION < PROP < DOCK < BUBBLE < PANEL < MENU**, porté par
+  `WindowId.layer`. L'animal est sous les stations (rebord de la baignoire, barreaux de la cage : `Seat` le fait
+  asseoir dedans), comme à l'origine où il était ajouté avant elles — l'écart avec un ordre STATION < PET est
+  voulu. `WindowTable` tient l'empilement réel (`stacking`) et, après chaque ajout, `relayout` ou `flush` ayant
+  déplacé une fenêtre, **retire puis rajoute** toute fenêtre d'une couche supérieure qui se retrouve sous une
+  fenêtre d'une couche inférieure **qu'elle chevauche** (`WindowBackend.width/height`, inconnue = chevauche) ;
+  les autres ne bougent pas (pas de clignotement du dock à chaque station qui apparaît). Statistique : `restacks`.
+  Le détacher / rattacher de la cage dans `followHolder` a disparu (garanti par les couches).
+  Tests : `WindowLayerTest` (faux WindowManager qui empile dans l'ordre d'ajout, 50 ordres d'ajout aléatoires).
 
 #### Schéma de persistance v1
 

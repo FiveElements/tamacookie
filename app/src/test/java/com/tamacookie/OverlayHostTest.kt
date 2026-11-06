@@ -95,13 +95,14 @@ class OverlayHostTest {
     @Test fun `detachAll retire tout, et chaque fenetre peut revenir`() {
         host.attach(petA, 0, 0); host.attach(WindowId.Dock, 0, 0); host.attach(WindowId.Station(StationKind.VET), 0, 0)
         host.move(WindowId.Dock, 9, 9)
+        val before = be.count("remove")          // le dock est repassé au-dessus de la station (WindowLayer)
         host.detachAll()
         host.flush()
-        assertEquals(3, be.count("remove"))
+        assertEquals(before + 3, be.count("remove"))
         assertEquals(0, be.count("move"))
         assertTrue(be.shown.isEmpty())
         host.detachAll()
-        assertEquals(3, be.count("remove"))
+        assertEquals(before + 3, be.count("remove"))
         host.attach(WindowId.Dock, 2, 2)
         assertTrue(host.isAttached(WindowId.Dock))
     }
