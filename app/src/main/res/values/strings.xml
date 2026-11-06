@@ -56,6 +56,11 @@
     <string name="main_wellbeing_off">Pauses proposées : désactivées</string>
     <string name="main_wellbeing_desc">Après %1$d min dans la même app, il bâille et propose une pause ; après %2$d min, il boude jusqu\'à ce que tu changes d\'app ou le caresses</string>
 
+    <string name="main_adskip_title">Chasseur de pubs</string>
+    <string name="main_adskip_on">🐾 Chasseur de pubs : activé</string>
+    <string name="main_adskip_off">Chasseur de pubs : désactivé</string>
+    <string name="main_adskip_desc">Quand le bouton « Ignorer l\'annonce » d\'une publicité apparaît, il saute dessus pour la passer. Il n\'appuie sur rien d\'autre (nécessite l\'accessibilité)</string>
+
     <string name="main_perms_title">Autorisations</string>
     <string name="main_perm_granted">"✅  %1$s"</string>
     <string name="main_perm_missing">"⚠️  %1$s — %2$s (toucher pour autoriser)"</string>
@@ -69,7 +74,7 @@
     <string name="main_perm_a11y_why">optionnel</string>
     <string name="main_a11y_help">Paramètres › Accessibilité › « Applications installées » (Samsung) ou « Applications téléchargées » (Pixel) › TamaCookie. Si c\'est grisé (« paramètre restreint ») : touche ici, puis ⋮ › « Autoriser les paramètres restreints », et réessaie.</string>
     <string name="main_a11y_dialog_title">Autoriser l\'accessibilité ?</string>
-    <string name="main_a11y_dialog_message">TamaCookie utilise l\'API d\'accessibilité d\'Android uniquement pour le jeu :\n\n• Ce qui est lu : la position des icônes et boutons affichés, leur nom court (ex. « Chrome »), l\'app au premier plan et le numéro de page du bureau ; le fait que tu touches un bouton, fasses défiler ou tapes au clavier.\n• Ce qui n\'est JAMAIS lu : le texte que tu tapes, le contenu des champs de saisie et des mots de passe.\n• Pourquoi : pour que le lapin saute sur les icônes, te suive d\'app en app, joue à cache-cache sur le bureau et fasse ses bêtises.\n• Rien n\'est enregistré ni envoyé : tout reste en mémoire sur ton téléphone (l\'app n\'a pas accès à Internet).\n\nTu peux le désactiver à tout moment dans Paramètres › Accessibilité.</string>
+    <string name="main_a11y_dialog_message">TamaCookie utilise l\'API d\'accessibilité d\'Android uniquement pour le jeu :\n\n• Ce qui est lu : la position des icônes et boutons affichés, leur nom court (ex. « Chrome »), l\'app au premier plan et le numéro de page du bureau ; le fait que tu touches un bouton, fasses défiler ou tapes au clavier.\n• Ce qui est fait : si le chasseur de pubs est activé, appuyer sur le bouton « Ignorer l\'annonce » d\'une publicité quand il saute dessus — rien d\'autre, jamais.\n• Ce qui n\'est JAMAIS lu : le texte que tu tapes, le contenu des champs de saisie et des mots de passe.\n• Pourquoi : pour que le lapin saute sur les icônes, te suive d\'app en app, joue à cache-cache sur le bureau et fasse ses bêtises.\n• Rien n\'est enregistré ni envoyé : tout reste en mémoire sur ton téléphone (l\'app n\'a pas accès à Internet).\n\nTu peux le désactiver à tout moment dans Paramètres › Accessibilité.</string>
     <string name="main_a11y_dialog_accept">J\'accepte</string>
     <string name="main_a11y_dialog_decline">Non merci</string>
 
@@ -206,7 +211,7 @@
     <!-- Service d'accessibilité (manifeste, accessibility_config.xml) -->
     <string name="a11y_label">TamaCookie – sauter sur les icônes</string>
     <string name="a11y_summary">Permet à Cookie de sauter sur les icônes et les boutons</string>
-    <string name="a11y_description">TamaCookie lit la position des éléments affichés (icônes, boutons) pour que le lapin puisse sauter dessus, ainsi que le nom court des icônes et boutons (par ex. « Chrome ») et le numéro de page du bureau. Il remarque aussi quand tu touches un bouton, fais défiler ou tapes au clavier, sans jamais lire le texte que tu saisis ni le contenu des champs de saisie ou des mots de passe. Tout reste sur le téléphone, en mémoire : rien n\'est enregistré ni envoyé.</string>
+    <string name="a11y_description">TamaCookie lit la position des éléments affichés (icônes, boutons) pour que le lapin puisse sauter dessus, ainsi que le nom court des icônes et boutons (par ex. « Chrome ») et le numéro de page du bureau. Il remarque aussi quand tu touches un bouton, fais défiler ou tapes au clavier, sans jamais lire le texte que tu saisis ni le contenu des champs de saisie ou des mots de passe. Si le réglage « Chasseur de pubs » est activé, il peut aussi appuyer sur le bouton « Ignorer l\'annonce » ou « Passer l\'annonce » d\'une publicité (par ex. sur YouTube), et sur rien d\'autre. Tout reste sur le téléphone, en mémoire : rien n\'est enregistré ni envoyé.</string>
 
     <!-- Widget (PetWidget ; le reste de ses textes : WidgetTexts, dans le cœur) -->
     <string name="widget_description">Cookie sur ton écran d\'accueil : humeur, jauges, nourrir et appeler</string>

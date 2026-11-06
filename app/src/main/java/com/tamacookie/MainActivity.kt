@@ -215,6 +215,34 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintWellbeing()
 
+        // Chasseur de pubs : il saute sur le bouton « Ignorer l'annonce » d'une publicité (et rien d'autre)
+        section(root, R.string.main_adskip_title)
+        val adChip = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Palette.INK)
+            val p = (10 * d).toInt(); setPadding(p, p, p, p)
+            touchTarget(d)
+        }
+        fun paintAdSkip() {
+            val on = prefs.getBoolean(Prefs.AD_SKIP, Prefs.AD_SKIP_DEFAULT)
+            adChip.setText(if (on) R.string.main_adskip_on else R.string.main_adskip_off)
+            adChip.describePlain(adChip.text)
+            adChip.background = chipBg(on)
+        }
+        adChip.setOnClickListener {
+            val on = prefs.getBoolean(Prefs.AD_SKIP, Prefs.AD_SKIP_DEFAULT)
+            prefs.edit().putBoolean(Prefs.AD_SKIP, !on).apply()
+            BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
+            paintAdSkip()
+        }
+        root.addView(adChip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(TextView(this).apply {
+            setText(R.string.main_adskip_desc)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Palette.UI_MUTED)
+            setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        paintAdSkip()
+
 
         section(root, R.string.main_perms_title)
         overlayBtn = permButton(root) {
