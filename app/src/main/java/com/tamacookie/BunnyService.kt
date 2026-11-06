@@ -1072,11 +1072,6 @@ class BunnyService : Service(), Choreographer.FrameCallback {
 
     private fun onMenuAction(a: PetMenu.Action) {
         when (a) {
-            PetMenu.Action.FEED -> { closeMenu(); toys.feed() }
-            PetMenu.Action.PLAY_BALL -> { closeMenu(); toys.startPlay(Toy.BALL) }
-            PetMenu.Action.PLAY_BALLOON -> { closeMenu(); toys.startPlay(Toy.BALLOON) }
-            PetMenu.Action.PLAY_FRISBEE -> { closeMenu(); toys.startPlay(Toy.FRISBEE) }
-            PetMenu.Action.PLAY_PLUSH -> { closeMenu(); toys.startPlay(Toy.PLUSH) }
             PetMenu.Action.STATIONS -> { closeMenu(); stations.toggleStationsPanel() }
             PetMenu.Action.HIDE_SEEK -> { closeMenu(); mischief.startHideSeek(fromMenu = true) }
             PetMenu.Action.SLEEP -> {

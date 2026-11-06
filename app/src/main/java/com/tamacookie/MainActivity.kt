@@ -177,7 +177,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         root.addView(TextView(this).apply {
             text = """
                 👆  Touche-le pour le caresser
-                👆👆  Double-touche ou appui long : menu (nourrir, jouer, dodo…)
+                👆👆  Double-touche ou appui long : menu (dodo, objets, cache-cache…)
                 ✋  Fais-le glisser pour l'attraper… et lance-le !
                 🎾  4 jouets : balle, ballon, frisbee, doudou (tu peux les lancer aussi)
                 🏠  Bouton flottant 🏠 : installe la baignoire, le véto, la cage — chacun sur la page de ton choix

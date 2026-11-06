@@ -98,7 +98,7 @@ open class Panel(context: Context) : LinearLayout(context) {
 }
 
 /**
- * Menu rapide (double-touche / appui long sur le lapin) : nourrir, jouer, dodo…
+ * Menu rapide (double-touche / appui long sur le lapin) : dodo, objets, cache-cache, ranger.
  * Les soins se font dans les "widgets" flottants : baignoire, véto, cage.
  */
 @SuppressLint("ViewConstructor", "SetTextI18n")
@@ -108,16 +108,9 @@ class PetMenu(
     private val onAction: (Action) -> Unit,
 ) : Panel(context) {
 
-    enum class Action { FEED, PLAY_BALL, PLAY_BALLOON, PLAY_FRISBEE, PLAY_PLUSH, SLEEP, STATIONS, HIDE_SEEK, HIDE, CLOSE }
-
-    companion object {
-        fun actionFor(t: Toy) = when (t) {
-            Toy.BALL -> Action.PLAY_BALL
-            Toy.BALLOON -> Action.PLAY_BALLOON
-            Toy.FRISBEE -> Action.PLAY_FRISBEE
-            Toy.PLUSH -> Action.PLAY_PLUSH
-        }
-    }
+    // Manger, jouer, se laver, voir sa santé : ça passe par les objets posés à l'écran
+    // (coffre, baignoire, véto, cage), pas par ce menu.
+    enum class Action { SLEEP, STATIONS, HIDE_SEEK, HIDE, CLOSE }
 
     private val title = TextView(context)
     private val moodText = small()
@@ -129,27 +122,14 @@ class PetMenu(
         addView(moodText)
 
         val row1 = row(); val row2 = row()
-        val toyRow = row().apply { visibility = GONE }
-        for (t in Toy.values()) {
-            val star = if (t == pet.favoriteToy) "⭐" else ""
-            toyRow.addView(button(t.emoji, t.label + star) { onAction(actionFor(t)) }, btnLp())
-        }
-        toyRow.addView(button("↩", "Retour") {
-            toyRow.visibility = GONE; row1.visibility = VISIBLE; row2.visibility = VISIBLE
-        }, btnLp())
-        row1.addView(button("🥕", "Nourrir") { onAction(Action.FEED) }, btnLp())
-        row1.addView(button("🎾", "Jouer") {
-            row1.visibility = GONE; row2.visibility = GONE; toyRow.visibility = VISIBLE
-        }, btnLp())
         sleepBtn = button("💤", "Dodo") { onAction(Action.SLEEP) }
         row1.addView(sleepBtn, btnLp())
-        row2.addView(button("🏠", "Bain/Véto/Cage") { onAction(Action.STATIONS) }, btnLp())
+        row1.addView(button("🏠", "Objets") { onAction(Action.STATIONS) }, btnLp())
         row2.addView(button("🫣", "Cache-cache") { onAction(Action.HIDE_SEEK) }, btnLp())
         row2.addView(button("🙈", "Ranger") { onAction(Action.HIDE) }, btnLp())
         addView(row1, rowLp(6))
         addView(row2, rowLp())
-        addView(toyRow, rowLp(6))
-        addView(small("💡 Glisse ${pet.name} dans la baignoire pour le laver, chez le véto pour voir sa santé.").apply {
+        addView(small("💡 Touche le coffre pour lui donner à manger ou un jouet. Glisse ${pet.name} dans la baignoire pour le laver, chez le véto pour voir sa santé.").apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f); setPadding(0, (6 * d).toInt(), 0, 0)
         })
         refresh()
