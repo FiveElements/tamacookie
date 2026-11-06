@@ -89,26 +89,26 @@ data class BrainInput(
 data class Neighbor(val id: PetId, val act: Act, val distance: Float)
 
 /** Ce que le lapin décide de faire ensuite ; le service l'exécute. */
-sealed class Decision {
-    object Sleep : Decision()
+sealed interface Decision {
+    object Sleep : Decision
     /** Il a fait une bêtise pour attirer l'attention (déjà exécutée par le rappel). */
-    object AttentionSought : Decision()
-    object GoToChest : Decision()
+    object AttentionSought : Decision
+    object GoToChest : Decision
     /** Il va à la gamelle ([BrainInput.bowlAvailable]). */
-    object GoToBowl : Decision()
-    object PageWander : Decision()
+    object GoToBowl : Decision
+    object PageWander : Decision
     /** Il va vers [other] (une interaction sociale : suivre, câlin…). */
-    data class Socialize(val other: Neighbor) : Decision()
+    data class Socialize(val other: Neighbor) : Decision
     /** Redescend de son icône vers le sol en [targetX]. */
-    data class JumpDown(val targetX: Float) : Decision()
+    data class JumpDown(val targetX: Float) : Decision
     /** Saute sur l'icône [index] de [BrainInput.platforms]. */
-    data class JumpToPlatform(val index: Int, val target: Box) : Decision()
+    data class JumpToPlatform(val index: Int, val target: Box) : Decision
     /** Se retourne puis reste tranquille [idleSeconds] s. */
-    data class TurnAround(val idleSeconds: Float) : Decision()
-    data class Idle(val seconds: Float) : Decision()
-    data class Walk(val targetX: Float) : Decision()
+    data class TurnAround(val idleSeconds: Float) : Decision
+    data class Idle(val seconds: Float) : Decision
+    data class Walk(val targetX: Float) : Decision
     /** Petit saut sur place avec cette vitesse initiale (px/s). */
-    data class Hop(val vy: Float, val vx: Float) : Decision()
+    data class Hop(val vy: Float, val vx: Float) : Decision
 }
 
 /**

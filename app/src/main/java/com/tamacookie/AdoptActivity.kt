@@ -185,7 +185,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             root.addView(asComp,
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (10 * d).toInt() })
             root.addView(TextView(this).apply {
-                text = getString(R.string.adopt_replace_hint, pet?.identity?.name ?: getString(R.string.adopt_your_pet))
+                text = getString(R.string.adopt_replace_hint, pet.identity.name)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Palette.UI_MUTED)
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (6 * d).toInt() })

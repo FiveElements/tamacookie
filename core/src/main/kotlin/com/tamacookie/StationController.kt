@@ -55,7 +55,8 @@ class StationController(
     private val pet: Pet get() = ctx.pet
     private val overlay get() = ctx.overlay
 
-    operator fun get(k: StationKind): Station = stations[k]!!
+    /** Toutes les stations existent après [create] (une par [StationKind]). */
+    operator fun get(k: StationKind): Station = stations.getValue(k)
 
     /** Ce que reçoivent les comportements de station : la façade, plus la sortie et les panneaux. */
     private val sctx: StationCtx = object : StationCtx, PetCtx by ctx {

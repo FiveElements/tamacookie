@@ -16,6 +16,9 @@ import kotlin.math.sign
  * l'évolution 4b) : les tirages existants ne changent pas. Ne met pas les bêtises en pause.
  */
 object StartleMischief : Mischief {
+    /** Il sursaute. */
+    val STARTLED = arrayOf("Hiii ! 🙈", "Tu m'as fait peur ! 😳", "Oh ! 😱")
+
     /** Distance (dp) du doigt en deçà de laquelle il peut sursauter. */
     const val RANGE_DP = 140f
 
@@ -31,7 +34,7 @@ object StartleMischief : Mischief {
         pet.body.facing = -away                       // il regarde le doigt en reculant
         ctx.actor.jump(pet, -520f * d, away * 140f * d, then = Act.IDLE)
         pet.express(Expr.SURPRISED, 1.6f)
-        ctx.say(ctx.pick("Hiii ! 🙈", "Tu m'as fait peur ! 😳", "Oh ! 😱"), 2f)
+        ctx.say(ctx.pick(*STARTLED), 2f)
         return true
     }
 }
