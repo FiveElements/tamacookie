@@ -97,7 +97,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
         // Niveau de bêtises
         section(root, "Bêtises")
-        val prefs = getSharedPreferences("pet", MODE_PRIVATE)
+        val prefs = Prefs.of(this)
         val levels = listOf(
             "😇 Sage" to "Il réclame de l'attention, sans plus",
             "😜 Taquin" to "Frappe à l'écran, s'assoit parfois sur un bouton",
@@ -110,7 +110,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
         val levelChips = ArrayList<TextView>()
         fun paintLevels() {
-            val cur = prefs.getInt("mischief", 1)
+            val cur = prefs.getInt(Prefs.MISCHIEF, 1)
             levelChips.forEachIndexed { i, c -> c.background = chipBg(i == cur) }
             levelDesc.text = levels[cur].second + if (cur > 0) " (bouton/clavier : nécessite l'accessibilité)" else ""
         }
@@ -120,7 +120,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
                 val p = (10 * d).toInt(); setPadding(p, p, p, p)
                 setOnClickListener {
-                    prefs.edit().putInt("mischief", i).apply()
+                    prefs.edit().putInt(Prefs.MISCHIEF, i).apply()
                     BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
                     paintLevels()
                 }
@@ -316,7 +316,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private fun rename() {
         val n = nameEdit.text.toString().trim().take(16)
         if (n.isEmpty()) return
-        getSharedPreferences("pet", MODE_PRIVATE).edit().putString("name", n).apply()
+        Prefs.of(this).edit().putString(Prefs.NAME, n).apply()
         BunnyService.send(this, BunnyService.ACTION_RELOAD)
         refresh()
     }

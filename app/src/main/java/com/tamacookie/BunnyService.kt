@@ -237,7 +237,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
 
         registerReceiver(screenReceiver, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT); addAction(Intent.ACTION_SCREEN_ON)
-        })
+        }, Context.RECEIVER_NOT_EXPORTED)
 
         startLoop()
         handler.postDelayed(appPoll, 2000)
@@ -318,7 +318,7 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             when (i.action) {
-                Intent.ACTION_SCREEN_OFF -> { awake = false; stopLoop(); pet.save() }
+                Intent.ACTION_SCREEN_OFF -> { awake = false; stopLoop(); handler.removeCallbacks(appPoll); pet.save() }
                 // Écran allumé mais verrouillé : rien à animer derrière l'écran de verrouillage
                 Intent.ACTION_SCREEN_ON -> if (!isLocked()) wakeUp(greet = false)
                 Intent.ACTION_USER_PRESENT -> wakeUp(greet = true)
@@ -332,6 +332,9 @@ class BunnyService : Service(), Choreographer.FrameCallback {
     private fun wakeUp(greet: Boolean) {
         if (awake) return
         awake = true
+        // Écran rallumé (et déverrouillé) : on reprend le suivi de l'app au premier plan
+        handler.removeCallbacks(appPoll)
+        handler.postDelayed(appPoll, 1500)
         tickStats(force = true)
         if (!hidden) startLoop()
         if (greet && !pet.sleeping) say(pick("Te revoilà ! 💕", "Coucou toi !", "Tu m'as manqué !"))

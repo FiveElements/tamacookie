@@ -154,8 +154,11 @@ class PetState(private val context: Context) {
     private fun Float.clamp() = max(0f, min(100f, this))
 
     fun save() {
+        val p = prefs()
+        // Un autre lapin est né depuis (adoption) : cet état est périmé, on ne l'écrit pas par-dessus
+        if (p.contains("bornAt") && p.getLong("bornAt", bornAt) != bornAt) return
         lastUpdate = System.currentTimeMillis()
-        prefs().edit()
+        p.edit()
             .putString("name", name)
             .putFloat("satiety", satiety).putFloat("happiness", happiness)
             .putFloat("energy", energy).putFloat("cleanliness", cleanliness)
@@ -220,13 +223,24 @@ class PetState(private val context: Context) {
 
     /** Nouveau lapin : jauges remises à zéro (l'apparence est sauvegardée à part). */
     fun reset() {
-        val enabled = prefs().getBoolean(Prefs.ENABLED, false)
-        prefs().edit().clear().putBoolean(Prefs.ENABLED, enabled).apply()
+        // Seules les clés du lapin sont effacées : réglages (bêtises, dock, stations, pages…) conservés
+        prefs().edit().apply { PET_KEYS.forEach { remove(it) } }.apply()
         satiety = 80f; happiness = 80f; energy = 90f; cleanliness = 90f; health = 100f
         sleeping = false; poops = 0; poopAccumulator = 0f; visitedApps = 0; caged = false
-        bornAt = System.currentTimeMillis()
+        // Nouvelle "génération" : une instance de l'ancien lapin ne pourra plus sauvegarder (cf. save)
+        bornAt = maxOf(System.currentTimeMillis(), bornAt + 1)
         save()
         saveLook()
+    }
+
+    companion object {
+        /** Clés propres au lapin (écrites par [save] et [saveLook]), effacées par [reset]. */
+        val PET_KEYS = listOf(
+            "name", "satiety", "happiness", "energy", "cleanliness", "health", "sleeping",
+            "poops", "poopAcc", "bornAt", "lastUpdate", "visitedApps", "caged",
+            "adopted", "look_fur", "look_ears", "look_eyes", "look_pattern", "look_acc", "look_accColor",
+            "personality", "favoriteToy",
+        )
     }
 
     private fun prefs() = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)

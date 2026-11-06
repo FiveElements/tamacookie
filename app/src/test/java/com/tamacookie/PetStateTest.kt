@@ -173,4 +173,70 @@ class PetStateTest {
         assertEquals(true, prefs.map["enabled"])
         assertEquals(80f, pet.satiety, eps)
     }
+
+    @Test
+    fun `nouveau lapin conserve les reglages et efface les cles du lapin`() {
+        val prefs = FakePrefs()
+        prefs.edit()
+            .putInt(Prefs.MISCHIEF, 2)
+            .putFloat(Prefs.DOCK_FX, 0.3f).putFloat(Prefs.DOCK_FY, 0.7f)
+            .putString(Prefs.stationAnchor(StationKind.CAGE), "home#p1")
+            .putFloat(Prefs.stationFx(StationKind.CAGE), 0.4f).putFloat(Prefs.stationFy(StationKind.CAGE), 0.9f)
+            .putFloat(Prefs.pageWidth(1080), 1234f)
+            // clés de l'ancien lapin
+            .putFloat("satiety", 3f).putInt("poops", 4).putBoolean("caged", true).putFloat("poopAcc", 0.9f)
+            .putInt("visitedApps", 12).putLong("bornAt", 1L).putLong("lastUpdate", 1L)
+            .apply()
+        newPet(prefs).load().reset()
+
+        // Réglages conservés
+        assertEquals(2, prefs.map[Prefs.MISCHIEF])
+        assertEquals(0.3f, prefs.map[Prefs.DOCK_FX])
+        assertEquals(0.7f, prefs.map[Prefs.DOCK_FY])
+        assertEquals("home#p1", prefs.map[Prefs.stationAnchor(StationKind.CAGE)])
+        assertEquals(0.4f, prefs.map[Prefs.stationFx(StationKind.CAGE)])
+        assertEquals(0.9f, prefs.map[Prefs.stationFy(StationKind.CAGE)])
+        assertEquals(1234f, prefs.map[Prefs.pageWidth(1080)])
+        // Clés du lapin remises à neuf
+        assertEquals(80f, prefs.map["satiety"])
+        assertEquals(0, prefs.map["poops"])
+        assertEquals(false, prefs.map["caged"])
+        assertEquals(0f, prefs.map["poopAcc"])
+        assertEquals(0, prefs.map["visitedApps"])
+        assertTrue((prefs.map["bornAt"] as Long) > 1L)
+    }
+
+    @Test
+    fun `reset efface exactement les cles ecrites par le lapin`() {
+        // Les clés supprimées par reset() = toutes celles que save()/saveLook() écrivent, et elles seules
+        val prefs = FakePrefs()
+        newPet(prefs).apply { save(); saveLook() }
+        assertEquals(prefs.map.keys, PetState.PET_KEYS.toSet())
+        prefs.edit().putInt(Prefs.MISCHIEF, 0).apply()
+        // Un reset sur un lapin "sans état" ne laisse que les réglages + les clés du lapin réécrites
+        newPet(prefs).reset()
+        assertEquals(PetState.PET_KEYS.toSet() + Prefs.MISCHIEF, prefs.map.keys)
+    }
+
+    @Test
+    fun `l'ancien lapin ne peut plus sauvegarder apres une adoption`() {
+        val prefs = FakePrefs()
+        val old = newPet(prefs).load()
+        old.satiety = 5f
+        old.save()
+        // Nouvelle adoption (autre instance, comme AdoptActivity) pendant que l'ancien service tourne
+        val adopted = newPet(prefs).load()
+        adopted.reset()
+        val newBorn = prefs.map["bornAt"]
+        // L'ancien service sauvegarde en partant (onDestroy) : ignoré
+        old.satiety = 1f
+        old.save()
+        assertEquals(newBorn, prefs.map["bornAt"])
+        assertEquals(80f, prefs.map["satiety"])
+        // Le nouveau lapin, lui, sauvegarde normalement
+        val reloaded = newPet(prefs).load()
+        reloaded.satiety = 50f
+        reloaded.save()
+        assertEquals(50f, prefs.map["satiety"])
+    }
 }

@@ -184,9 +184,11 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             pet.save()
         }
         if (BunnyService.running && newPet) {
-            // On arrête d'abord l'ancien lapin (il sauvegarde en partant), puis on enregistre le nouveau
+            // On arrête l'ancien lapin puis on enregistre le nouveau. Pas de course : reset() change
+            // bornAt, donc la sauvegarde de l'ancien lapin (onDestroy) est ignorée si elle passe après.
             BunnyService.stop(app)
-            android.os.Handler(mainLooper).postDelayed({ save(); BunnyService.start(app) }, 600)
+            save()
+            BunnyService.start(app)
         } else {
             save()
             if (BunnyService.running) BunnyService.send(app, BunnyService.ACTION_RELOAD)

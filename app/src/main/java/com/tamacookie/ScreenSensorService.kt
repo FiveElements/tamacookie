@@ -189,6 +189,9 @@ class ScreenSensorService : AccessibilityService() {
         ) {
             lastWindowChangeAt = SystemClock.uptimeMillis()
         }
+        // Lapin rangé : personne n'utilise les plateformes, on ne scanne pas l'arbre (batterie).
+        // Au redémarrage, le prochain événement d'une autre app relance un scan normalement.
+        if (!BunnyService.running) return
         // Défilement des pages du bureau : on le suit en direct
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED &&
             event.packageName?.toString() == Platforms.launcherPkg && event.scrollY == 0 && event.scrollX >= 0 &&
@@ -238,7 +241,7 @@ class ScreenSensorService : AccessibilityService() {
 
     /** Plafonne les scans complets (batterie) : reporte le scan s'il arrive trop tôt. */
     private fun runScan() {
-        if (!Platforms.screenOn) return
+        if (!Platforms.screenOn || !BunnyService.running) return
         val now = SystemClock.uptimeMillis()
         val wait = lastScanAt + MIN_SCAN_INTERVAL_MS - now
         if (wait > 0) { scheduleScan(wait); return }
