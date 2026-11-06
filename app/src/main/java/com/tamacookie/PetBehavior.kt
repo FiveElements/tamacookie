@@ -260,7 +260,8 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
             return
         }
         val now = ctx.clock.wallMs()
-        if (now - p.mind.lastTravelAt < Tuning.TRAVEL_COOLDOWN_MS) { ctx.say(comment, 3f); return }
+        val cooldownMs = (Tuning.TRAVEL_COOLDOWN_MS * p.species.behavior(p.personality).travelCooldownFactor).toLong()
+        if (now - p.mind.lastTravelAt < cooldownMs) { ctx.say(comment, 3f); return }
         p.mind.lastTravelAt = now
         ctx.closeMenu()
         p.mind.travelComment = comment

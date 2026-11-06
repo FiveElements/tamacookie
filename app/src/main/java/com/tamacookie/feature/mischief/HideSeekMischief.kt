@@ -9,6 +9,7 @@ import com.tamacookie.Pet
 import com.tamacookie.Tuning
 import com.tamacookie.ViewKey
 import com.tamacookie.feature.Travel
+import com.tamacookie.species.BehaviorMods
 import java.util.EnumSet
 
 /**
@@ -22,6 +23,9 @@ object HideSeekMischief : Mischief {
     override val travel = Travel.IGNORES
 
     override fun chance(level: Int) = 0.35f
+
+    /** Un peureux se cache plus volontiers ([BehaviorMods.hideChanceFactor]). */
+    override fun chance(level: Int, mods: BehaviorMods) = chance(level) * mods.mischiefChanceFactor * mods.hideChanceFactor
 
     /** Possible seulement sur le bureau, avec plusieurs pages (détectées via l'accessibilité). */
     override fun canStart(ctx: MischiefCtx, pet: Pet): Boolean {

@@ -5,6 +5,7 @@ import com.tamacookie.Act
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
 import com.tamacookie.feature.Travel
+import com.tamacookie.species.BehaviorMods
 import kotlin.random.Random
 
 /**
@@ -24,6 +25,12 @@ interface Mischief {
      * cascade ([Mischiefs.seek]) ; 0 = jamais de cette façon, 1 = sans tirage.
      */
     fun chance(level: Int): Float = 0f
+
+    /**
+     * [chance] modulée par le caractère ([BehaviorMods.mischiefChanceFactor]) ; avec les facteurs par
+     * défaut (1), c'est exactement [chance] (mêmes tirages qu'avant l'évolution 4b).
+     */
+    fun chance(level: Int, mods: BehaviorMods): Float = chance(level) * mods.mischiefChanceFactor
 
     /** Possible maintenant (écran, page, capteurs) ? Ne consomme pas d'aléatoire. */
     fun canStart(ctx: MischiefCtx, pet: Pet): Boolean = true
@@ -97,25 +104,31 @@ class UserEvents {
 /** Les bêtises enregistrées, et le choix de la bêtise. */
 object Mischiefs {
     /** Dans l'ordre de la cascade (attention) et des réactions (clic, frappe, défilement). */
-    val ALL: List<Mischief> = listOf(HideSeekMischief, SquatMischief, ChewEdgeMischief, KnockMischief, ScrollDizzy, TongueMischief)
+    val ALL: List<Mischief> = listOf(
+        HideSeekMischief, SquatMischief, ChewEdgeMischief, KnockMischief, ScrollDizzy, TongueMischief, StartleMischief,
+    )
 
     /**
      * Cascade sur [list] : chaque bêtise ([Mischief.chance] > 0) possible ([possible]), dans l'ordre, est
      * tirée avec sa probabilité (≥ 1 : sans tirage) ; la première tirée qui démarre ([start]) est renvoyée.
      * Une probabilité par bêtise plutôt que des poids normalisés : c'est la cascade d'origine, à l'identique.
+     * [mods] : influence du caractère (défaut : aucune).
      */
     fun seek(
         list: List<Mischief>, level: Int, rnd: Random,
         possible: (Mischief) -> Boolean, start: (Mischief) -> Boolean,
+        mods: BehaviorMods = NO_MODS,
     ): Mischief? {
         for (m in list) {
-            val c = m.chance(level)
+            val c = m.chance(level, mods)
             if (c <= 0f || !possible(m)) continue
             if (c < 1f && rnd.nextFloat() >= c) continue
             if (start(m)) return m
         }
         return null
     }
+
+    private val NO_MODS = BehaviorMods()
 
     /** Première bêtise de [list] qui réagit ([react]) à ce que vient de faire l'utilisateur (null = aucune). */
     fun react(list: List<Mischief>, react: (Mischief) -> Boolean): Mischief? {

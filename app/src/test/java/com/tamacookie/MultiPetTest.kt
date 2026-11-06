@@ -181,4 +181,23 @@ class MultiPetTest {
         assertTrue(b.body.targetX > ctx.arena.screenW)
         assertNotNull(b.mind.travelComment)
     }
+
+    /** Évolution 4b : l'explorateur repart deux fois plus tôt (3 s), les autres gardent la pause de 6 s. */
+    @Test fun voyage_explorateurRepartPlusTot() {
+        val ctx = FakePetCtx()
+        val e = ctx.addPet("e", x = 900f, seed = 2, traits = Traits(Personality.EXPLORER))
+        val beh = PetBehavior(ctx, Hooks())
+        val app = ForegroundAppWatcher.AppInfo("com.app.notes", "Notes", -1, isHome = false)
+        fun travel() = listOf(ctx.first, e).onEach { p ->
+            p.setAct(Act.IDLE)
+            ctx.world.asPet(p) { beh.onAppChanged(p, app) }
+        }.map { it.act }
+        assertEquals(listOf(Act.TRAVEL_OUT, Act.TRAVEL_OUT), travel())
+        ctx.clock.advance(Tuning.TRAVEL_COOLDOWN_MS / 2)
+        assertEquals(listOf(Act.IDLE, Act.TRAVEL_OUT), travel())            // 3 s : seul l'explorateur repart
+        ctx.clock.advance(Tuning.TRAVEL_COOLDOWN_MS / 2 - 1)
+        assertEquals(listOf(Act.IDLE, Act.IDLE), travel())
+        ctx.clock.advance(1)
+        assertEquals(Act.TRAVEL_OUT, travel().first())                       // 6 s : le résident aussi
+    }
 }

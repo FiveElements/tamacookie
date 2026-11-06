@@ -14,6 +14,10 @@ class PersonalityTest {
         Personality.LAZY to mapOf(StatMod.ENERGY_LOSS to 1.3f),
         Personality.CURIOUS to mapOf(StatMod.APP_VISIT_JOY to 3f),
         Personality.CUDDLY to mapOf(StatMod.HAPPINESS_LOSS to 1.2f, StatMod.PET_JOY to 1.6f),
+        // évolution 4b
+        Personality.SHY to mapOf(StatMod.HAPPINESS_LOSS to 1.15f, StatMod.PET_JOY to 1.2f),
+        Personality.PRANKSTER to mapOf(StatMod.HAPPINESS_LOSS to 1.1f, StatMod.PLAY_JOY to 1.2f),
+        Personality.EXPLORER to mapOf(StatMod.ENERGY_LOSS to 1.15f, StatMod.APP_VISIT_JOY to 2f),
     )
 
     @Test
@@ -36,6 +40,8 @@ class PersonalityTest {
 
     @Test
     fun `noms sauvegardes inchanges`() {
-        assertEquals(listOf("PLAYFUL", "GLUTTON", "LAZY", "CURIOUS", "CUDDLY"), Personality.entries.map { it.name })
+        // les nouveaux caractères sont ajoutés à la fin : les ordinaux (et les graines des traces) ne bougent pas
+        assertEquals(listOf("PLAYFUL", "GLUTTON", "LAZY", "CURIOUS", "CUDDLY", "SHY", "PRANKSTER", "EXPLORER"),
+            Personality.entries.map { it.name })
     }
 }

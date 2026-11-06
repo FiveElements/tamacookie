@@ -570,11 +570,15 @@ class BunnyBrainTest {
 
     @Test
     fun `seuil d'attention selon les betises et le calin`() {
+        // facteur d'attention par caractère (câlin 0,6 ; évolution 4b : peureux 1,3, farceur 0,5)
+        val factor = mapOf(Personality.CUDDLY to 0.6f, Personality.SHY to 1.3f, Personality.PRANKSTER to 0.5f)
         for (p in Personality.values()) {
-            val cuddly = p == Personality.CUDDLY
-            assertEquals("$p", if (cuddly) 432_000L else 720_000L, BunnyBrain.attentionThresholdMs(0, p))
-            assertEquals("$p", if (cuddly) 216_000L else 360_000L, BunnyBrain.attentionThresholdMs(1, p))
-            assertEquals("$p", if (cuddly) 108_000L else 180_000L, BunnyBrain.attentionThresholdMs(2, p))
+            val f = factor[p] ?: 1f
+            assertEquals("$p", (12f * f * 60_000).toLong(), BunnyBrain.attentionThresholdMs(0, p))
+            assertEquals("$p", (6f * f * 60_000).toLong(), BunnyBrain.attentionThresholdMs(1, p))
+            assertEquals("$p", (3f * f * 60_000).toLong(), BunnyBrain.attentionThresholdMs(2, p))
+            if (p == Personality.CUDDLY) assertEquals(216_000L, BunnyBrain.attentionThresholdMs(1, p))
+            if (f == 1f) assertEquals("$p", 360_000L, BunnyBrain.attentionThresholdMs(1, p))
             // au-delà de 2 : traité comme le niveau maximal
             assertEquals("$p", BunnyBrain.attentionThresholdMs(2, p), BunnyBrain.attentionThresholdMs(3, p))
         }

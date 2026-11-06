@@ -80,7 +80,9 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
             return false
         }
         val p = pet
-        return Mischiefs.seek(all, level, ctx.rnd, { it.canStart(mctx, p) }, { it.start(mctx, p) }) != null
+        return Mischiefs.seek(
+            all, level, ctx.rnd, { it.canStart(mctx, p) }, { it.start(mctx, p) }, p.species.behavior(p.personality),
+        ) != null
     }
 
     /**
