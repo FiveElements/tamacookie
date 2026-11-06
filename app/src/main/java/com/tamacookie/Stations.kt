@@ -145,7 +145,8 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         r.set(w * 0.78f - 6 * d, top + 10 * d, w * 0.78f, h - 2 * d); c.drawRect(r, p)
         // stéthoscope décoratif
         stroke.color = Color.parseColor("#6E7B8B")
-        c.drawArc(RectF(w - 40 * d, 8 * d, w - 12 * d, 36 * d), 0f, 180f, false, stroke)
+        r.set(w - 40 * d, 8 * d, w - 12 * d, 36 * d)
+        c.drawArc(r, 0f, 180f, false, stroke)
         stroke.color = Color.parseColor("#5B4A55")
         if (!occupied) tag(c, w / 2, h * 0.55f, "🩺 Véto")
     }
