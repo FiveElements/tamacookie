@@ -39,6 +39,10 @@ Chaque release fournit aussi un fichier `SHA256SUMS.txt` pour vérifier l'APK.
 - **Pages du bureau** : Cookie vit sur une page, défile avec elle, part explorer la page voisine
   et revient sur l'écran affiché.
 - **Bêtises** (réglables) : il s'assoit sur un bouton, tape à l'écran, joue à cache-cache sur une autre page…
+- **Chasseur de pubs** (réglable, activé par défaut ; accessibilité requise) : quand le bouton « Ignorer
+  l'annonce » d'une publicité apparaît (YouTube…), il court, saute dessus et l'appuie — « Hop ! Au revoir la
+  pub ! 🐾 ». Il n'appuie sur rien d'autre : ni « Consulter le site de l'annonceur », ni « Télécharger », ni
+  « Fermer ».
 
 ## 🔐 Permissions
 
@@ -47,7 +51,7 @@ Chaque release fournit aussi un fichier `SHA256SUMS.txt` pour vérifier l'APK.
 | Affichage par-dessus les autres apps | **Oui** | Faire vivre le lapin à l'écran (fenêtres flottantes) | Écran principal › « Faire apparaître Cookie », voir [ci-dessous](#1-affichage-par-dessus-les-autres-apps-obligatoire) |
 | Notifications | **Oui** (Android 13+) | Le service tourne au premier plan, avec sa notification (Nourrir, Cacher…) et les alertes (faim, maladie…) | Demandée au premier lancement |
 | Accès aux données d'utilisation | Non | Savoir quelle application est ouverte (sans accessibilité) pour qu'il la commente et la suive | Écran principal › ligne ⚠️, ou Paramètres › Applis › Accès spécial des applis › Accès aux données d'utilisation |
-| Accessibilité | Non | Position des icônes, page du bureau, défilement : il saute sur les icônes et suit les pages. **Jamais** le texte saisi ni le contenu des écrans | Paramètres › Accessibilité › TamaCookie |
+| Accessibilité | Non | Position des icônes, page du bureau, défilement : il saute sur les icônes et suit les pages. **Jamais** le texte saisi ni le contenu des écrans. Une seule action : appuyer sur le bouton « Ignorer / Passer l'annonce » d'une publicité (chasseur de pubs, désactivable) | Paramètres › Accessibilité › TamaCookie |
 
 Accordées sans rien demander (déclarées dans le manifeste) : service au premier plan, démarrage au boot et après une
 mise à jour, vibration, masquage des fenêtres flottantes d'autres apps pendant les réglages.
@@ -94,7 +98,9 @@ Si le menu ⋮ n'apparaît pas, c'est que l'étape 1 n'a pas encore été tenté
 
 Paramètres › Accessibilité › **Applications installées** (Samsung) / **Applications téléchargées** (Pixel) ›
 TamaCookie › activer. Grisé : voir « paramètres restreints » ci-dessus. Le service ne lit que la position des
-éléments à l'écran (icônes, boutons, clavier) et le défilement du bureau.
+éléments à l'écran (icônes, boutons, clavier) et le défilement du bureau. Il n'agit que dans un cas : si le
+réglage « Chasseur de pubs » est activé, il appuie sur le bouton « Ignorer l'annonce » / « Passer l'annonce »
+d'une publicité (identifiant `skip_ad_button` de YouTube, ou libellé exact), quand le lapin saute dessus.
 
 ### 4. Par ADB (développement, appareil branché)
 
