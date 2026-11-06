@@ -83,6 +83,8 @@ interface PetCtx {
 
     // --- Boucle, notification, menu ---
     fun requestFrames()
+    /** Un doigt touche une de nos fenêtres : l'écran est donc allumé et utilisable (réveille la boucle au besoin). */
+    fun userTouched() = requestFrames()
     fun updateNotification(force: Boolean)
     fun closeMenu()
     fun hide()

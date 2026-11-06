@@ -185,8 +185,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         private set
 
     // --- Boucle ---
-    /** Écran allumé ET déverrouillé. */
-    private var awake = true
+    /** Écran allumé ET déverrouillé (voir [ScreenWake] : le déverrouillage n'est pas toujours signalé). */
+    private val screenWake = ScreenWake()
+    private val awake get() = screenWake.awake
     private var lastTickWall = 0L
     private var lastSaveWall = 0L
     private var notifTimer = 0f
@@ -493,6 +494,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         handler.removeCallbacksAndMessages(null)
         widgetThrottle.cancel()
         stopLoop()
+        handler.removeCallbacks(unlockPoll)
         if (wasReady) {
             try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
             saveAll()
@@ -531,22 +533,41 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         override fun onReceive(c: Context, i: Intent) {
             when (i.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    awake = false; stopLoop(); handler.removeCallbacks(appPoll); saveAll()
+                    screenWake.screenOff(); stopLoop(); handler.removeCallbacks(appPoll); saveAll()
+                    handler.removeCallbacks(unlockPoll)
                     wellbeing.reset()   // écran éteint : la séance est finie (sans réplique)
                 }
-                // Écran allumé mais verrouillé : rien à animer derrière l'écran de verrouillage
-                Intent.ACTION_SCREEN_ON -> if (!isLocked()) wakeUp(greet = false)
-                Intent.ACTION_USER_PRESENT -> wakeUp(greet = true)
+                // Écran allumé mais verrouillé : rien à animer derrière l'écran de verrouillage, on guette le
+                // déverrouillage (USER_PRESENT n'arrive pas toujours)
+                Intent.ACTION_SCREEN_ON -> {
+                    if (screenWake.screenOn(isLocked())) onWoke(greet = false)
+                    else if (screenWake.waitingUnlock) { handler.removeCallbacks(unlockPoll); handler.postDelayed(unlockPoll, ScreenWake.POLL_MS) }
+                }
+                Intent.ACTION_USER_PRESENT -> if (screenWake.userPresent()) onWoke(greet = true)
             }
         }
+    }
+
+    /** Écran allumé mais verrouillé : relit le verrou jusqu'au déverrouillage (ou à l'extinction). */
+    private val unlockPoll = object : Runnable {
+        override fun run() {
+            if (!screenWake.waitingUnlock) return
+            if (screenWake.poll(isLocked())) onWoke(greet = true)
+            else handler.postDelayed(this, ScreenWake.POLL_MS)
+        }
+    }
+
+    /** Un doigt sur une de nos fenêtres : l'écran est utilisable, même si le déverrouillage n'a pas été signalé. */
+    override fun userTouched() {
+        if (screenWake.touched()) onWoke(greet = false)
+        requestFrames()
     }
 
     private fun isLocked(): Boolean =
         try { getSystemService(KeyguardManager::class.java).isKeyguardLocked } catch (_: Exception) { false }
 
-    private fun wakeUp(greet: Boolean) {
-        if (awake) return
-        awake = true
+    private fun onWoke(greet: Boolean) {
+        handler.removeCallbacks(unlockPoll)
         // Écran rallumé (et déverrouillé) : on reprend le suivi de l'app au premier plan
         handler.removeCallbacks(appPoll)
         handler.postDelayed(appPoll, 1500)

@@ -791,6 +791,16 @@ Principes :
     ou changement d'app, écran éteint qui remet à zéro, notre app et le bureau qui ne comptent pas, réglage coupé =
     rien), avec et sans service d'accessibilité (UsageStats).
 
+- **Après 4c — lapin figé en sortie de veille (tablette, reproduit et corrigé)** : écran éteint → boucle arrêtée ;
+  écran rallumé **verrouillé** → on attendait `ACTION_USER_PRESENT`, qui n'est pas arrivé (Galaxy Tab S10+,
+  Android 16). La boucle ne repartait jamais : fenêtres figées (lapin, laitue qui jaillit du coffre), seuls les
+  gestes vivaient — la bulle suivait le doigt, le lapin restait en `DRAGGED` (« Hé ! Pose-moi ! »). Diagnostic par
+  un build de journalisation temporaire (`looping=false awake=false` après le réveil). Correctif : **`ScreenWake`**
+  (pur, `ScreenWakeTest`) — écran allumé verrouillé → l'hôte relit `isKeyguardLocked` toutes les secondes jusqu'au
+  déverrouillage (`unlockPoll`) ; un toucher sur la fenêtre d'un animal réveille aussi (`PetCtx.userTouched`, appelé
+  par `TouchHandler` à `ACTION_DOWN`). `USER_PRESENT` reste écouté. Suspect probable des « lapin endormi figé » de
+  l'étape 5 (non reproduits à l'époque).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :

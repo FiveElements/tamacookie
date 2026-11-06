@@ -91,7 +91,7 @@ class TouchHandler(
                     downX = ev.rawX; downY = ev.rawY; lastRawX = ev.rawX
                     dragging = false
                     vt?.recycle(); vt = VelocityTracker.obtain()
-                    ctx.requestFrames()
+                    ctx.userTouched()
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!dragging && hypot(ev.rawX - downX, ev.rawY - downY) > slop) {
