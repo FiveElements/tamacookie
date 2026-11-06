@@ -16,8 +16,8 @@ import kotlin.math.hypot
 /**
  * Renderers des entités (adaptateur Android) : fabrique la fenêtre d'un objet ou d'une station la
  * première fois que l'[OverlayManager] l'affiche, et traduit les gestes sur ces fenêtres en appels aux
- * contrôleurs (Kotlin pur). [forwardToPet] : transmet un geste à la fenêtre de l'animal qui occupe la station (la cage lui
- * passe les touchers).
+ * contrôleurs (Kotlin pur). [occupantTouch] : à l'appui, l'écouteur de la fenêtre de l'animal qui occupe la station
+ * (null = vide) ; tout le geste lui est transmis, même s'il sort de la station en cours de route (glisser).
  */
 class EntityWindows(
     private val context: Context,
@@ -25,7 +25,7 @@ class EntityWindows(
     private val world: World,
     private val toys: ToyController,
     private val stations: StationController,
-    private val forwardToPet: (Station, MotionEvent) -> Boolean,
+    private val occupantTouch: (Station) -> ((MotionEvent) -> Boolean)?,
     /** Lecteur d'écran : caresse l'occupant de la station (faux = station vide). */
     private val caressOccupant: (Station) -> Boolean,
     /** Lecteur d'écran : [block] est une réponse à l'utilisateur (sa bulle est annoncée). */
@@ -151,16 +151,17 @@ class EntityWindows(
         val slop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
         var downX = 0f; var downY = 0f; var startCx = 0f; var startCy = 0f
         var moving = false
-        var forwarding = false
+        // Animal visé, fixé à l'appui : il quitte la station dès qu'on le glisse, le reste du geste doit le suivre
+        var forwardTo: ((MotionEvent) -> Boolean)? = null
         val longPress = Runnable {
             moving = true
             v.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             v.animate().scaleX(1.08f).scaleY(1.08f).setDuration(100).start()
         }
         v.setOnTouchListener { _, ev ->
-            if (ev.actionMasked == MotionEvent.ACTION_DOWN) forwarding = stations.touchGoesToPet(s)
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) forwardTo = occupantTouch(s)
             // Lapin à l'intérieur : les touchers vont au lapin (pour le sortir / le caresser)
-            if (forwarding) return@setOnTouchListener forwardToPet(s, ev)
+            forwardTo?.let { return@setOnTouchListener it(ev) }
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = ev.rawX; downY = ev.rawY; startCx = s.cx; startCy = s.cy
