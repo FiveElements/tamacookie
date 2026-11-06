@@ -9,6 +9,7 @@ Code, commentaires, commits et UI sont **en français**.
 ```bash
 ./gradlew testDebugUnitTest   # tests JVM (JUnit 4) — doivent rester verts à chaque étape
 ./gradlew assembleDebug       # APK : app/build/outputs/apk/debug/
+./gradlew createDebugUnitTestCoverageReport   # couverture JaCoCo : app/build/reports/coverage/test/debug/ (index.html, report.xml)
 ./gradlew lintDebug           # ⚠️ plante avec JDK 25 (UastFacade) : lancer Gradle avec un JDK 17/21
 ```
 
@@ -385,6 +386,16 @@ Principes :
   les autres ne bougent pas (pas de clignotement du dock à chaque station qui apparaît). Statistique : `restacks`.
   Le détacher / rattacher de la cage dans `followHolder` a disparu (garanti par les couches).
   Tests : `WindowLayerTest` (faux WindowManager qui empile dans l'ordre d'ajout, 50 ordres d'ajout aléatoires).
+- **Couverture des tests** : JaCoCo **intégré à AGP** (`enableUnitTestCoverage = true` sur `debug`, aucun
+  plugin ajouté ; `android.testCoverage.jacocoVersion = "0.8.13"` pour lire les classes des JDK récents). AGP
+  exclut `R`, `BuildConfig`, `Manifest`. Rapport HTML + XML. CI : la tâche tourne avec les tests, le rapport est
+  un artefact (`coverage-report`) et le taux va dans le résumé du job ; le job `coverage-badge` (push sur `main`
+  seulement, seul à avoir `contents: write`) régénère `.github/badges/coverage.svg` avec
+  `.github/scripts/coverage_badge.py` (taux de **lignes**, style « flat ») et le commite avec `[skip ci]`
+  (+ `paths-ignore` sur `.github/badges/**`). Pas de `cicirello/jacoco-badge-generator` : il ne lit que le CSV
+  de JaCoCo, qu'AGP ne produit pas. Mesure de départ (7f49e65) : **41,5 % des lignes** (43,1 % des
+  instructions, 38,9 % des branches) ; à 0 % : `BunnyService`, `MainActivity`, `PetMenu`, `AdoptActivity`,
+  `TouchHandler`, `OverlayWindows`… (adaptateurs Android, attendus) ; `BunnyView` 0,8 %.
 
 #### Schéma de persistance v1
 

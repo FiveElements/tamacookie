@@ -1,6 +1,7 @@
 # 🐰 TamaCookie
 
 [![CI](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml/badge.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
+[![Couverture des tests](.github/badges/coverage.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
 [![Release](https://github.com/FiveElements/tamacookie/actions/workflows/release.yml/badge.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/release.yml)
 [![Dernière version](https://img.shields.io/github/v/release/FiveElements/tamacookie?label=version&logo=github)](https://github.com/FiveElements/tamacookie/releases/latest)
 [![Téléchargements](https://img.shields.io/github/downloads/FiveElements/tamacookie/total?label=t%C3%A9l%C3%A9chargements&logo=android&color=3DDC84)](https://github.com/FiveElements/tamacookie/releases)
@@ -57,6 +58,7 @@ Prérequis : JDK 17+ et le SDK Android (API 34).
 ```bash
 ./gradlew testDebugUnitTest   # tests unitaires (JVM)
 ./gradlew assembleDebug       # APK de debug : app/build/outputs/apk/debug/
+./gradlew createDebugUnitTestCoverageReport   # couverture (JaCoCo) : app/build/reports/coverage/test/debug/index.html
 ```
 
 Le projet n'utilise que le framework Android et la bibliothèque standard Kotlin (aucune dépendance AndroidX).
@@ -65,7 +67,7 @@ Le projet n'utilise que le framework Android et la bibliothèque standard Kotlin
 
 | Workflow | Déclencheur | Rôle |
 |---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | push sur `main`, pull requests | tests unitaires, lint, APK debug (artefact) |
+| [`ci.yml`](.github/workflows/ci.yml) | push sur `main`, pull requests | tests unitaires, couverture (rapport en artefact ; badge SVG commité sur `main`, sans service externe), lint, APK debug (artefact) |
 | [`release.yml`](.github/workflows/release.yml) | tag `v*` ou lancement manuel | tests, APK release signé, publication GitHub Release |
 | [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) | PR Dependabot | fusion automatique dès que la CI est verte, **uniquement pour les mises à jour patch et minor** (les majeures restent manuelles) |
 

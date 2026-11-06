@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    # Le badge de couverture est commité par la CI elle-même : pas de nouveau passage pour lui
+    paths-ignore: ['.github/badges/**']
   pull_request:
   workflow_dispatch:
 
@@ -28,8 +30,18 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
-      - name: Tests unitaires, lint et APK debug
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+      - name: Tests unitaires, couverture, lint et APK debug
+        run: ./gradlew --no-daemon testDebugUnitTest createDebugUnitTestCoverageReport lintDebug assembleDebug
+
+      - name: Taux de couverture (résumé du job)
+        run: python3 .github/scripts/coverage_badge.py app/build/reports/coverage/test/debug/report.xml /tmp/coverage.svg --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Rapport de couverture (HTML + XML)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-report
+          path: app/build/reports/coverage/test/debug/
+          if-no-files-found: error
 
       - name: Rapports de tests
         if: always()
@@ -47,3 +59,34 @@ jobs:
         with:
           name: tamacookie-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+  # Badge de couverture sans service externe : SVG généré depuis le rapport JaCoCo et commité sur main.
+  coverage-badge:
+    name: badge de couverture
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write    # seul job autorisé à écrire : commit du badge
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: coverage-report
+          path: coverage
+
+      - name: Générer et commiter le badge
+        run: |
+          python3 .github/scripts/coverage_badge.py coverage/report.xml .github/badges/coverage.svg
+          if git diff --quiet -- .github/badges/coverage.svg; then
+            echo "Badge inchangé"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/badges/coverage.svg
+          # [skip ci] (et paths-ignore) : ce commit ne relance pas la CI
+          git commit -m "CI : badge de couverture [skip ci]"
+          git push origin HEAD:main || echo "::warning::main a avancé entre-temps : le prochain passage mettra le badge à jour"
