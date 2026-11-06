@@ -66,7 +66,9 @@ Le projet n'utilise que le framework Android et la bibliothèque standard Kotlin
 |---|---|---|
 | [`ci.yml`](.github/workflows/ci.yml) | push sur `main`, pull requests | tests unitaires, lint, APK debug (artefact) |
 | [`release.yml`](.github/workflows/release.yml) | tag `v*` ou lancement manuel | tests, APK release signé, publication GitHub Release |
-| [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) | PR Dependabot | fusion automatique dès que la CI est verte |
+| [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) | PR Dependabot | fusion automatique dès que la CI est verte, **uniquement pour les mises à jour patch et minor** (les majeures restent manuelles) |
+
+Les actions GitHub sont épinglées par SHA de commit (le tag est indiqué en commentaire) ; Dependabot les met à jour.
 
 **Publier une version** :
 
@@ -76,6 +78,8 @@ git tag v1.1.0 && git push origin v1.1.0
 
 ou *Actions → Release → Run workflow* avec le numéro de version.
 
-**Signature** : l'APK de release est signé avec la clé fournie par les secrets du dépôt
-`TAMACOOKIE_KEYSTORE_BASE64`, `TAMACOOKIE_KEYSTORE_PASSWORD`, `TAMACOOKIE_KEY_ALIAS` et `TAMACOOKIE_KEY_PASSWORD`
-(sinon, avec une clé de debug et un avertissement).
+La version doit être de la forme `X.Y.Z` (ex. `1.2.0`), sinon le workflow échoue.
+
+**Signature** : la release **exige** les 4 secrets du dépôt
+`TAMACOOKIE_KEYSTORE_BASE64`, `TAMACOOKIE_KEYSTORE_PASSWORD`, `TAMACOOKIE_KEY_ALIAS` et `TAMACOOKIE_KEY_PASSWORD`.
+Sans clé de signature, le workflow échoue (aucune release signée avec une clé de debug n'est publiée).

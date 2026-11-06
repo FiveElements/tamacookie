@@ -18,29 +18,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
+      # Les valeurs fournies par l'utilisateur passent par env: (jamais interpolées dans le script)
       - name: Version
         id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
           else
-            VERSION="${GITHUB_REF_NAME#v}"
+            VERSION="${REF_NAME#v}"
           fi
-          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version invalide (attendu : X.Y.Z, ex. 1.2.0)."
+            exit 1
+          fi
           # versionCode croissant : nombre de commits + numéro de run
-          echo "code=$(( $(git rev-list --count HEAD 2>/dev/null || echo 0) + ${{ github.run_number }} ))" >> "$GITHUB_OUTPUT"
+          CODE=$(( $(git rev-list --count HEAD 2>/dev/null || echo 0) + RUN_NUMBER ))
+          {
+            echo "name=$VERSION"
+            echo "tag=v$VERSION"
+            echo "code=$CODE"
+          } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       - name: Tests unitaires
         run: ./gradlew --no-daemon testDebugUnitTest
@@ -69,10 +82,12 @@ jobs:
           TAMACOOKIE_KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_KEYSTORE_PASSWORD }}
           TAMACOOKIE_KEY_ALIAS: ${{ secrets.TAMACOOKIE_KEY_ALIAS }}
           TAMACOOKIE_KEY_PASSWORD: ${{ secrets.TAMACOOKIE_KEY_PASSWORD }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           ./gradlew --no-daemon assembleRelease \
-            -PversionName=${{ steps.version.outputs.name }} \
-            -PversionCode=${{ steps.version.outputs.code }}
+            "-PversionName=$VERSION_NAME" \
+            "-PversionCode=$VERSION_CODE"
           rm -f "$TAMACOOKIE_KEYSTORE"
 
       # Contrôle indépendant de Gradle : signature valide et certificat épinglé
@@ -91,13 +106,15 @@ jobs:
           [ "$actual" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::APK signé par $actual, attendu $EXPECTED_CERT_SHA256"; exit 1; }
 
       - name: Préparer les artefacts
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/tamacookie-${{ steps.version.outputs.name }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/tamacookie-$VERSION_NAME.apk"
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
 
       - name: Publication GitHub
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: TamaCookie ${{ steps.version.outputs.name }}

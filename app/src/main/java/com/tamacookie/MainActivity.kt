@@ -37,9 +37,13 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private lateinit var nameEdit: EditText
     private var lastNs = 0L
     private var previewT = 0f
+    /** Le lapin vient d'être lancé : on passera en arrière-plan après la réponse à la demande de permission. */
+    private var backgroundAfterPermission = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Anti-tapjacking : aucune surimpression d'une autre app par-dessus nos réglages
+        window.setHideOverlayWindows(true)
         window.statusBarColor = Color.parseColor("#FFF4E6")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
@@ -134,7 +138,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
         }
         notifBtn = permButton(root) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF)
         }
         usageBtn = permButton(root) {
             try {
@@ -144,11 +148,10 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             }
         }
 
-        a11yBtn = permButton(root) {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        }
+        a11yBtn = permButton(root) { confirmAccessibility() }
         a11yHelp = TextView(this).apply {
-            text = "Paramètres › Accessibilité › Applications installées › TamaCookie. " +
+            text = "Paramètres › Accessibilité › « Applications installées » (Samsung) ou " +
+                "« Applications téléchargées » (Pixel) › TamaCookie. " +
                 "Si c'est grisé (« paramètre restreint ») : touche ici, puis ⋮ › « Autoriser les paramètres restreints », et réessaie."
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(Color.parseColor("#7A6B75"))
@@ -197,6 +200,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             topMargin = (24 * d).toInt()
         })
 
+        scroll.filterTouchesWhenObscured = true
         setContentView(scroll)
 
         // Premier lancement : écran d'adoption
@@ -228,6 +232,11 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         refresh()
+        // La boîte de dialogue a reçu sa réponse : on peut laisser le lapin vivre sur l'écran
+        if (requestCode == REQ_NOTIF_THEN_BACKGROUND && backgroundAfterPermission) {
+            backgroundAfterPermission = false
+            if (BunnyService.running) moveTaskToBack(true)
+        }
     }
 
     override fun doFrame(frameTimeNanos: Long) {
@@ -268,13 +277,40 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             return
         }
         if (BunnyService.running) BunnyService.stop(this) else {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-            }
             BunnyService.start(this)
-            moveTaskToBack(true)   // on laisse le lapin vivre sur l'écran
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                // Ne pas reculer maintenant : la boîte de dialogue partirait en arrière-plan.
+                backgroundAfterPermission = true
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIF_THEN_BACKGROUND)
+            } else {
+                moveTaskToBack(true)   // on laisse le lapin vivre sur l'écran
+            }
         }
         mainBtn.postDelayed({ refresh() }, 300)
+    }
+
+    /** Divulgation et consentement explicites AVANT d'ouvrir les réglages d'accessibilité. */
+    private fun confirmAccessibility() {
+        AlertDialog.Builder(this)
+            .setTitle("Autoriser l'accessibilité ?")
+            .setMessage(
+                "TamaCookie utilise l'API d'accessibilité d'Android uniquement pour le jeu :\n\n" +
+                    "• Ce qui est lu : la position des icônes et boutons affichés, leur nom court " +
+                    "(ex. « Chrome »), l'app au premier plan et le numéro de page du bureau ; " +
+                    "le fait que tu touches un bouton, fasses défiler ou tapes au clavier.\n" +
+                    "• Ce qui n'est JAMAIS lu : le texte que tu tapes, le contenu des champs de saisie " +
+                    "et des mots de passe.\n" +
+                    "• Pourquoi : pour que le lapin saute sur les icônes, te suive d'app en app, " +
+                    "joue à cache-cache sur le bureau et fasse ses bêtises.\n" +
+                    "• Rien n'est enregistré ni envoyé : tout reste en mémoire sur ton téléphone " +
+                    "(l'app n'a pas accès à Internet).\n\n" +
+                    "Tu peux le désactiver à tout moment dans Paramètres › Accessibilité."
+            )
+            .setPositiveButton("J'accepte") { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNegativeButton("Non merci", null)
+            .show()
     }
 
     private fun rename() {
@@ -324,6 +360,11 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             cornerRadius = 12 * d
             setColor(Color.parseColor(if (ok) "#E3F4E8" else "#FFE3E3"))
         }
+    }
+
+    private companion object {
+        const val REQ_NOTIF = 1
+        const val REQ_NOTIF_THEN_BACKGROUND = 2
     }
 
     private fun smallButton(label: String, click: () -> Unit) = TextView(this).apply {
