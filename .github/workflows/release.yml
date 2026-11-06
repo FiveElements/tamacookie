@@ -66,7 +66,7 @@ jobs:
           cache-read-only: true
 
       - name: Tests unitaires
-        run: ./gradlew --no-daemon testDebugUnitTest
+        run: ./gradlew --no-daemon :core:test testDebugUnitTest
 
       # Une release n'est jamais signée avec la clé de debug : sans clé, on échoue.
       - name: Clé de signature

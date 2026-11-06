@@ -1,22 +1,32 @@
 # TamaCookie — guide pour Claude
 
 Lapin façon tamagotchi qui vit en **overlay** (WindowManager) par-dessus l'écran Android.
-Kotlin 2.0, Android 13+ (minSdk 33, compile/target 34), un seul module `:app`, aucune dépendance runtime.
+Kotlin 2.0, Android 13+ (minSdk 33, compile/target 34), deux modules — `:core` (Kotlin/JVM pur) et `:app`
+(Android, dépend de `:core`) —, aucune dépendance runtime.
 Code, commentaires, commits et UI sont **en français**.
 
 ## Commandes
 
 ```bash
-./gradlew testDebugUnitTest   # tests JVM (JUnit 4) — doivent rester verts à chaque étape
+./gradlew test                # tous les tests JVM (JUnit 4) — doivent rester verts à chaque étape
+./gradlew :core:test          # tests du cœur (l'essentiel : ~470) ; ceux de l'app : ./gradlew testDebugUnitTest
 ./gradlew assembleDebug       # APK : app/build/outputs/apk/debug/
-./gradlew createDebugUnitTestCoverageReport   # couverture JaCoCo : app/build/reports/coverage/test/debug/ (index.html, report.xml)
+./gradlew :core:jacocoTestReport createDebugUnitTestCoverageReport   # couverture JaCoCo des deux modules :
+#   core/build/reports/jacoco/test/ (html/, jacocoTestReport.xml) et app/build/reports/coverage/test/debug/ (index.html, report.xml)
+#   total : python .github/scripts/coverage_badge.py core/…/jacocoTestReport.xml app/…/report.xml sortie.svg
 ./gradlew lintDebug           # ⚠️ plante avec JDK 25 (UastFacade) : lancer Gradle avec un JDK 17/21
 ```
 
 ## Pièges connus
 
-- `unitTests.isReturnDefaultValues = true` : dans les tests JVM, les classes Android (`Rect`, `Color`,
-  `org.json`…) renvoient silencieusement 0/false/null. **Le code testé ne doit pas dépendre d'Android.**
+- **Le cœur est dans `:core`** (Kotlin/JVM pur, `core/src/main/kotlin`) : il ne voit aucune classe Android, le
+  compilateur le garantit. Une logique testable va dans `:core` ; ce qui touche Android (vues, `Canvas`,
+  `SharedPreferences`, `Context`, services) reste dans `:app` derrière un port (`SettingsStore`, `PetStore`,
+  `OverlayHost`, `ScreenSensor`, `Clock`…). Une constante Android utile au cœur y est **recopiée** et vérifiée par
+  `AndroidConstantsTest` (app) : `Haptic`, `AppCategory`.
+- `unitTests.isReturnDefaultValues = true` ne concerne plus que les tests de `:app` : les classes Android (`Rect`,
+  `Color`, `org.json`…) y renvoient silencieusement 0/false/null. **Ne pas y tester de logique** : la mettre dans
+  `:core`.
 - **Réglages** : passer par `Prefs` (fichier `"pet"`). **Animaux** : uniquement par `PetRepository` (fichier
   `"pets"`, schéma versionné, voir « Schéma de persistance v1 »). Ne jamais renommer une clé ni un identifiant
   sauvegardé (`Look` : `id` des options ; noms d'enum `Personality`, `Toy`) sans migration — ce sont les
@@ -49,6 +59,8 @@ Depuis l'étape 6, l'écran des autres applications n'est connu que par le port 
 Depuis l'étape 7, plusieurs animaux vivent ensemble : l'espèce est un plugin (`species/`, lapin = `species/rabbit/`),
 chaque animal affiché passe dans la boucle (`PetBehavior`) avec **lui pour animal courant** (`World.asPet` →
 `PetCtx.pet`), `Director` arbitre ce qui est unique à l'écran et `social/` porte les interactions à deux.
+Depuis l'étape 8a, ce cœur est le module `:core` (JVM pur) : `:app` ne garde que les adaptateurs Android (service,
+activités, vues, fenêtres, dessin, persistance sur SharedPreferences, accessibilité, notification, widget, tuile).
 Problèmes à résorber (audit) :
 - `BunnyService` (~1 270 l.) est un god-object : ~16 responsabilités, ~45 `internal var`.
 - `StationController`, `ToyController`, `MischiefController`, `PageTracker`, `OverlayWindows` reçoivent
@@ -65,7 +77,7 @@ Problèmes à résorber (audit) :
 ## Architecture cible : hexagonal + monde d'entités (ECS léger)
 
 ```
-:core (Kotlin pur, à terme module JVM)                                   :app (Android)
+:core (Kotlin/JVM pur, module depuis 8a)                                 :app (Android)
   domain/   PetStats + PetRules (événements → état + effets), GameRules,   adapters/  Platforms→ScreenSensor,
             Personality.modifiers, Act/Pose/Expr, Brain, Physics                      PetRepository, OverlayManager,
   world/    World { pets: Map<PetId, Pet>, props, stations }                          UsageStats, Notifier
@@ -77,6 +89,10 @@ Problèmes à résorber (audit) :
   species/  rabbit/ (renderer, physique, fonctionnalités, répliques)
   ports/    ScreenSensor, ForegroundAppSource, PetStore, OverlayHost, Clock, Notifier, (PeerTransport)
 ```
+
+Depuis 8a, les **packages** sont restés ceux d'avant (`com.tamacookie`, `.feature.*`, `.species.*`, `.social`,
+`.persist`…) des deux côtés : seul le module dit ce qui est pur. Le dessin d'une station / d'un objet / d'une espèce
+est dans `:app` à côté de son comportement (même package, fichier `…Drawer.kt` / `…Renderer.kt`).
 
 Principes :
 1. **Hexagonal à la frontière seulement** : le cœur ne connaît Android qu'au travers de ports. Pas de couche
@@ -114,7 +130,7 @@ Principes :
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
 | 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ✅ |
 | — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins — voir « Évolutions » | ⏳ |
-| 8 | Module `:core` (JVM pur), detekt, chaînes dans `strings.xml`, accessibilité | |
+| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ; **8c** chaînes dans `strings.xml` ; **8d** accessibilité | ⏳ |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
 
 ### Évolutions (contenu sur les plugins : comportement existant inchangé, seulement des ajouts)
@@ -801,6 +817,64 @@ Principes :
   par `TouchHandler` à `ACTION_DOWN`). `USER_PRESENT` reste écouté. Suspect probable des « lapin endormi figé » de
   l'étape 5 (non reproduits à l'époque).
 
+- **Étape 8a** (module `:core`, Kotlin/JVM pur ; refactorisation sans changement de comportement) — 7 commits :
+  - **Module** : `core/build.gradle.kts` = plugin `org.jetbrains.kotlin.jvm` (même version que l'app, 2.4.21,
+    déclarée dans le `build.gradle.kts` racine), JVM 17, JUnit 4, plugin `jacoco` de Gradle (0.8.13, comme l'app) ;
+    **aucune dépendance** (la bibliothèque standard Kotlin vient du plugin). `:app` : `implementation(project(":core"))`.
+    Sources dans `core/src/main/kotlin`, tests dans `core/src/test/kotlin`, **mêmes packages** qu'avant (`git mv` :
+    l'historique suit ; aucun nom d'enum, id ou clé ne bouge).
+  - **Dans `:core`** (86 fichiers) : règles et jauges (`PetStats`, `PetRules`, `GameRules`, `Personality`, `Look`,
+    `Mood`), `Pet` / `World` / `Arena`, `BunnyBrain`, `BunnyPhysics`, `BunnyActor`, `PetBehavior`, `ScrollMath`,
+    `Tuning`, `Season`, `Palette` (littéraux `Int`), `PetRenderState` / `AmbientAnimator`, ports (`Clock`,
+    `SettingsStore`, `ScreenSensor`, `OverlayHost` / `WindowTable`, `PetStore`, `FrameLoop` / `FrameScheduler`,
+    `ForegroundAppSource`, `StationPanels`), `ScreenSensorHub`, `ScreenScan`, `ScreenWake`, `ForegroundAppWatcher`,
+    `Director`, `social/`, `Speech`, les contrôleurs devenus purs (`PageTracker`, `MischiefController`,
+    `ToyController`, `StationController`), le **comportement** des plugins (`feature/station`, `feature/toy`,
+    `feature/mischief`, `feature/menu`, `feature/wellbeing`, `ActHandler`), les espèces sans rendu (`Species`,
+    `SpeciesLines`, `Rabbit`, `RabbitLines`), `PetSnapshot`, `Adoption`, textes purs (`NotifierTexts`,
+    `WidgetTexts`, `TileTexts`), `Prefs` (les clés).
+  - **Resté dans `:app`** (Android) : `BunnyService`, `TamaApp`/`AppGraph`, activités, `BootReceiver`, `PetCommands`
+    (intents), `TouchHandler`, `OverlayManager` / `OverlayWindows` / `EntityWindows` / `FloatingPanel` /
+    `StationPanelWindows` / `PetMenu` (fenêtres), vues (`PetView`, `PropView`, `StationView`, bulle), dessins et
+    renderers, `PetNotifier`, `ScreenSensorService` (+ `NodeInfoReader`), `AndroidForegroundApps` (UsageStats),
+    `AndroidClock`, `Options` (couleurs `Color`), `SharedPrefsSettings` + `Prefs.of(context)`, widget / tuile, et
+    **`PetRepository` + `PetMigrations` + `Pets`** : c'est l'adaptateur du port `PetStore` sur `SharedPreferences`
+    (lecture des clés, `commit()`, migration du fichier `"pet"`) ; l'abstraire derrière un magasin clé-valeur aurait
+    doublé l'API de `SharedPreferences` sans rien rendre testable de plus (`PetRepositoryTest` tourne déjà en JVM
+    avec `FakePrefs`). Seules ses deux fonctions pures utiles à `PetSnapshot` sont passées dans le port
+    (`PetStore.isValidId`, `PetStore.enumOr` ; `PetRepository.isValidId` / `PetFields.enumOr` y délèguent).
+  - **Ports et constantes ajoutés** pour couper les derniers liens Android du cœur : `SettingsStore` (réglages lus
+    par le cœur : niveau de bêtises, largeur des pages, placement des stations ; `PetCtx.prefs` n'est plus un
+    `SharedPreferences` ; adaptateur `SharedPrefsSettings`, faux `FakeSettings`) — nom choisi pour ne pas heurter
+    `android.provider.Settings` ; `Haptic.KEYBOARD_TAP` et `AppCategory` (ex-copies privées dans `RabbitLines` /
+    `PetBehavior`) recopient `HapticFeedbackConstants` / `ApplicationInfo.CATEGORY_*`, vérifiés par
+    `AndroidConstantsTest` ; `ColorOption.argb` (teinte des jouets, ex-`Options.color` = `Color.parseColor`) ;
+    `NotifierTexts` (ex-compagnon de `PetNotifier`). Le `Clock` réel (`AndroidClock`) et `Options` ont leur fichier
+    dans l'app.
+  - **Dessin séparé du comportement** : `StationBehavior.draw` → `StationDrawer` (un `object …StationDrawer` par
+    station dans `app/…/feature/station/`, registre **`StationDrawers.of(kind)`** en `when` exhaustif : une station
+    sans dessin ne compile pas) ; `PropSpec.draw` → `PropDrawer` (un `…ToyDrawer` par jouet, `FoodDrawers.kt` pour
+    les nourritures et la crotte, registre **`PropDrawers`** en `when` exhaustifs sur `Toy` et `Food`) ; `PropPen`
+    suit le dessin (`PropDrawer.kt`) ; `Species.renderer(density)` → **`SpeciesRenderers.of(species, d)`** (table
+    par id d'espèce). Les constantes qui ne servaient qu'au dessin (`WheelStation.TURNS_PER_S`, `FLOWERS_X`,
+    `SEEDS`, `CHIPS`) ont suivi. Code de dessin recopié tel quel. `DrawersTest` (app) : chaque station, jouet,
+    nourriture, la crotte et chaque espèce ont leur dessin, distinct.
+  - **Tests** : 41 fichiers, faux compris (`FakePetCtx`, `FakeClock`, `FakeOverlayHost`, `FakeScreenSensor`,
+    `FakeSettings`, `testPet`) passent dans `core/src/test` — ils tournent **sans stubs Android**. Restent dans l'app :
+    `PetRepositoryTest` (+ `FakePrefs`, horloge locale `RepoClock` : pas de `testFixtures`, inutile pour un seul
+    faux de 5 lignes), `DrawersTest`, `AndroidConstantsTest`. **486 → 492 tests** : 468 dans `:core`, 24 dans `:app`
+    (+1 `LookTest` pour `argb`, +3 `DrawersTest`, +2 `AndroidConstantsTest`).
+  - **Couverture** : CI = `:core:test :core:jacocoTestReport testDebugUnitTest createDebugUnitTestCoverageReport` ;
+    l'artefact `coverage-report` contient `core/` (`jacocoTestReport.xml` + `html/`) et `app/` (`report.xml` +
+    HTML) ; `coverage_badge.py` prend plusieurs rapports et **somme** les compteurs LINE (tableau par module dans
+    le résumé du job). **49,7 % → 49,5 % des lignes** (3 481 / 7 009 → 3 498 / 7 064 ; instructions 49,5 → 49,2 %,
+    branches 49,3 → 49,1 %) : `:core` **86,7 %** des lignes (3 283 / 3 786), `:app` 6,6 % (215 / 3 278). La légère
+    baisse vient du découpage, pas d'une perte de tests : +55 lignes Android non testées (en-têtes des 17 objets de
+    dessin, registres, `SharedPrefsSettings`, `AndroidClock`, `Options`) contre +17 lignes couvertes (registres
+    par `DrawersTest`, `argb`).
+  - `lint-baseline.xml` inchangé (ses entrées `StationController` étaient déjà périmées depuis l'étape 4 ; lint
+    ne passe pas sur `:core`, module JVM sans plugin lint — detekt viendra en 8b).
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -827,13 +901,18 @@ Valeur inconnue ou absente → défaut (`PetFields.read`).
 
 ### Ajouter une station (ex. : le lit)
 
-1. `feature/station/BedStation.kt` : `object BedStation : StationBehavior` — `name` (« 🛏️ Lit »), `tapHint`,
-   `busyLine`, `draw`, `seat`, les propriétés utiles (`capacity = 2`, `slowFrames = true`, `holdsPet`…) et
+Chemins : `core/src/main/kotlin/com/tamacookie/…` (cœur) et `app/src/main/java/com/tamacookie/…` (dessin).
+
+1. Cœur — `feature/station/BedStation.kt` : `object BedStation : StationBehavior` — `name` (« 🛏️ Lit »), `tapHint`,
+   `busyLine`, `seat`, les propriétés utiles (`capacity = 2`, `slowFrames = true`, `holdsPet`…) et
    `onEnter` / `update` / `onLeave` / `onPet` si besoin (répliques dans le fichier).
-2. `StationKind` (`feature/station/StationKind.kt`) : ajouter **à la fin** `BED("Lit", 140, 90, BedStation)` —
+2. Cœur — `StationKind` (`feature/station/StationKind.kt`) : ajouter **à la fin** `BED("Lit", 140, 90, BedStation)` —
    l'ordre fixe le placement par défaut, le nom les clés `st_BED_*` (créées automatiquement, rien à migrer).
-3. (Facultatif) ses couleurs dans `Palette` ; un test de son comportement à côté de `StationBehaviorTest`
-   (le test d'exhaustivité le couvre déjà).
+3. App — `feature/station/BedStationDrawer.kt` : `object BedStationDrawer : StationDrawer` (`draw(c, v, w, h)` :
+   pinceaux `v.pen`, état `v.t` / `v.open` / `v.occupied`) et sa branche dans `StationDrawers.of` (le `when`
+   exhaustif l'exige) ; ses couleurs dans `Palette` (cœur).
+4. (Facultatif) un test de son comportement à côté de `StationBehaviorTest` (`core/src/test`) ; les tests
+   d'exhaustivité (`StationBehaviorTest`, `DrawersTest`) la couvrent déjà.
 
 Rien d'autre : panneau 🏠, survol/dépôt, toucher, cadence, voyage, sommeil, caresse, sauvegarde du placement
 suivent. Avant 3a il fallait toucher ~10 endroits (enum + `when` du dessin, `positionInStation`, `enterStation`,
@@ -846,19 +925,24 @@ s'assoit à `seat` ; pour des places distinctes, `seatFor(rang)` — voir `BedSt
 
 ### Ajouter un jouet (ex. : le cerf-volant)
 
-1. `feature/toy/KiteToy.kt` : `object KiteToy : ToySpec` — `toy get() = Toy.KITE` (getter : pas de cycle
-   d'initialisation avec l'enum), `wDp`/`hDp`, `startLines`, `draw`, `play` (pendant `Act.PLAY`), `step` (sa physique,
+1. Cœur — `feature/toy/KiteToy.kt` : `object KiteToy : ToySpec` — `toy get() = Toy.KITE` (getter : pas de cycle
+   d'initialisation avec l'enum), `wDp`/`hDp`, `startLines`, `play` (pendant `Act.PLAY`), `step` (sa physique,
    via `ctx.stepToy`) et au besoin `launch`, `randomTint`, `complainsWhenTaken` ; ses répliques dans le fichier.
-2. `Toy` (`feature/toy/Toy.kt`) : ajouter **à la fin** `KITE("Cerf-volant", "🪁", KiteToy)` (le nom est sauvegardé
-   dans `favoriteToy`).
-3. (Facultatif) ses couleurs dans `Palette` ; `ToySpecTest` le couvre déjà (exhaustivité).
+2. Cœur — `Toy` (`feature/toy/Toy.kt`) : ajouter **à la fin** `KITE("Cerf-volant", "🪁", KiteToy)` (le nom est
+   sauvegardé dans `favoriteToy`).
+3. App — `feature/toy/KiteToyDrawer.kt` : `object KiteToyDrawer : PropDrawer` (`draw(c, v, w, h)` : `v.spin`,
+   `v.tint`, pinceaux `v.pen`) et sa branche dans `PropDrawers.of(Toy)` (`when` exhaustif) ; ses couleurs dans
+   `Palette`. `ToySpecTest` (cœur) et `DrawersTest` (app) le couvrent déjà (exhaustivité).
 
 Coffre, jouet préféré à l'adoption, fiche du véto, partie, lancer au doigt, protestation, cadence suivent. Avant 3b :
 ~10 endroits (enum `Toy`, `PropView.Kind` + `when` du dessin, `Prop.toy`, taille dans `startPlay`, teinte, lancer,
 répliques, `updatePlay`, physique dans `update`, protestation dans le toucher). Une nourriture : un `object … : FoodSpec`
-dans `Foods.kt` + une ligne dans `Food`.
+dans `Foods.kt` + une ligne dans `Food` (cœur), son `…FoodDrawer` dans `FoodDrawers.kt` + sa branche dans
+`PropDrawers.of(Food)` (app).
 
 ### Ajouter une bêtise (ex. : il tire la langue à l'écran)
+
+Tout est dans le cœur (`core/src/main/kotlin/com/tamacookie/`), tests dans `core/src/test`.
 
 1. `feature/mischief/XxxMischief.kt` : `object XxxMischief : Mischief` — pour qu'il la fasse quand on l'ignore :
    `chance(level)` (> 0), `canStart`, `start` ; pour réagir à l'utilisateur : `react(ctx, pet, ev)` ; si elle a sa
@@ -875,10 +959,10 @@ Avant 3b : ~6 endroits (cascade et état dans `MischiefController`, `Act` + ense
 
 ### Ajouter une action de menu (ex. : chanter)
 
-1. `MenuEntries` (`feature/menu/MenuEntry.kt`) : `val SING = MenuEntry("🎵", "Chanter") { ctx, pet -> … }` (avec
+1. `MenuEntries` (`feature/menu/MenuEntry.kt`, cœur) : `val SING = MenuEntry("🎵", "Chanter") { ctx, pet -> … }` (avec
    `refresh = { st -> … }` si le bouton change selon l'état) et l'ajouter à `ALL` (même fichier ; deux par rangée).
 2. Seulement si l'action a besoin d'autre chose que `PetCtx` (un panneau, un autre contrôleur) : une méthode dans
-   `MenuCtx` et son implémentation dans `TouchHandler.menuCtx`.
+   `MenuCtx` (cœur) et son implémentation dans `TouchHandler.menuCtx` (app).
 
 Fermeture du menu, mise en page, rafraîchissement suivent. Avant 3b : 4 endroits (enum `PetMenu.Action`, bouton et
 rangée dans `PetMenu`, branche de `TouchHandler.onMenuAction`, texte dynamique dans `refresh`).
@@ -888,20 +972,21 @@ rangée dans `PetMenu`, branche de `TouchHandler.onMenuAction`, texte dynamique 
 1. `PetStats` : `val thirst: Float = 80f` ; `PetRules.clamp` : la borner ; `PetRules.elapsed` : son évolution
    (taux dans `GameRules`, ex. `thirstLossPerH`) ; un `PetEvent` qui la remonte (`Drank`), sa branche dans
    `apply` et dans `savesNow` (le compilateur exige les deux) ; l'humeur dans `PetRules.mood` si besoin
-   (`Mood.THIRSTY` → `Lines`, `PetNotifier`, `PetMenu`, `BunnyRenderState.moodExpr` : signalés par le compilateur).
-2. Persistance : `PetFields` (`THIRST = "thirst"`, `write` + `read` avec défaut) — **pas de migration** : une clé
+   (`Mood.THIRSTY` → `SpeciesLines`, `NotifierTexts`, `PetMenu`, `PetRenderState.moodExpr` : signalés par le
+   compilateur). Tout cela est dans le cœur, sauf `PetMenu` (app).
+2. Persistance (app, `persist/PetRepository.kt`) : `PetFields` (`THIRST = "thirst"`, `write` + `read` avec défaut) — **pas de migration** : une clé
    absente prend la valeur par défaut. `PetSnapshot` : l'ajouter seulement si elle a du sens sur un autre
    téléphone (champ ignoré par les anciennes versions, défaut chez nous s'il manque).
 3. Si un caractère la module : une entrée `StatMod` et sa valeur dans `Personality.modifiers`.
-4. Tests : `PetRulesTest` (taux, bornes) — la trace de référence ne change pas tant que la nouvelle stat
-   n'influence pas les autres ; `PetRepositoryTest` (aller-retour).
+4. Tests : `PetRulesTest` (cœur : taux, bornes) — la trace de référence ne change pas tant que la nouvelle stat
+   n'influence pas les autres ; `PetRepositoryTest` (app : aller-retour).
 
 Un changement de **forme** (renommer / scinder une clé, changer une unité) demande une migration : une entrée à la
 fin de `PetMigrations.ALL`, `SCHEMA_VERSION` + 1, et un test à partir d'un fichier de la version précédente.
 
 ### Ajouter une personnalité (ex. : peureux)
 
-1. `Personality` (`Personality.kt`) : ajouter **à la fin** `SHY("Peureux", "🙈", "…", mapOf(StatMod.HAPPINESS_LOSS
+1. `Personality` (`Personality.kt`, cœur) : ajouter **à la fin** `SHY("Peureux", "🙈", "…", mapOf(StatMod.HAPPINESS_LOSS
    to 1.1f))` — le nom d'enum est sauvegardé et échangé (`PetSnapshot`) : ne plus le changer.
 2. `PersonalityTest` : sa ligne dans la table `expected` (le test d'exhaustivité l'exige).
 3. Comportement propre (hors jauges) : sa ligne dans `behavior()` de chaque espèce (`Rabbit.modsFor` : un champ de
@@ -918,12 +1003,14 @@ Un pair qui envoie un caractère inconnu (version plus récente) le voit remplac
 1. `species/hamster/Hamster.kt` : `object Hamster : Species` — `id` (« hamster » : **sauvegardé et échangé**, ne plus
    le changer), `label`, `emoji`, `spec` (`SpeciesSpec` : gabarit de fenêtre, pieds, haut de la tête, vitesses),
    `behavior(p)` (un `BehaviorMods` par `Personality`, `when` exhaustif), `accepts(k)` / `accepts(t)` si certaines
-   stations / jouets ne lui conviennent pas, `lines` et `renderer(density)`.
-2. `species/hamster/HamsterLines.kt` : `object HamsterLines : SpeciesLines` (le compilateur liste ce qui manque) ;
-   `species/hamster/HamsterRenderer.kt` : `class HamsterRenderer(d: Float) : PetRenderer` (`draw` du corps pour
-   chaque `Pose` / `Expr`, `onState` pour l'apparence, `hitTest`) ; ses couleurs dans `Palette`.
+   stations / jouets ne lui conviennent pas, et `lines` (cœur, `core/…/species/hamster/`).
+2. Cœur — `species/hamster/HamsterLines.kt` : `object HamsterLines : SpeciesLines` (le compilateur liste ce qui
+   manque). App — `species/hamster/HamsterRenderer.kt` : `class HamsterRenderer(d: Float) : PetRenderer` (`draw` du
+   corps pour chaque `Pose` / `Expr`, `onState` pour l'apparence, `hitTest`) et sa ligne dans `SpeciesRenderers`
+   (`Hamster.ID to ::HamsterRenderer`) ; ses couleurs dans `Palette`.
 3. `Species.ALL` (`species/Species.kt`) : l'ajouter **après** le lapin (le premier est l'espèce par défaut des
-   anciennes sauvegardes). `SpeciesTest` le couvre (exhaustivité) ; `PetSnapshot` l'accepte tout seul.
+   anciennes sauvegardes). `SpeciesTest` (cœur) et `DrawersTest` (app : un renderer par espèce) le couvrent
+   (exhaustivité) ; `PetSnapshot` l'accepte tout seul.
 4. Pour le proposer : un choix d'espèce dans `AdoptActivity` (l'`Adoption` porte alors l'espèce jusqu'à
    `Identity(species = …)`) — pas encore d'interface. Si son gabarit diffère du lapin : la fenêtre (`Arena.bw/bh`)
    devient par animal (`ensurePetWindow` prend `p.species.spec`), et `BunnyActor` / `PageTracker` lisent la largeur
@@ -933,7 +1020,7 @@ Boucle, cerveau, jauges, stations, jouets, bêtises, social, persistance suivent
 
 ### Ajouter une interaction sociale (ex. : jouer à chat)
 
-1. `social/TagSocial.kt` : `object TagSocial : SocialInteraction` — par le cerveau : `chance` (> 0), `canStart(ctx,
+1. `social/TagSocial.kt` (cœur) : `object TagSocial : SocialInteraction` — par le cerveau : `chance` (> 0), `canStart(ctx,
    a, b)` (sans aléatoire), `start(sys, a, b)` qui engage les participants (`sys.engage(p, this, partner, durée,
    leads)` : un seul pour une interaction « passive » comme suivre, les deux pour une interaction mutuelle) et
    `update(sys, self, partner, e, dt)` (chaque image pour chaque engagé ; `false` = fini ; `partner == null` = parti
@@ -944,7 +1031,7 @@ Boucle, cerveau, jauges, stations, jouets, bêtises, social, persistance suivent
    dans `canStart` ; si c'est le `Director` qui la déclenche (dispute) : une file comme `takeDisputes`.
 
 `Act.SOCIAL`, `ActRegistry`, interruption (caresse, glisser, voyage), cadence et perception suivent. Tests : à côté de
-`SocialSystemTest`, avec un `FakePetCtx` + `addPet` et des `Random` seedés.
+`SocialSystemTest` (`core/src/test`), avec un `FakePetCtx` + `addPet` et des `Random` seedés.
 
 Règles pour chaque étape : pas de big-bang, pas de nouvelle dépendance sans justification écrite,
 ajouter des tests JVM pour tout ce qui devient pur, mettre à jour ce fichier (colonne État + écarts).

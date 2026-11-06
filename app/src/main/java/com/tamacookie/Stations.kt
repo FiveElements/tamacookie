@@ -7,9 +7,11 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import com.tamacookie.feature.station.StationDrawer
+import com.tamacookie.feature.station.StationDrawers
 import com.tamacookie.feature.station.StationKind
 
-/** Fenêtre d'une station : affiche l'état de son [Station] (dessin porté par son comportement). */
+/** Fenêtre d'une station : affiche l'état de son [Station] (dessin : [StationDrawers]). */
 @SuppressLint("ViewConstructor")
 class StationView(context: Context, val station: Station) : View(context), Refreshable {
     val kind: StationKind get() = station.kind
@@ -20,7 +22,9 @@ class StationView(context: Context, val station: Station) : View(context), Refre
     /** Surlignage affiché (agrandissement animé quand le modèle change). */
     private var highlighted = false
 
-    /** Pinceaux partagés par les dessins des stations ([StationKind.behavior] `.draw`). */
+    private val drawer: StationDrawer = StationDrawers.of(station.kind)
+
+    /** Pinceaux partagés par les dessins des stations ([StationDrawer.draw]). */
     internal val pen = StationPen(resources.displayMetrics.density)
 
     override fun refresh() {
@@ -33,7 +37,7 @@ class StationView(context: Context, val station: Station) : View(context), Refre
     }
 
     override fun onDraw(c: Canvas) {
-        kind.behavior.draw(c, this, width.toFloat(), height.toFloat())
+        drawer.draw(c, this, width.toFloat(), height.toFloat())
     }
 }
 

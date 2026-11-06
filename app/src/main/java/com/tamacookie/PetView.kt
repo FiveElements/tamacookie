@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
 import com.tamacookie.species.Species
+import com.tamacookie.species.SpeciesRenderers
 import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
@@ -15,7 +16,7 @@ import kotlin.random.Random
 
 /**
  * Dessin d'un animal : la vue (générique) n'affiche qu'un [PetRenderState] immuable ([render]) — elle
- * n'écrit ni ne lit l'état du jeu. Le corps est dessiné par le renderer de l'espèce ([Species.renderer] :
+ * n'écrit ni ne lit l'état du jeu. Le corps est dessiné par le renderer de l'espèce ([SpeciesRenderers] :
  * `species/rabbit/RabbitRenderer`) ; l'animation ambiante (clignement, oreilles, particules) est calculée
  * par son [AmbientAnimator] (aléatoire injectable) et les particules, communes à toutes les espèces, sont
  * dessinées ici.
@@ -33,7 +34,7 @@ class PetView(
     private val t get() = ambient.t
 
     private val d = resources.displayMetrics.density
-    private val renderer: PetRenderer = species.renderer(d)
+    private val renderer: PetRenderer = SpeciesRenderers.of(species, d)
 
     private val pPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

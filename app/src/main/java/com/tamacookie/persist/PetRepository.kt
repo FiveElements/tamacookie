@@ -56,8 +56,8 @@ class PetRepository private constructor(
             return PetRepository(prefs, clock, newId)
         }
 
-        /** Un identifiant valide : pas de séparateur de liste ni de clé. */
-        fun isValidId(s: String) = s.isNotEmpty() && s.length <= 64 && s.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+        /** Un identifiant valide : pas de séparateur de liste ni de clé ([PetStore.isValidId]). */
+        fun isValidId(s: String) = PetStore.isValidId(s)
     }
 
     /** Un nouvel identifiant d'animal (UUID). */
@@ -255,6 +255,5 @@ internal object PetFields {
         )
     }
 
-    inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
-        enumValues<E>().firstOrNull { it.name == name } ?: default
+    inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E = PetStore.enumOr(name, default)
 }
