@@ -12,14 +12,6 @@ data class Look(
     var accColor: Int = 0,
 )
 
-enum class Personality(val label: String, val emoji: String, val desc: String) {
-    PLAYFUL("Joueur", "🎾", "Adore jouer, s'ennuie vite"),
-    GLUTTON("Gourmand", "🥕", "A tout le temps faim, adore manger"),
-    LAZY("Paresseux", "😴", "Fait de longues siestes, marche lentement"),
-    CURIOUS("Curieux", "🔍", "Explore les icônes et commente tes apps"),
-    CUDDLY("Câlin", "💕", "Réclame des caresses, très affectueux"),
-}
-
 object Options {
     val furs = listOf(
         "Neige" to "#FFFBF5", "Crème" to "#F5E2C4", "Caramel" to "#DDA463",
