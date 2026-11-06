@@ -43,6 +43,9 @@ Package `com.tamacookie` (+ `com.tamacookie.feature` depuis l'étape 3a). Cœur 
 fenêtres passent par le port `OverlayHost` (adaptateur `OverlayManager`, ids `WindowId` par entité) et la vue de
 l'animal n'affiche qu'un `BunnyRenderState`. Depuis l'étape 5, les jauges sont `PetStats` + `PetRules` (événements → état + effets, `GameRules`) et
 les animaux ne sont lus / écrits que par `PetRepository` (`persist/` : schéma versionné, `PetSnapshot` portable).
+Depuis l'étape 6, l'écran des autres applications n'est connu que par le port `ScreenSensor` (`PetCtx.screen` :
+`ScreenSnapshot` immuable + `UserSignal` sans perte ; faux : `FakeScreenSensor`) et l'app au premier plan par
+`ForegroundAppSource` ; `TamaApp`/`AppGraph` (DI manuelle) relient le service d'accessibilité à `BunnyService`.
 Problèmes à résorber (audit) :
 - `BunnyService` (~1 270 l.) est un god-object : ~16 responsabilités, ~45 `internal var`.
 - `StationController`, `ToyController`, `MischiefController`, `PageTracker`, `OverlayWindows` reçoivent
@@ -52,6 +55,7 @@ Problèmes à résorber (audit) :
   locomotion et le sommeil (voir écarts 3b).
 - Les vues sont de l'état de jeu (`bunny.pose`, `bunny.facing` écrits par 4 classes).  → étape 4 : `BunnyRenderState`.
 - `Platforms` (dans ScreenSensorService.kt) : état global `@Volatile`, compteurs `*Version` qui perdent des événements.
+  → étape 6 : port `ScreenSensor` (`ScreenSensorHub`), signaux en file, scan sur `HandlerThread` ; `Platforms` supprimé.
 - `PetState` mélange règles, persistance et `Context` ; `Look` stocke des **index** (fragile).  → étape 5 :
   `PetStats` + `PetRules`, `PetRepository` (schéma versionné, ids stables), `PetState` supprimé.
 
@@ -104,8 +108,8 @@ Principes :
 | 3 | Fonctionnalités en plugins recevant `pet` : **3a** stations (occupant, capacité, `FloatingPanel`) ; **3b** jouets, bêtises, menu | ✅ |
 | 4 | `OverlayManager` unique + `RenderState` par entité | ✅ |
 | 5 | `PetStats` + `PetRules` + `PetRepository` versionné par `PetId`, look par ids stables (migration) | ✅ |
-| 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ⏳ |
-| 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | |
+| 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
+| 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ⏳ |
 | 8 | Module `:core` (JVM pur), detekt, chaînes dans `strings.xml`, accessibilité | |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
 
@@ -396,6 +400,69 @@ Principes :
   de JaCoCo, qu'AGP ne produit pas. Mesure de départ (7f49e65) : **41,5 % des lignes** (43,1 % des
   instructions, 38,9 % des branches) ; à 0 % : `BunnyService`, `MainActivity`, `PetMenu`, `AdoptActivity`,
   `TouchHandler`, `OverlayWindows`… (adaptateurs Android, attendus) ; `BunnyView` 0,8 %.
+
+- **Étape 6** (capteur d'écran ; `Platforms` supprimé, `ForegroundAppWatcher` devenu pur) — 5 commits :
+  - **Port `ScreenSensor`** (`ScreenSensor.kt`, pur) : `snapshot: ScreenSnapshot` (data class immuable : `connected`,
+    `screenOn`, `platforms: PlatformSet` = `Platform(Box, label)` + `boxes` + `version`, `ime: Box?`,
+    `foregroundPkg`, `viewKey`, `launcherPkg`, `pageCount`, `pageW`, `scroll: ScrollSamples` x0/t0/x1/t1),
+    `observe(listener)` (**`Observable` maison**, fil principal), `takeSignals(): List<UserSignal>` (`Click(box)`,
+    `Typing`, `Scroll`), `setPageWidth(w)` (`PageTracker` y écrit la largeur mémorisée / l'oublie à la rotation).
+    **Pas de coroutines** : tout est sur le fil principal, un appel direct suffit (aucune dépendance ajoutée).
+  - **`ScreenSensorHub`** (pur) = implémentation unique, tient ce qui était dans `Platforms` : suivi du défilement du
+    bureau, calage au repos (`settle` : largeur de page apprise, recalage « bouton Accueil »), version des
+    plateformes, file de signaux (plafond 64, les plus récents gardés). **`epoch`** : incrémenté à chaque vidage
+    venu d'ailleurs qu'un scan (défilement, écran éteint, déconnexion) ; un scan lancé avant met à jour la vue et
+    les pages mais **ne republie pas** ses plateformes (avant, scan et événement ne pouvaient pas se croiser).
+  - **`ScreenScan`** (pur) : `parsePage`, `detectionBand`, `Geometry.accepts`, `ignoredPkg`, et le **parcours** de
+    l'arbre (`walk`, DFS, 800 nœuds, 60 plateformes, pas de chevauchement au même `top`) derrière `NodeReader<N>`
+    (pas d'enveloppe par nœud ; adaptateur `NodeInfoReader` sur `AccessibilityNodeInfo`). `Box` : `width`,
+    `height`, `isEmpty`, `intersects` (sémantique de `Rect`). Plus de `android.graphics.Rect` dans les bêtises.
+  - **Adaptateur `ScreenSensorService`** : publie dans le hub (`onConnected`, `onScreenOff/On`, `onViewScrolled`,
+    `onClick`, `onTyping`, `onScan`). **Fils** : le fil principal reçoit les événements et décide quand scanner
+    (mêmes délais, ≤ 1 scan / 600 ms, lapin arrêté = pas de scan) ; le **`HandlerThread` « TamaCookie-scan »**
+    fait les appels IPC (`windows`, `rootInActiveWindow`, `getChild`…) avec des paramètres capturés (bureau
+    connu, géométrie, epoch) et renvoie un `ScanResult` immuable par `post` ; le fil principal le replie dans
+    le hub, qui reste à **un seul écrivain** sans verrou (d'où un `ScanResult` plutôt qu'un `ScreenSnapshot`
+    fabriqué sur le fil du scan). Un scan à la fois (une demande pendant un scan est rejouée au retour).
+    `onDestroy` : `quit()` du fil, résultats en vol ignorés. `onInterrupt` reste vide (il ne signale qu'une
+    interruption du retour à l'utilisateur, le service reste connecté). minSdk 33 : `recycle()` est sans effet,
+    rien à recycler. Une exception de lecture est journalisée (avant : plantage du processus).
+  - **`TamaApp` + `AppGraph`** (`TamaApp.kt`, déclarée dans le manifeste) : `screen` (hub unique) et
+    `foregroundWatcher()` (un par `BunnyService`). Le service d'accessibilité publie par `AppGraph.of(this).screen`,
+    `BunnyService` l'expose en `PetCtx.screen`. `Pets.repository` reste un singleton à part (inchangé) ;
+    `BunnyService.running` (statique) est toujours lu par le service d'accessibilité (garde de l'étape 0).
+  - **Port `ForegroundAppSource`** (`ForegroundAppSource.kt`) : `AccessibilityForegroundSource` (snapshot),
+    `UsageStatsForegroundSource` (`AndroidForegroundApps.kt` : requête ≤ 1 / 3 s, permission revérifiée / 30 s,
+    `Clock` injectée), composite **`ConnectionAwareForegroundSource`** (accessibilité si connectée, UsageStats
+    jamais interrogé ; sinon UsageStats). `ForegroundAppWatcher` (pur) : écran allumé, changements seulement,
+    notre app / le volet ignorés, `describe` injecté (`AppDescriber`).
+  - **Signaux sans perte, écarts voulus** (`MischiefController.checkUserEvents`, une fois par image) : chaque
+    **frappe** compte pour la rafale de 12 (avant : une par image où l'on avait tapé ; identique sauf frappe plus
+    rapide que la cadence) ; chaque **clic** est proposé aux bêtises dans l'ordre, jusqu'à la première qui réagit
+    (avant : deux clics dans la même image n'en faisaient qu'un, avec le dernier rectangle) ; le **défilement**
+    compte une fois par image (il arrive en rafale). Comme avant : les signaux d'avant le premier passage sont
+    ignorés ; ceux reçus endormi / sage / dans une station / caché sont consommés sans réaction ; occupé (pas
+    `FREE`), les frappes comptent mais les clics sont perdus. `UserEvents.click: Box?`.
+  - Écart mineur : une fenêtre active **sans nom de package** est traitée comme « pas de fenêtre » (avant :
+    parcourue avec un package nul).
+  - **Travail a807 (session précédente, non fusionné)** : repris = les cas limites de `ScrollMathTest`, et l'idée
+    d'un état remis à zéro par test (ici : un `FakeScreenSensor` par `FakePetCtx`, plus d'état global). **Non
+    repris** (changements de comportement, pour une étape dédiée) : filtrage des noms (`safeLabel` : codes,
+    soldes, numéros), apps sensibles (`isSensitivePkg`, `sensitiveScreen`), `setEventTypes(0)` écran éteint,
+    relecture des launchers à l'installation d'une app, scan toutes les 1,5 s, `notificationTimeout` 250 ms,
+    nouveau texte de description du service.
+  - Piste : `getRootInActiveWindow(FLAG_PREFETCH_DESCENDANTS_HYBRID)` (API 33) réduirait les IPC du scan.
+  - Tests : `ScreenScanTest` (faux arbre), `ScreenSensorHubTest` (signaux, défilement, scans, calage, epoch,
+    écran éteint, observable), `UserSignalsTest` (2 clics entre 2 images, rafale arrêtée, frappes, défilement),
+    `ForegroundAppSourceTest`, `PageTrackerTest` et `MischiefTest` (squat sur icône / clavier) alimentés par le
+    port ; `FakePetCtx.screen`, `resetPlatforms()` supprimé. 332 → 376 tests ; couverture **41,3 → 44,3 % des
+    lignes** (43,0 → 46,0 % des instructions, 38,8 → 45,0 % des branches) ; `ScreenSensorHub`, `ScreenScan`,
+    `ForegroundAppWatcher` à 100 %.
+  - **À vérifier sur tablette** (non couvert par les tests JVM) : pages du bureau (vue, page du lapin,
+    cache-cache), défilement (le lapin suit les pages, recalage après « Accueil »), sauts sur les icônes et chute
+    quand elles bougent, bêtises au clic / à la frappe (squat bouton / clavier au niveau 2), voyage d'app en app
+    avec et sans accessibilité (UsageStats), écran éteint puis rallumé, service d'accessibilité désactivé pendant
+    que le lapin tourne.
 
 #### Schéma de persistance v1
 
