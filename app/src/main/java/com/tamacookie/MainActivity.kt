@@ -54,7 +54,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         super.onCreate(savedInstanceState)
         // Anti-tapjacking : aucune surimpression d'une autre app par-dessus nos réglages
         window.setHideOverlayWindows(true)
-        window.statusBarColor = Color.parseColor("#FFF4E6")
+        window.statusBarColor = Palette.UI_BG
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
         val root = LinearLayout(this).apply {
@@ -63,7 +63,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             val p = (22 * d).toInt(); setPadding(p, p, p, p)
         }
         val scroll = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#FFF4E6"))
+            setBackgroundColor(Palette.UI_BG)
             isFillViewport = true
             addView(root)
         }
@@ -71,13 +71,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         root.addView(TextView(this).apply {
             setText(R.string.app_name)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
-            setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
+            setTextColor(Palette.INK); paint.isFakeBoldText = true
             gravity = Gravity.CENTER
+            isAccessibilityHeading = true
         })
         root.addView(TextView(this).apply {
             setText(R.string.main_tagline)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setTextColor(Color.parseColor("#7A6B75")); gravity = Gravity.CENTER
+            setTextColor(Palette.UI_MUTED); gravity = Gravity.CENTER
         })
 
         preview = PetView(this)
@@ -86,6 +87,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             previewExpr = Expr.HAPPY
             preview.postDelayed({ previewExpr = Expr.NORMAL }, 1200)
         }
+        // Lecteur d'écran : « Cookie, lapin, content » (onResume), double toucher = caresser
+        preview.clickLabel(getString(R.string.access_action_pet))
         root.addView(preview, LinearLayout.LayoutParams((170 * d).toInt(), (170 * d).toInt()).apply {
             topMargin = (8 * d).toInt()
         })
@@ -126,21 +129,22 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         )
         val levelRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val levelDesc = TextView(this).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Palette.UI_MUTED)
             setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
         }
         val levelChips = ArrayList<TextView>()
         fun paintLevels() {
             val cur = prefs.getInt(Prefs.MISCHIEF, 1)
-            levelChips.forEachIndexed { i, c -> c.background = chipBg(i == cur) }
+            levelChips.forEachIndexed { i, c -> c.background = chipBg(i == cur); c.isSelected = i == cur }
             val desc = getString(levels[cur].second)
             levelDesc.text = if (cur > 0) getString(R.string.main_mischief_needs_a11y, desc) else desc
         }
         levels.forEachIndexed { i, (label, _) ->
             val c = TextView(this).apply {
                 setText(label); gravity = Gravity.CENTER
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Palette.INK)
                 val p = (10 * d).toInt(); setPadding(p, p, p, p)
+                touchTarget(d); describePlain(text)
                 setOnClickListener {
                     prefs.edit().putInt(Prefs.MISCHIEF, i).apply()
                     BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
@@ -158,12 +162,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         section(root, R.string.main_seasons_title)
         val seasonChip = TextView(this).apply {
             gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Palette.INK)
             val p = (10 * d).toInt(); setPadding(p, p, p, p)
+            touchTarget(d)
         }
         fun paintSeason() {
             val on = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT)
             seasonChip.setText(if (on) R.string.main_seasons_on else R.string.main_seasons_off)
+            seasonChip.describePlain(seasonChip.text)
             seasonChip.background = chipBg(on)
         }
         seasonChip.setOnClickListener {
@@ -175,7 +181,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         root.addView(seasonChip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         root.addView(TextView(this).apply {
             setText(R.string.main_seasons_desc)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Palette.UI_MUTED)
             setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintSeason()
@@ -184,12 +190,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         section(root, R.string.main_wellbeing_title)
         val wellChip = TextView(this).apply {
             gravity = Gravity.CENTER
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Palette.INK)
             val p = (10 * d).toInt(); setPadding(p, p, p, p)
+            touchTarget(d)
         }
         fun paintWellbeing() {
             val on = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT)
             wellChip.setText(if (on) R.string.main_wellbeing_on else R.string.main_wellbeing_off)
+            wellChip.describePlain(wellChip.text)
             wellChip.background = chipBg(on)
         }
         wellChip.setOnClickListener {
@@ -202,7 +210,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         root.addView(TextView(this).apply {
             val rules = GameRules.DEFAULT
             text = getString(R.string.main_wellbeing_desc, rules.breakSuggestAfterMin, rules.breakSulkAfterMin)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Palette.UI_MUTED)
             setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintWellbeing()
@@ -227,7 +235,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         a11yHelp = TextView(this).apply {
             setText(R.string.main_a11y_help)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setTextColor(Color.parseColor("#7A6B75"))
+            setTextColor(Palette.UI_MUTED)
             setPadding((12 * d).toInt(), 0, (12 * d).toInt(), (6 * d).toInt())
             setOnClickListener {
                 startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
@@ -238,8 +246,9 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         mainBtn = TextView(this).apply {
             gravity = Gravity.CENTER
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTextColor(Color.WHITE); paint.isFakeBoldText = true
+            paint.isFakeBoldText = true
             val p = (16 * d).toInt(); setPadding(p, p, p, p)
+            touchTarget(d)
             setOnClickListener { toggleBunny() }
         }
         root.addView(mainBtn, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
@@ -249,8 +258,9 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         section(root, R.string.main_howto_title)
         root.addView(TextView(this).apply {
             setText(R.string.main_howto)
+            contentDescription = SpokenText.plainLines(text.toString())
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setTextColor(Color.parseColor("#3A2E39"))
+            setTextColor(Palette.INK)
             setLineSpacing(0f, 1.35f)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
@@ -269,8 +279,9 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
     private fun chipBg(selected: Boolean) = GradientDrawable().apply {
         cornerRadius = 14 * d
-        setColor(Color.parseColor(if (selected) "#FFE0E8" else "#FFFFFF"))
-        setStroke((if (selected) 3 * d else 1 * d).toInt(), Color.parseColor(if (selected) "#F07893" else "#E3D6CC"))
+        setColor(if (selected) Palette.UI_SELECTED else Palette.WHITE)
+        val stroke = if (selected) Palette.UI_SELECTED_STROKE else Palette.UI_STROKE
+        setStroke((if (selected) 3 * d else 1 * d).toInt(), stroke)
     }
 
     override fun onResume() {
@@ -280,6 +291,11 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         previewLook = pet?.look ?: Look()
         residentEmoji = Species.of(pet?.identity?.species).emoji
         nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
+        preview.contentDescription = A11yTexts.preview(
+            nameEdit.text.toString(), Species.of(pet?.identity?.species).label,
+            pet?.stats?.mood ?: Mood.OK, pet?.stats?.sleeping == true,
+        )
+        preview.reducedMotion = MotionSettings.reduced(contentResolver)
         refreshPets()
         refresh()
         Choreographer.getInstance().postFrameCallback(this)
@@ -332,9 +348,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         val name = nameEdit.text.toString()
         mainBtn.text = if (running) getString(R.string.main_stop_pet, name)
         else getString(R.string.main_start_pet, name, residentEmoji)
+        mainBtn.describePlain(mainBtn.text)
+        // Contrastes ≥ 4,5:1 (étape 8d) : framboise au lieu du rose ; sans la permission, fond clair + texte encre
+        mainBtn.setTextColor(if (!overlay) Palette.INK else Palette.WHITE)
         mainBtn.background = GradientDrawable().apply {
             cornerRadius = 18 * d
-            setColor(Color.parseColor(if (!overlay) "#BDB3B8" else if (running) "#7A6B75" else "#F07893"))
+            setColor(
+                if (!overlay) Palette.UI_ACTION_OFF else if (running) Palette.UI_ACTION_STOP else Palette.UI_ACTION,
+            )
         }
     }
 
@@ -387,11 +408,18 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             row.addView(TextView(this).apply {
                 text = getString(R.string.main_pet_row, r.identity.name, role, sleeping,
                     NotifierTexts.statusLine(st.satiety, st.happiness, st.energy, st.cleanliness), st.health.toInt())
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Color.parseColor("#3A2E39"))
+                // Lu « Cookie, résident. Satiété 80 %, … » au lieu des noms des emojis
+                contentDescription = getString(R.string.access_pet_row, r.identity.name,
+                    getString(if (r === resident) R.string.access_role_resident else R.string.access_role_companion),
+                    if (i >= Tuning.MAX_PETS_SHOWN) getString(R.string.access_offscreen) else "",
+                    A11yTexts.gauges(st))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Palette.INK)
             }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
             if (r !== resident) {
                 val id = r.identity.id; val name = r.identity.name
-                row.addView(smallButton(getString(R.string.main_pet_remove)) { confirmRemove(id, name) })
+                row.addView(smallButton(getString(R.string.main_pet_remove)) { confirmRemove(id, name) }.apply {
+                    contentDescription = getString(R.string.access_remove_pet, name)
+                })
             }
             petList.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
         }
@@ -401,6 +429,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         val max = Tuning.MAX_PETS
         companionBtn.text = if (full) resources.getQuantityString(R.plurals.main_house_full, max, max)
         else getString(R.string.main_adopt_companion)
+        companionBtn.describePlain(companionBtn.text)
     }
 
     private fun confirmRemove(id: PetId, name: String) {
@@ -441,7 +470,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         root.addView(TextView(this).apply {
             setText(title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
+            setTextColor(Palette.INK); paint.isFakeBoldText = true
+            isAccessibilityHeading = true
             setPadding(0, (8 * d).toInt(), 0, (6 * d).toInt())
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
     }
@@ -449,8 +479,9 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private fun permButton(root: LinearLayout, onClick: () -> Unit): TextView {
         val tv = TextView(this).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setTextColor(Color.parseColor("#3A2E39"))
+            setTextColor(Palette.INK)
             val p = (12 * d).toInt(); setPadding(p, p, p, p)
+            touchTarget(d)
             setOnClickListener { onClick() }
         }
         root.addView(tv, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
@@ -460,10 +491,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private fun setPerm(tv: TextView, ok: Boolean, label: Int, why: Int) {
         tv.text = if (ok) getString(R.string.main_perm_granted, getString(label))
         else getString(R.string.main_perm_missing, getString(label), getString(why))
+        tv.contentDescription = if (ok) getString(R.string.access_perm_granted, getString(label))
+        else getString(R.string.access_perm_missing, getString(label), getString(why))
         tv.isEnabled = !ok
         tv.background = GradientDrawable().apply {
             cornerRadius = 12 * d
-            setColor(Color.parseColor(if (ok) "#E3F4E8" else "#FFE3E3"))
+            setColor(if (ok) Palette.UI_OK else Palette.UI_WARN)
         }
     }
 
@@ -475,9 +508,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private fun smallButton(label: String, click: () -> Unit) = TextView(this).apply {
         text = label
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        setTextColor(Color.parseColor("#3A2E39"))
+        setTextColor(Palette.INK)
         val p = (10 * d).toInt(); setPadding(p + p / 2, p, p + p / 2, p)
-        background = GradientDrawable().apply { cornerRadius = 12 * d; setColor(Color.parseColor("#FBE3D6")) }
+        gravity = Gravity.CENTER
+        touchTarget(d)
+        describePlain(label)
+        background = GradientDrawable().apply { cornerRadius = 12 * d; setColor(Palette.UI_CHIP) }
         setOnClickListener { click() }
     }
 }

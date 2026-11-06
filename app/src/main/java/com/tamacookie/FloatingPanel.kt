@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import android.annotation.SuppressLint
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -29,6 +30,9 @@ class FloatingPanel<V : View>(
     val isOpen: Boolean get() = view != null && overlay.isAttached(id)
 
     /** Affiche [v] (le panneau déjà ouvert est d'abord retiré). */
+    // L'écouteur ne guette que les touchers à l'extérieur (ACTION_OUTSIDE) : ce n'est pas un clic, rien à doubler
+    // pour le lecteur d'écran (le panneau se ferme par son bouton « Fermer »).
+    @SuppressLint("ClickableViewAccessibility")
     fun open(v: V, onOutside: (() -> Unit)? = null) {
         close()
         val p = windows.panelParams(windows.panelWidth(widthDp), watchOutside)

@@ -52,4 +52,14 @@ class SpeechBubble(context: Context) : FrameLayout(context) {
         }
         addView(text, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
     }
+
+    /**
+     * Affiche [s] ; [announce] : zone « live » polie, le lecteur d'écran la lit quand il a fini de parler
+     * (étape 8d) — sinon le texte change sans être annoncé (bavardage).
+     */
+    fun show(s: String, announce: Boolean) {
+        text.accessibilityLiveRegion =
+            if (announce) View.ACCESSIBILITY_LIVE_REGION_POLITE else View.ACCESSIBILITY_LIVE_REGION_NONE
+        text.text = s
+    }
 }

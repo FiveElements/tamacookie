@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Boutons du widget (« Nourrir », « Appeler ») -->
+<!-- Boutons du widget (« Nourrir », « Appeler ») : framboise = Palette.UI_ACTION (texte blanc à 4,8:1 ;
+     était #F07893, 2,7:1 : étape 8d) -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#FFF07893" />
+    <solid android:color="#FFC2456A" />
     <corners android:radius="14dp" />
 </shape>

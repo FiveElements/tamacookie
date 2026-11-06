@@ -57,6 +57,13 @@ versionnées, les problèmes existants y apparaissent donc tous).
   Kotlin, **dans un `object`** (fonctionnalité, `companion object` du contrôleur, `CommonLines`, `SpeciesLines`),
   jamais écrit dans le code d'une méthode. Rien de « lapin » / « carotte » hors de `species/rabbit/` (test). Voir
   « Textes : où ils vont » en fin de fichier.
+- **Accessibilité** (étape 8d) : tout élément graphique ou emoji seul a une description ; une description
+  calculée va dans le cœur (`A11yTexts`, `SpokenText.plain` retire les emojis), un libellé fixe dans `strings.xml`
+  (`access_*`) ; une cible tactile fait ≥ 48 dp (`touchTarget(d)`) ; un texte est en `sp` et sa boîte n'a pas de
+  hauteur ni de largeur fixe (minimum seulement) ; une couleur de texte de l'interface est une paire de `Palette.UI_*`
+  vérifiée par `A11yTextsTest` (≥ 4,5:1). Un geste sur une fenêtre overlay a son équivalent en action TalkBack
+  (`PetAccessibility`, `EntityWindows`). Lint `ContentDescription`, `ClickableViewAccessibility`,
+  `KeyboardInaccessibleWidget`, `LabelFor`… sont **bloquants**. Voir « Accessibilité » en fin de fichier.
 - Ignorer `.claude/worktrees/` (copies de travail) dans les recherches.
 - Le repo est indexé par **graft** : `graft ask "<question>" --source`, `graft grep`, `graft skeleton <fichier>`,
   `graft callers <symbole> --depth all` avant tout déplacement/renommage.
@@ -147,7 +154,7 @@ Principes :
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
 | 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ✅ |
 | — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins — voir « Évolutions » | ⏳ |
-| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ✅ ; **8c** textes (`strings.xml`, répliques regroupées) ✅ ; **8d** accessibilité | ⏳ |
+| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ✅ ; **8c** textes (`strings.xml`, répliques regroupées) ✅ ; **8d** accessibilité (TalkBack, contrastes, cibles, animations réduites) ✅ | ✅ |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
 
 ### Évolutions (contenu sur les plugins : comportement existant inchangé, seulement des ajouts)
@@ -1019,6 +1026,94 @@ Principes :
     « 🐰 TamaCookie »), tuile (description lue par TalkBack), service d'accessibilité dans Paramètres (libellé),
     bulles (chanson, coffre, « Au revoir … ! 👋 »).
 
+- **Étape 8d** (accessibilité ; pour un utilisateur voyant, rien ne change sauf les contrastes corrigés et des
+  boutons un peu plus hauts quand ils étaient sous 48 dp) — 3 commits (cœur ; app ; ce fichier) :
+  - **Cœur** : `A11yTexts` (`A11yTexts.kt`) — description de l'animal (`pet` : « Cookie, lapin, content » ; activité
+    quand elle parle plus que l'humeur : « dort », « joue », « se cache »… ; un besoin — faim, bain, solitude,
+    maladie — est dit même quand il est occupé ; sa station : « dans Baignoire »), aperçus (`preview`), jauges
+    (`gauge` / `gauges` : « Satiété 80 % », espace insécable, partie entière bornée comme le widget), stations
+    (« Baignoire, vide » / « Lit, Cookie et Noisette dedans » / « Coffre »), objets (« Balle, jouet », « Carotte, à
+    manger », « Crotte de Cookie »), et la règle d'annonce des bulles (`announces`). `SpokenText.plain` /
+    `plainLines` : un texte affiché sans ses emojis ni symboles (catégorie Unicode *So*, blocs d'emojis U+1F000–1FAFF
+    par plage — le JDK 17 de la CI ne connaît pas 🫣, Unicode 14 —, jointures, sélecteurs de
+    variante, couleurs de peau), pour les descriptions dérivées d'un libellé (« 🛁 Baignoire », « 💤\nDodo »).
+    `ReducedMotion.isReduced(animateur, transition, fenêtre)`. `Palette.UI_*` + `Contrast` (luminance et rapport
+    WCAG 2.x). `WidgetTexts.Gauge.description` ; ses libellés viennent de `A11yTexts` (mêmes mots).
+  - **Contrastes corrigés** (seuls changements visuels, mesurés par `Contrast`, testés) : boutons d'action en texte
+    blanc (« Faire apparaître … », « Adopter ! » / « Enregistrer », « Nourrir » / « Appeler » du widget) : fond
+    `#F07893` → **`#C2456A`** (framboise, même teinte plus foncée) — **2,69 → 4,82:1** ; bouton principal sans la
+    permission de surimpression (il reste actif : il ouvre le réglage) : `#BDB3B8` + blanc (**2,04:1**) → fond
+    `#D9D1D5` + texte encre `#3A2E39` (**8,61:1**). Vérifiés conformes, inchangés : encre sur crème (11,9), sur les
+    puces / choix / autorisations / boutons de panneau (10,5 à 11,4), texte secondaire `#7A6B75` sur crème (4,62),
+    panneau (4,94), blanc (5,01) ; blanc sur `#7A6B75` (« Ranger », 5,01) ; bulle (encre sur blanc, 12,9). Le rose
+    `#F07893` reste pour ce qui n'est pas du texte (contour du choix, nez, jauge du widget). Limite : la bulle est une
+    fenêtre non tactile, qu'Android oblige à une opacité ≤ 0,8 ; son contraste réel dépend de ce qu'il y a dessous.
+  - **Écrans** (`MainActivity`, `AdoptActivity`) : titres de section `isAccessibilityHeading` (et le titre de
+    l'écran) ; aperçus décrits (« Cookie, lapin, content » ; à l'adoption, le nom en cours de saisie) avec l'action
+    « Caresser » ; lignes des animaux lues « Cookie, résident. Satiété 80 %, Bonheur… » (au lieu des noms des
+    emojis), « Retirer Noisette » ; autorisations « … : autorisé » / « … : non autorisé, obligatoire. Touche deux
+    fois pour autoriser » ; boutons et puces décrits sans emoji ; « Comment jouer » lu ligne à ligne sans les puces
+    emoji ; niveaux de bêtises, options d'oreilles / motif / accessoire, pastilles de couleur (nommées : « Chocolat »)
+    et cartes de caractère `isSelected` (TalkBack dit « sélectionné »). Cibles : petits boutons, puces, autorisations,
+    bouton principal ≥ 48 dp (`touchTarget`, texte centré) ; pastilles 44 → 48 dp. L'ordre de lecture est celui de
+    la mise en page (une colonne). Les dialogues (`AlertDialog`) sont accessibles d'origine.
+  - **Overlay** : animal (`PetAccessibility`, créé par `TouchHandler`) — description calculée à la demande du lecteur
+    d'écran (pas à chaque image), **double toucher = caresser** (clic), **appui long = menu**, actions
+    personnalisées « **Ouvrir le menu** », « **Mettre dans <station>** » (chaque station affichée qui l'accepte et a
+    une place : attrapé comme au doigt — `startDrag` — puis `enterStation`, l'équivalent exact du glisser-déposer),
+    « **Sortir de <station>** » (`leaveStation(hopOut = true)`). Les actions passent par l'animal de la fenêtre
+    (`World.asPet`) en priorité HIGH. Le **clic / appui long ne viennent que du lecteur d'écran** : l'écouteur
+    tactile consomme tous les vrais touchers (`setOnClickListener` posé à côté, même astuce pour le dock et les
+    stations). Ids des actions : `res/values/ids.xml` (une par station, 12 places ; `A11yActionIdsTest`).
+    Stations (`EntityWindows`) : décrites, clic = le tap (explication en bulle **annoncée**, coffre ouvert) ou, occupée,
+    une caresse à l'occupant ; libellé « Expliquer » / « Ouvrir » / « Caresser ». Objets : jouet = action
+    « **Lancer** » (`grab` + `release` vers le milieu de l'écran, 500 × 900 dp/s : un lancer moyen, sans « Quel
+    lancer ! ») ; crotte = « Ramasser » (son clic existait) ; nourriture décrite seulement (fenêtre non tactile).
+    Dock : « Objets de cette page » (« Cache-cache en cours… » pendant le cache-cache), clic = le panneau 🏠 ;
+    l'emoji passe en `dp` (icône dans un rond fixe de 52 dp, débordait à 200 %).
+  - **Panneaux** (menu, véto, coffre, 🏠) : `accessibilityPaneTitle` (« Menu de Cookie », « 🩺 Fiche de Cookie »
+    sans emoji…) annoncé à l'ouverture ; titre en en-tête ; « ✕ » = « Fermer » en 48 dp ; boutons décrits par leur
+    libellé (« Dodo » / « Réveil » suivent l'état ; « Balle, jouet préféré ») ; boutons de panneau à 56 dp **au
+    moins** (hauteur fixe avant : texte coupé à 200 %) ; « Ranger Baignoire » / « Mettre ici Baignoire » ; fiche du
+    véto : une rangée = un nœud « Satiété 80 % » (`isScreenReaderFocusable`, libellé, barre et valeur muets), largeurs
+    minimales au lieu de fixes (112 / 36 dp), plus de `singleLine`. **Focus non forcé** à l'ouverture : lint
+    `AccessibilityFocus` le refuse (il perturbe le lecteur d'écran) ; le titre de fenêtre est annoncé à la place.
+  - **Bulles** : zone live **polie** seulement pour une réplique **HIGH** (réponse à un toucher, au menu, à une
+    commande : `A11yTexts.announces`) ; LOW (bavardage, social) et NORMAL (ce qu'il fait tout seul : repas, chute,
+    voyage) restent affichées sans être lues — sinon TalkBack parlerait sans arrêt. Les répliques déclenchées par une
+    action du lecteur d'écran passent par HIGH (`speech.at`), y compris l'explication d'une station. Une bulle toute
+    neuve (fenêtre ajoutée) refait son texte après l'ajout (`post`) pour que le changement soit vu, seulement si elle
+    affiche encore ce texte.
+  - **Widget et tuile** : chaque jauge du widget est une rangée lue « Satiété 80 % » (`screenReaderFocusable`, ids
+    `widget_gN_row`, enfants `importantForAccessibility="no"`) au lieu d'un bloc d'emojis ; titre lu « Cookie, Se
+    promène » ; boutons « Nourrir Cookie » / « Appeler Cookie », 48 dp de haut au moins ; valeurs en largeur
+    minimale. Tuile : `stateDescription` (« Sur l'écran », « Caché », « Rangé ») en plus de sa description.
+  - **Animations réduites** : `MotionSettings.reduced` (app) lit `ANIMATOR_DURATION_SCALE`,
+    `TRANSITION_ANIMATION_SCALE`, `WINDOW_ANIMATION_SCALE` ; réduit si l'animateur est à 0 (« Supprimer les
+    animations » met les trois à 0) ou transitions **et** fenêtres à 0. Lu au démarrage du service, à
+    `ACTION_RELOAD`, et **quand le réglage change** (`ContentObserver`, sans redémarrer), et par les aperçus à
+    `onResume`. Réduit : `AmbientAnimator.reducedMotion` — ni frémissement d'oreille, ni miettes, étoiles du vertige,
+    bulles de saleté, flocons / pétales de saison ; une particule par demande du jeu (cœurs, notes, étincelles) ;
+    restent la marche, la respiration, le clignement, les Zzz et les larmes (ils disent son état). Non réduit :
+    **mêmes tirages** qu'avant (testé). Les petites animations de vues (menu qui s'ouvre, boutons pressés) passent
+    par `ViewPropertyAnimator`, qui suit déjà l'échelle d'Android.
+  - **Lint** : `ContentDescription`, `ClickableViewAccessibility`, `KeyboardInaccessibleWidget`, `LabelFor`,
+    `GetContentDescriptionOverride`, `AccessibilityFocus`, `AccessibilityScrollActions`,
+    `AccessibilityWindowStateChangedEvent` en **erreur**. Ancien code : `FloatingPanel.open` (écouteur
+    `ACTION_OUTSIDE`, pas un clic) supprimé localement avec sa raison ; les `@SuppressLint("ClickableViewAccessibility")`
+    existants restent (gestes doublés par des actions). `lint-baseline.xml` : 4 entrées périmées retirées
+    (`StationController`, passé dans `:core` en 8a), aucune ajoutée.
+  - **detekt** : aucune entrée ajoutée ; `A11yTexts` découpé (`SpokenText` à part, activités en `EnumMap`) pour
+    rester sous `TooManyFunctions` / `CyclomaticComplexMethod`, et les gestes TalkBack de l'animal dans
+    `PetAccessibility` plutôt que dans `TouchHandler` (qui en était à 10 fonctions). Des lignes modifiées qui étaient
+    trop longues (dans la baseline) ont été coupées : leurs entrées sont devenues sans objet (non nettoyées).
+  - **Tests** : `A11yTextsTest` (cœur, +18 : jauges, descriptions de l'animal pour chaque activité et humeur,
+    stations / jouets / nourritures / entrées du menu toutes décrites sans emoji — exhaustivité —, `plain`,
+    annonces, animations réduites et trace identique sans réduction, contrastes de chaque paire `Palette.UI_*`),
+    `A11yActionIdsTest` (app, +2). **498 → 518 tests** (489 dans `:core`, 29 dans `:app`).
+  - **Non couvert par les tests JVM** (vues Android, TalkBack) : voir « Accessibilité » en fin de fichier, liste
+    d'essais sur tablette.
+
 #### Schéma de persistance v1
 
 Fichier **`pets`** (SharedPreferences, `Prefs.PETS_FILE`) :
@@ -1057,6 +1152,10 @@ Chemins : `core/src/main/kotlin/com/tamacookie/…` (cœur) et `app/src/main/jav
    exhaustif l'exige) ; ses couleurs dans `Palette` (cœur).
 4. (Facultatif) un test de son comportement à côté de `StationBehaviorTest` (`core/src/test`) ; les tests
    d'exhaustivité (`StationBehaviorTest`, `DrawersTest`) la couvrent déjà.
+5. Accessibilité : son `name` est aussi sa **description** au lecteur d'écran, emoji retiré (« 🛏️ Lit » → « Lit »,
+   « Lit, Cookie dedans », action « Mettre dans Lit » de l'animal) — il doit rester parlant sans l'emoji, et son
+   `tapHint` est l'explication annoncée au double toucher (`A11yTextsTest` vérifie chaque station). Rien à
+   déclarer : `ids.xml` a 12 places d'action (`A11yActionIdsTest` échoue s'il en manque).
 
 Rien d'autre : panneau 🏠, survol/dépôt, toucher, cadence, voyage, sommeil, caresse, sauvegarde du placement
 suivent. Avant 3a il fallait toucher ~10 endroits (enum + `when` du dessin, `positionInStation`, `enterStation`,
@@ -1077,6 +1176,9 @@ s'assoit à `seat` ; pour des places distinctes, `seatFor(rang)` — voir `BedSt
 3. App — `feature/toy/KiteToyDrawer.kt` : `object KiteToyDrawer : PropDrawer` (`draw(c, v, w, h)` : `v.spin`,
    `v.tint`, pinceaux `v.pen`) et sa branche dans `PropDrawers.of(Toy)` (`when` exhaustif) ; ses couleurs dans
    `Palette`. `ToySpecTest` (cœur) et `DrawersTest` (app) le couvrent déjà (exhaustivité).
+4. Accessibilité : son libellé (« Cerf-volant ») est sa description (« Cerf-volant, jouet ») et le nom de son bouton
+   dans le coffre ; l'action TalkBack « Lancer » suit. Une nourriture : idem (« …, à manger »). `A11yTextsTest`
+   vérifie que chaque jouet et chaque nourriture ont un libellé lisible sans emoji.
 
 Coffre, jouet préféré à l'adoption, fiche du véto, partie, lancer au doigt, protestation, cadence suivent. Avant 3b :
 ~10 endroits (enum `Toy`, `PropView.Kind` + `when` du dessin, `Prop.toy`, taille dans `startPlay`, teinte, lancer,
@@ -1095,7 +1197,9 @@ Tout est dans le cœur (`core/src/main/kotlin/com/tamacookie/`), tests dans `cor
 2. `Mischiefs.ALL` (`feature/mischief/Mischief.kt`) : l'insérer à sa place — l'ordre est celui de la cascade et des
    réactions ; une bêtise de probabilité 1 doit rester la dernière (toc-toc).
 3. Seulement si elle a une nouvelle activité : l'ajouter à `Act` (BunnyBrain.kt) et aux ensembles utiles (`MOVING`
-   pour une animation fluide, `RUSH_BACK`, `BUSY_FOR_TRAVEL` — `BunnyBrainTest` vérifie leur cohérence).
+   pour une animation fluide, `RUSH_BACK`, `BUSY_FOR_TRAVEL` — `BunnyBrainTest` vérifie leur cohérence), et si
+   besoin ce que dit le lecteur d'écran pendant cette activité (`A11yTexts.ACTIVITIES` ; sans entrée : son humeur).
+   Si elle fait des particules purement décoratives : ne pas les émettre quand `AmbientAnimator.reducedMotion`.
 
 Enregistrement dans `ActRegistry`, boucle, caresse, voyage, cadence, niveau / pause / applications exemptées suivent.
 Avant 3b : ~6 endroits (cascade et état dans `MischiefController`, `Act` + ensembles, `when` de `updateBehavior`,
@@ -1107,6 +1211,9 @@ Avant 3b : ~6 endroits (cascade et état dans `MischiefController`, `Act` + ense
    `refresh = { st -> … }` si le bouton change selon l'état) et l'ajouter à `ALL` (même fichier ; deux par rangée).
 2. Seulement si l'action a besoin d'autre chose que `PetCtx` (un panneau, un autre contrôleur) : une méthode dans
    `MenuCtx` (cœur) et son implémentation dans `TouchHandler.menuCtx` (app).
+3. Accessibilité : le bouton est lu par son `label` (« Chanter »), et un texte dynamique (`refresh`) par sa partie
+   sans emoji (« ☀️\nRéveil » → « Réveil ») — garder la forme « emoji, retour à la ligne, libellé ».
+   `A11yTextsTest` vérifie chaque entrée (endormi et réveillé).
 
 Fermeture du menu, mise en page, rafraîchissement suivent. Avant 3b : 4 endroits (enum `PetMenu.Action`, bouton et
 rangée dans `PetMenu`, branche de `TouchHandler.onMenuAction`, texte dynamique dans `refresh`).
@@ -1228,6 +1335,86 @@ décrite dans les écarts 8c (port `UiTexts` + `object` de répliques par langue
   étape 4). « Cookie » (canaux de notification, widget, tuile, `a11y_summary`) est le nom par défaut du personnage
   (TamaCookie), pas celui de l'animal : gardé.
 - Le **genre** des textes (« il dort », « Touche pour t'occuper de lui ») reste masculin : à revoir avec la traduction.
+
+### Accessibilité (étape 8d)
+
+**Principes**
+
+1. **Tout ce qui se fait au doigt se fait au lecteur d'écran.** Sur une fenêtre overlay, un geste (toucher, double
+   toucher, appui long, glisser) a son équivalent : clic, appui long ou action personnalisée
+   (`AccessibilityAction` à id de ressource, `res/values/ids.xml`). L'écouteur tactile garde les vrais touchers ;
+   un `setOnClickListener` posé à côté ne sert qu'au lecteur d'écran (et au clavier / contacteur).
+2. **Décrire, pas épeler les emojis.** Un élément graphique ou un emoji seul a une `contentDescription` ; un texte
+   à emojis décoratifs est décrit par `SpokenText.plain` (sans emojis). Les états se disent par le système
+   (`isSelected` → « sélectionné », `isEnabled`), les titres par `isAccessibilityHeading` / `accessibilityPaneTitle`.
+3. **Parler peu.** Seules les répliques qui répondent à l'utilisateur sont annoncées (`A11yTexts.announces`) ;
+   les descriptions sont calculées quand le lecteur d'écran les demande, jamais à chaque image.
+4. **Voir et toucher** : texte ≥ 4,5:1 (`Palette.UI_*` + `Contrast`, testé), cibles ≥ 48 dp (`touchTarget`), texte
+   en `sp` sans boîte de taille fixe (police à 200 %), animations décoratives coupées si Android les supprime
+   (`ReducedMotion`, `AmbientAnimator.reducedMotion`).
+
+**Où sont les textes**
+
+| Texte | Où |
+|---|---|
+| Description calculée (animal, jauges, station, objet, aperçu) ; règle d'annonce | `A11yTexts` (cœur) |
+| Texte affiché sans ses emojis | `SpokenText.plain` / `plainLines` (cœur) |
+| Libellé fixe : actions (« Caresser », « Ouvrir le menu », « Mettre dans %1$s »…), « Fermer », dock, rôles, autorisations, widget | `strings.xml`, préfixe `access_` |
+| Ids des actions personnalisées | `res/values/ids.xml` (`access_action_*`), `A11yActionIds` |
+| Gestes de l'animal au lecteur d'écran | `PetAccessibility` ; stations et objets : `EntityWindows` |
+
+**Tester avec TalkBack** : Paramètres › Accessibilité › TalkBack (raccourci : les deux touches de volume 3 s). Un
+toucher = lire, double toucher = activer, glisser à droite / gauche = élément suivant / précédent, menu d'actions
+= glisser vers le haut puis à droite (ou toucher à trois doigts selon la version), « Actions » liste les actions
+personnalisées. `adb shell settings put global animator_duration_scale 0` (puis `1`) pour les animations réduites ;
+Paramètres › Affichage › Taille de police au maximum (200 %) ; `adb shell uiautomator dump` pour lire l'arbre
+(descriptions, `selected`, `heading`). Les fenêtres overlay ne prennent pas le focus clavier
+(`FLAG_NOT_FOCUSABLE`) : on y va par exploration au toucher ou en glissant d'élément en élément (TalkBack parcourt
+toutes les fenêtres affichées).
+
+**Essais sur la tablette avec TalkBack** (non couverts par les tests JVM) :
+
+1. Animal : explorer au doigt → « Cookie, lapin, content » (puis « dort », « joue », « dans Baignoire »… selon ce
+   qu'il fait) ; double toucher = caresse (cœurs, réplique **annoncée**) ; appui long (double toucher maintenu) =
+   menu ; actions : « Ouvrir le menu », « Mettre dans Baignoire » (il y entre, réplique de la station), « Sortir de
+   Baignoire » ; « Mettre dans … » absent pour une station rangée, pleine ou d'une autre page ; avec deux animaux,
+   chacun agit sur le **bon** animal.
+2. Bavardage et répliques sociales : affichés, **pas** lus ; réponses à un toucher / au menu / à une commande
+   (notification, widget) : lues une fois, sans couper la lecture en cours (zone polie).
+3. Menu : annoncé « Menu de Cookie » à l'ouverture ; titre en en-tête ; boutons « Dodo » (puis « Réveil »),
+   « Fermer » ; le panneau ne se ferme pas tout seul pendant l'exploration (toucher à l'extérieur).
+4. Panneau 🏠 (dock « Objets de cette page ») : lignes « Baignoire, sur cette page », boutons « Ranger Baignoire » /
+   « Mettre ici … » ; coffre : « Carotte », « Balle, jouet préféré » ; fiche du véto : une rangée = « Satiété 80 % »,
+   « Soigner », « Sortir ».
+5. Stations : « Baignoire, vide » → double toucher = explication **lue** ; coffre « Ouvrir » ; cage occupée
+   « Cage, Cookie dedans » → double toucher = caresse à Cookie.
+6. Objets : « Balle, jouet » → action « Lancer » (il court après) ; « Crotte de Cookie » → double toucher = ramassée.
+7. Écran principal : titres de section (navigation par titres), aperçu « Cookie, lapin, … », lignes des animaux
+   « Cookie, résident. Satiété … », niveaux « Sage / Taquin / Petit monstre » avec « sélectionné », autorisations
+   « … : autorisé / non autorisé », « Comment jouer » sans noms d'emojis. Adoption : pastilles de couleur nommées
+   et « sélectionné », cartes de caractère « sélectionné », aperçu qui suit le nom saisi.
+8. Widget : rangées « Satiété 80 % »…, « Nourrir Cookie », « Appeler Cookie » ; à la taille minimale (3 × 2), les
+   boutons (désormais 48 dp) ne sont pas coupés. Tuile : nom, état (« Sur l'écran »), action.
+9. Police à 200 % : boutons du menu, du coffre, de la fiche du véto (libellés et valeurs) non coupés ; dock
+   inchangé ; écrans principal et d'adoption qui défilent sans texte tronqué.
+10. Animations supprimées (Paramètres › Accessibilité › Supprimer les animations) **pendant** que le lapin tourne :
+   plus de flocons / pétales, de bulles de saleté, de miettes, d'oreille qui frémit ; une seule particule par
+   caresse ; il marche, respire, cligne et fait ses Zzz. Remettre : tout revient sans relancer.
+11. Contrastes : boutons framboise (« Faire apparaître », « Adopter ! », widget) et bouton gris clair sans la
+   permission de surimpression.
+
+**Ce qui n'est pas couvert**
+
+- **Glisser-déposer libre** (lancer l'animal, le poser ailleurs que dans une station) et **déplacer une station**
+  (appui long + glisser) : pas d'action — une station se place avec le panneau 🏠 (« Mettre ici »).
+- **Cache-cache** : l'animal caché sur une autre page se trouve en changeant de page ; caché (fenêtre hors de
+  l'écran ou cachée), il n'est pas lisible — seul le dock dit « Cache-cache en cours ».
+- **Bêtises qui gênent** (il s'assoit sur un bouton, sur le clavier) : la fenêtre de l'animal peut recouvrir un
+  bouton d'une autre app ; le lecteur d'écran le décrit mais ne passe pas « dessous » — le toucher le fait partir.
+- **Bulle** : contraste réel ≤ celui annoncé (opacité 0,8 imposée par Android aux fenêtres non tactiles).
+- **Notification** : boutons « 🥕 Nourrir »… lus avec leur emoji (texte de notification, laissé tel quel).
+- **Ordre de lecture entre fenêtres overlay** : décidé par le système (ordre des fenêtres), pas par l'app.
+- Pas de test instrumenté (Espresso / Accessibility Test Framework) : aucune dépendance de test Android.
 
 Règles pour chaque étape : pas de big-bang, pas de nouvelle dépendance sans justification écrite,
 ajouter des tests JVM pour tout ce qui devient pur, mettre à jour ce fichier (colonne État + écarts).

@@ -43,6 +43,11 @@ class PetView(
     private val path = Path()
     private val oval = RectF()
 
+    /** Animations réduites (réglage d'Android, étape 8d) : voir [AmbientAnimator.reducedMotion]. */
+    var reducedMotion: Boolean
+        get() = ambient.reducedMotion
+        set(v) { ambient.reducedMotion = v }
+
     /**
      * Affiche [s] et avance l'animation ambiante de [dt] secondes. Ne redessine que si l'image change
      * (état différent, clignement, oreille, particules, ou dessin qui dépend du temps).

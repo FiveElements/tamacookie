@@ -95,6 +95,13 @@ android {
         // Étape 8c : les textes d'interface sont dans res/values/strings.xml — un texte en dur ou une
         // concaténation affichée fait échouer le build (au lieu d'un simple avertissement).
         error += listOf("HardcodedText", "SetTextI18n")
+        // Étape 8d (accessibilité) : bloquants pour le code neuf ; les anciens cas sont dans la baseline ou
+        // supprimés localement avec leur raison (@SuppressLint : gestes doublés par des actions d'accessibilité).
+        error += listOf(
+            "ContentDescription", "ClickableViewAccessibility", "KeyboardInaccessibleWidget", "LabelFor",
+            "GetContentDescriptionOverride", "AccessibilityFocus", "AccessibilityScrollActions",
+            "AccessibilityWindowStateChangedEvent",
+        )
     }
 }
 

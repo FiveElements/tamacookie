@@ -4,7 +4,9 @@ import android.app.Activity
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Choreographer
 import android.view.Gravity
@@ -36,6 +38,8 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         const val EXTRA_NEW = "new"
         /** Adopter un compagnon (le résident reste). */
         const val EXTRA_COMPANION = "companion"
+        /** Contour d'une pastille de couleur non choisie (non textuel). */
+        private val SWATCH_STROKE = 0xFFB9ACA3.toInt()
     }
 
     /** Noms proposés à un compagnon (`adopt_companion_names`). */
@@ -52,12 +56,14 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     private var t = 0f
     private var previewFacing = 1f
     private val refreshers = ArrayList<() -> Unit>()
+    /** Espèce dite par l'aperçu (lecteur d'écran). */
+    private var previewSpecies = Species.DEFAULT.label
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Anti-tapjacking : aucune surimpression d'une autre app par-dessus cet écran
         window.setHideOverlayWindows(true)
-        window.statusBarColor = Color.parseColor("#FFF4E6")
+        window.statusBarColor = Palette.UI_BG
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
@@ -82,7 +88,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             val p = (20 * d).toInt(); setPadding(p, p, p, p)
         }
         val scroll = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#FFF4E6"))
+            setBackgroundColor(Palette.UI_BG)
             addView(root)
         }
 
@@ -94,12 +100,15 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
                 else -> getString(R.string.adopt_title_edit, Species.of(pet?.identity?.species).emoji)
             }
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
-            setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
+            setTextColor(Palette.INK); paint.isFakeBoldText = true
             gravity = Gravity.CENTER
+            isAccessibilityHeading = true
         })
 
         preview = PetView(this)
         preview.setOnClickListener { preview.emit(PType.HEART, 3) }
+        preview.clickLabel(getString(R.string.access_action_pet))
+        previewSpecies = Species.of(if (isNew) null else pet?.identity?.species).label
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
         nameEdit = EditText(this).apply {
@@ -112,6 +121,12 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             setHint(R.string.adopt_name_hint)
             gravity = Gravity.CENTER
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            // L'aperçu porte le nom saisi (lecteur d'écran)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) { describePreview() }
+            })
         }
         root.addView(nameEdit, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
@@ -135,11 +150,12 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
                 val card = TextView(this).apply {
                     text = getString(R.string.adopt_personality, p.emoji, p.label, p.desc)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                    setTextColor(Color.parseColor("#3A2E39"))
+                    setTextColor(Palette.INK)
                     val pd = (12 * d).toInt(); setPadding(pd, pd, pd, pd)
+                    contentDescription = getString(R.string.adopt_personality, "", p.label, p.desc).trim()
                     setOnClickListener { personality = p; refreshAll() }
                 }
-                refreshers += { card.background = chipBg(personality == p) }
+                refreshers += { card.background = chipBg(personality == p); card.isSelected = personality == p }
                 list.addView(card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
             }
             root.addView(list, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -149,24 +165,28 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
                     R.string.adopt_personality_fixed, personality.emoji, personality.label, personality.desc,
                 )
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setTextColor(Color.parseColor("#7A6B75"))
+                setTextColor(Palette.UI_MUTED)
             }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         }
 
         val btnRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        btnRow.addView(bigButton(getString(R.string.adopt_random), "#FBE3D6", "#3A2E39") { randomize() },
+        btnRow.addView(bigButton(getString(R.string.adopt_random), Palette.UI_CHIP, Palette.INK) { randomize() },
             LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply { rightMargin = (8 * d).toInt() })
         val confirm = getString(if (isNew) R.string.adopt_confirm else R.string.adopt_save)
-        btnRow.addView(bigButton(confirm, "#F07893", "#FFFFFF") { validate() },
+        // Framboise (et non plus rose) : texte blanc lisible à 4,8:1 (étape 8d)
+        btnRow.addView(bigButton(confirm, Palette.UI_ACTION, Palette.WHITE) { validate() },
             LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         root.addView(btnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (22 * d).toInt() })
         // Nouveau lapin alors qu'un résident existe : il peut aussi le rejoindre au lieu de le remplacer
         if (isNew && !asCompanion && canAddCompanion) {
-            root.addView(bigButton(getString(R.string.adopt_as_companion), "#E3F4E8", "#3A2E39") { asCompanion = true; validate() },
+            val asComp = bigButton(getString(R.string.adopt_as_companion), Palette.UI_OK, Palette.INK) {
+                asCompanion = true; validate()
+            }
+            root.addView(asComp,
                 LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (10 * d).toInt() })
             root.addView(TextView(this).apply {
                 text = getString(R.string.adopt_replace_hint, pet?.identity?.name ?: getString(R.string.adopt_your_pet))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Palette.UI_MUTED)
                 gravity = Gravity.CENTER
             }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (6 * d).toInt() })
         }
@@ -176,7 +196,11 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         refreshAll()
     }
 
-    override fun onResume() { super.onResume(); Choreographer.getInstance().postFrameCallback(this) }
+    override fun onResume() {
+        super.onResume()
+        preview.reducedMotion = MotionSettings.reduced(contentResolver)
+        Choreographer.getInstance().postFrameCallback(this)
+    }
     override fun onPause() { super.onPause(); Choreographer.getInstance().removeFrameCallback(this); lastNs = 0L }
 
     override fun doFrame(frameTimeNanos: Long) {
@@ -197,6 +221,13 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
     private fun refreshAll() {
         refreshers.forEach { it() }
+        describePreview()
+    }
+
+    /** « Noisette, lapin, content » : le nom en cours de saisie (lecteur d'écran). */
+    private fun describePreview() {
+        val name = Adoption.cleanName(nameEdit.text.toString()) ?: Identity.DEFAULT_NAME
+        preview.contentDescription = A11yTexts.preview(name, previewSpecies)
     }
 
     private fun randomize() {
@@ -236,15 +267,17 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         root.addView(TextView(this).apply {
             setText(title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
+            setTextColor(Palette.INK); paint.isFakeBoldText = true
+            isAccessibilityHeading = true
             setPadding(0, (14 * d).toInt(), 0, (6 * d).toInt())
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
     }
 
     private fun chipBg(selected: Boolean) = GradientDrawable().apply {
         cornerRadius = 14 * d
-        setColor(Color.parseColor(if (selected) "#FFE0E8" else "#FFFFFF"))
-        setStroke((if (selected) 3 * d else 1 * d).toInt(), Color.parseColor(if (selected) "#F07893" else "#E3D6CC"))
+        setColor(if (selected) Palette.UI_SELECTED else Palette.WHITE)
+        val stroke = if (selected) Palette.UI_SELECTED_STROKE else Palette.UI_STROKE
+        setStroke((if (selected) 3 * d else 1 * d).toInt(), stroke)
     }
 
     private fun <E : LookOption> chips(options: List<E>, get: () -> E, set: (E) -> Unit): View {
@@ -253,11 +286,14 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             val c = TextView(this).apply {
                 text = o.label
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setTextColor(Color.parseColor("#3A2E39"))
+                setTextColor(Palette.INK)
                 val p = (10 * d).toInt(); setPadding(p + p / 2, p, p + p / 2, p)
+                gravity = Gravity.CENTER
+                touchTarget(d)
+                describePlain(o.label)
                 setOnClickListener { set(o); refreshAll() }
             }
-            refreshers += { c.background = chipBg(get() == o) }
+            refreshers += { c.background = chipBg(get() == o); c.isSelected = get() == o }
             row.addView(c, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { rightMargin = (8 * d).toInt() })
         }
         return HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(row) }
@@ -267,28 +303,36 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         options.forEach { o ->
             val col = o.hex
-            val v = View(this).apply { setOnClickListener { set(o); refreshAll() } }
+            // Pastille de couleur : son nom pour le lecteur d'écran, « sélectionné » sur le choix en cours
+            val v = View(this).apply {
+                contentDescription = SpokenText.plain(o.label)
+                setOnClickListener { set(o); refreshAll() }
+            }
             refreshers += {
+                v.isSelected = get() == o
                 v.background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
                     setColor(Color.parseColor(col))
                     val sel = get() == o
-                    setStroke((if (sel) 4 * d else 1.5f * d).toInt(), Color.parseColor(if (sel) "#F07893" else "#B9ACA3"))
+                    val stroke = if (sel) Palette.UI_SELECTED_STROKE else SWATCH_STROKE
+                    setStroke((if (sel) 4 * d else 1.5f * d).toInt(), stroke)
                 }
             }
-            val s = (44 * d).toInt()
+            val s = (MIN_TOUCH_DP * d).toInt()   // 44 dp avant l'étape 8d
             row.addView(v, LinearLayout.LayoutParams(s, s).apply { rightMargin = (10 * d).toInt() })
         }
         return HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(row) }
     }
 
-    private fun bigButton(label: String, bg: String, fg: String, click: () -> Unit) = TextView(this).apply {
+    private fun bigButton(label: String, bg: Int, fg: Int, click: () -> Unit) = TextView(this).apply {
         text = label
+        describePlain(label)
         gravity = Gravity.CENTER
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-        setTextColor(Color.parseColor(fg)); paint.isFakeBoldText = true
+        setTextColor(fg); paint.isFakeBoldText = true
         val p = (15 * d).toInt(); setPadding(p, p, p, p)
-        background = GradientDrawable().apply { cornerRadius = 18 * d; setColor(Color.parseColor(bg)) }
+        touchTarget(d)
+        background = GradientDrawable().apply { cornerRadius = 18 * d; setColor(bg) }
         setOnClickListener { click() }
     }
 }

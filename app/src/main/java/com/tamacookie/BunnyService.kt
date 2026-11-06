@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
+import android.database.ContentObserver
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -159,15 +160,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             val p = pet
             if (!hidden && !isAway(p) && world.isShown(p) &&
                 director.bubbles.request(Director.BubbleQueue.Line(p.id, text, seconds, speech.priority))
-            ) showBubble(p.id, text, seconds)
+            ) showBubble(p.id, text, seconds, speech.priority)
             requestFrames()
         }
     }
 
     /** Affiche la bulle de [id] ; celle d'un autre animal, interrompue, disparaît. */
-    private fun showBubble(id: PetId, text: String, seconds: Float) {
+    private fun showBubble(id: PetId, text: String, seconds: Float, priority: SpeechPriority) {
         for (q in world.pets.keys) if (q != id) windows.hideBubble(q)
-        windows.say(id, text, seconds)
+        windows.say(id, text, seconds, announce = A11yTexts.announces(priority))
     }
     private lateinit var notifier: PetNotifier
     private lateinit var touch: TouchHandler
@@ -247,10 +248,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         social.registerActs(acts)
         behavior = PetBehavior(this, behaviorHooks)
         touch = TouchHandler(this, windows, this, stations, mischief)
-        val entities = EntityWindows(this, windows, world, toys, stations) { s, ev ->
-            val view = stations.occupantOf(s)?.let { petWindows[it.id]?.view }
-            if (view != null) touch.forward(view, ev) else false
-        }
+        val entities = EntityWindows(this, windows, world, toys, stations,
+            forwardToPet = { s, ev ->
+                val view = stations.occupantOf(s)?.let { petWindows[it.id]?.view }
+                if (view != null) touch.forward(view, ev) else false
+            },
+            // Lecteur d'écran : la station occupée « touchée » caresse son occupant
+            caressOccupant = { s -> stations.occupantOf(s)?.let { touch.accessibility.caress(it); true } ?: false },
+            asUser = { block -> speech.at(SpeechPriority.HIGH, block) },
+        )
         overlayManager.factory = entities::create
 
         computeBounds()
@@ -258,6 +264,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         mischief.loadLevel()
         loadSeasonal()
         loadWellbeing()
+        loadMotion()
+        for (u in MotionSettings.URIS) contentResolver.registerContentObserver(u, false, motionObserver)
 
         // La fenêtre du lapin est ajoutée AVANT startForeground : sur Android 15+, une fenêtre
         // en surimpression visible autorise le passage au premier plan (redémarrage START_STICKY).
@@ -472,7 +480,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             ACTION_SHOW -> if (hidden) show() else if (clock.uptimeMs() - createdAt > 3_000) say(CALLED)
             ACTION_STOP -> { stop(this); return START_NOT_STICKY }
             // Réglages changés (niveau de bêtises)
-            ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); loadWellbeing(); showNewLook() }
+            ACTION_RELOAD -> { mischief.loadLevel(); loadSeasonal(); loadWellbeing(); loadMotion(); showNewLook() }
             PetCommands.ACTION_SET_NAME -> {
                 val n = Adoption.cleanName(intent.getStringExtra(PetCommands.EXTRA_NAME)) ?: return START_STICKY
                 resident.rename(n)
@@ -495,6 +503,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         widgetThrottle.cancel()
         stopLoop()
         handler.removeCallbacks(unlockPoll)
+        // Sans effet s'il n'a pas été enregistré (démarrage interrompu)
+        contentResolver.unregisterContentObserver(motionObserver)
         if (wasReady) {
             try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
             saveAll()
@@ -590,6 +600,18 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         windows.createDock { stations.toggleStationsPanel() }
     }
 
+    /** Animations réduites (réglage d'Android, étape 8d) : relu au démarrage, à `ACTION_RELOAD`, à son changement. */
+    private var reducedMotion = false
+
+    private fun loadMotion() {
+        reducedMotion = MotionSettings.reduced(contentResolver)
+        for (w in petWindows.values) w.view.reducedMotion = reducedMotion
+    }
+
+    private val motionObserver = object : ContentObserver(handler) {
+        override fun onChange(selfChange: Boolean) { loadMotion() }
+    }
+
     private fun loadSeasonal() { seasonal.enabled = prefs.getBoolean(Prefs.SEASONAL, Prefs.SEASONAL_DEFAULT) }
 
     private fun loadWellbeing() { wellbeing.enabled = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT) }
@@ -597,6 +619,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** La vue de [p] (créée à sa première apparition, avec l'écouteur des gestes). */
     private fun ensurePetWindow(p: Pet): PetWindow = petWindows.getOrPut(p.id) {
         val v = PetView(this, p.species)
+        v.reducedMotion = reducedMotion
         v.render(PetRenderState.of(p, season = season), 0f)
         viewOwner[v] = p.id
         touch.attach(v) { viewOwner[v]?.let { world.pets[it] } }
@@ -823,7 +846,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         // Bulle suivante (plusieurs animaux) : celle qui attendait son tour
         director.bubbles.tick(dt)?.let { l ->
             val p = world.pets[l.pet]
-            if (p != null && !hidden && !isAway(p) && world.isShown(p)) showBubble(l.pet, l.text, l.seconds)
+            if (p != null && !hidden && !isAway(p) && world.isShown(p)) showBubble(l.pet, l.text, l.seconds, l.priority)
         }
         windows.updateBubbles(dt)
         // Au plus un updateViewLayout par fenêtre et par image

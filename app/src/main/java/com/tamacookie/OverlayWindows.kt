@@ -111,16 +111,28 @@ class OverlayWindows(
     /** Une bulle est affichée. */
     val anyBubbleShown: Boolean get() = bubbles.values.any { overlay.isAttached(it.id) }
 
-    /** [pet] dit [text] pendant [seconds] s. */
-    fun say(pet: PetId, text: String, seconds: Float) {
+    /**
+     * [pet] dit [text] pendant [seconds] s ; [announce] : le lecteur d'écran la lit (réponse à l'utilisateur,
+     * [A11yTexts.announces]) — sinon elle reste affichée sans être annoncée.
+     */
+    fun say(pet: PetId, text: String, seconds: Float, announce: Boolean = false) {
         val b = bubbleOf(pet)
-        b.view.text.text = text
+        b.view.show(text, announce)
         b.view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
         b.w = b.view.measuredWidth; b.h = b.view.measuredHeight
         b.time = seconds
         positionBubble(pet, b)
         // Nouveau texte (nouvelle taille) : appliqué tout de suite
-        if (!overlay.isAttached(b.id)) overlay.attach(b.id, b.view, b.lp) else overlay.relayout(b.id)
+        if (!overlay.isAttached(b.id)) {
+            overlay.attach(b.id, b.view, b.lp)
+            // Fenêtre toute neuve : le changement de texte a eu lieu avant qu'elle soit affichée
+            if (announce) b.view.post {
+                // Seulement si elle affiche encore ce texte (une autre réplique a pu la remplacer entre-temps)
+                if (overlay.isAttached(b.id) && b.view.text.text.toString() == text) b.view.show(text, announce = true)
+            }
+        } else {
+            overlay.relayout(b.id)
+        }
     }
 
     private fun positionBubble(pet: PetId, b: Bubble) {
@@ -171,13 +183,17 @@ class OverlayWindows(
         val size = (Tuning.DOCK_SIZE_DP * d).toInt()
         dock = TextView(context).apply {
             setText(R.string.dock_home)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            // Emoji = icône dans un rond de taille fixe : en dp (pas en sp), pour ne pas déborder à 200 %
+            setTextSize(TypedValue.COMPLEX_UNIT_DIP, 22f)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#FFFDF9"))
-                setStroke((2 * d).toInt(), Color.parseColor("#5B4A55"))
+                setColor(Palette.UI_PANEL)
+                setStroke((2 * d).toInt(), Palette.OUTLINE)
             }
+            contentDescription = context.getString(R.string.access_dock_home)
+            // Les vrais touchers sont consommés par l'écouteur ci-dessous : ce clic ne vient que du lecteur d'écran
+            setOnClickListener { onTap() }
         }
         dockLp = params(size, size, touchable = true)
         reloadDockPosition()
@@ -238,6 +254,9 @@ class OverlayWindows(
 
     /** 🫣 pendant qu'il se cache, 🏠 sinon. */
     fun setDockHiding(hiding: Boolean) {
-        if (::dock.isInitialized) dock.setText(if (hiding) R.string.dock_hiding else R.string.dock_home)
+        if (!::dock.isInitialized) return
+        dock.setText(if (hiding) R.string.dock_hiding else R.string.dock_home)
+        val desc = if (hiding) R.string.access_dock_hiding else R.string.access_dock_home
+        dock.contentDescription = context.getString(desc)
     }
 }

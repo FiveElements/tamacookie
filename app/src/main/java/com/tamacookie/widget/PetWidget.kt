@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
+import com.tamacookie.SpokenText
 import com.tamacookie.BunnyService
 import com.tamacookie.MainActivity
 import com.tamacookie.R
@@ -40,6 +41,9 @@ class PetWidget : AppWidgetProvider() {
             Triple(R.id.widget_g2_label, R.id.widget_g2_bar, R.id.widget_g2_value),
             Triple(R.id.widget_g3_label, R.id.widget_g3_bar, R.id.widget_g3_value),
         )
+        /** Rangée de chaque jauge : c'est elle que lit le lecteur d'écran (« Satiété 80 % »). */
+        private val GAUGE_ROWS =
+            intArrayOf(R.id.widget_g0_row, R.id.widget_g1_row, R.id.widget_g2_row, R.id.widget_g3_row)
 
         /** Redessine tous les widgets posés (rien s'il n'y en a aucun). */
         fun updateAll(ctx: Context) {
@@ -62,15 +66,23 @@ class PetWidget : AppWidgetProvider() {
             else WidgetTexts.content(rec.identity.name, rec.stats, BunnyService.running)
             val v = RemoteViews(ctx.packageName, R.layout.widget_pet)
             v.setTextViewText(R.id.widget_title, c.title)
+            // Lecteur d'écran (étape 8d) : le nom sans l'emoji d'humeur, puis l'humeur en mots
+            v.setContentDescription(R.id.widget_title,
+                ctx.getString(R.string.access_widget_title, SpokenText.plain(c.title), SpokenText.plain(c.subtitle)))
             v.setTextViewText(R.id.widget_subtitle, c.subtitle)
             v.setViewVisibility(R.id.widget_gauges, if (c.gauges.isEmpty()) View.GONE else View.VISIBLE)
-            v.setContentDescription(R.id.widget_gauges, c.statusLine)
             for ((i, g) in c.gauges.withIndex().take(GAUGES.size)) {
                 val (label, bar, value) = GAUGES[i]
                 v.setTextViewText(label, g.emoji)
                 v.setContentDescription(label, g.label)
+                v.setContentDescription(GAUGE_ROWS[i], g.description)
                 v.setProgressBar(bar, 100, g.value, false)
                 v.setTextViewText(value, ctx.getString(R.string.widget_gauge_value, g.value))
+            }
+            if (rec != null) {
+                val name = rec.identity.name
+                v.setContentDescription(R.id.widget_feed, ctx.getString(R.string.access_widget_feed, name))
+                v.setContentDescription(R.id.widget_call, ctx.getString(R.string.access_widget_call, name))
             }
             v.setTextViewText(R.id.widget_status, c.status)
             v.setViewVisibility(R.id.widget_status, if (c.status.isEmpty()) View.GONE else View.VISIBLE)

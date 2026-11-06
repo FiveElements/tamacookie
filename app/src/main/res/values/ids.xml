@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Identifiants des actions TalkBack personnalisées (étape 8d) : une action personnalisée doit avoir un id de
+     ressource (pas de collision avec les actions standard). Une par station : StationKind.entries.size au plus
+     (A11yActionIds, vérifié par A11yActionIdsTest). -->
+<resources>
+    <item name="access_action_menu" type="id" />
+    <item name="access_action_leave" type="id" />
+    <item name="access_action_throw" type="id" />
+    <item name="access_action_station_0" type="id" />
+    <item name="access_action_station_1" type="id" />
+    <item name="access_action_station_2" type="id" />
+    <item name="access_action_station_3" type="id" />
+    <item name="access_action_station_4" type="id" />
+    <item name="access_action_station_5" type="id" />
+    <item name="access_action_station_6" type="id" />
+    <item name="access_action_station_7" type="id" />
+    <item name="access_action_station_8" type="id" />
+    <item name="access_action_station_9" type="id" />
+    <item name="access_action_station_10" type="id" />
+    <item name="access_action_station_11" type="id" />
+</resources>

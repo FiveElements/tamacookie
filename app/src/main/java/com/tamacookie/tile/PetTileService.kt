@@ -66,6 +66,8 @@ class PetTileService : TileService() {
         tile.label = TileTexts.label(name, getString(R.string.tile_label))
         tile.subtitle = st.subtitle
         tile.contentDescription = getString(R.string.tile_description, tile.label, st.action)
+        // Lu après le nom par le lecteur d'écran : « Sur l'écran », « Caché », « Rangé » (étape 8d)
+        tile.stateDescription = st.subtitle
         tile.state = if (st.active) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.updateTile()
     }
