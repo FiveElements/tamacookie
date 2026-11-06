@@ -1,11 +1,18 @@
 package com.tamacookie
 
+import com.tamacookie.feature.station.StationKind
 import android.content.Context
 import android.content.SharedPreferences
 
-/** Fichier et clés SharedPreferences, centralisés. */
+/**
+ * Fichiers et clés SharedPreferences des **réglages**, centralisés. Les animaux sont dans un fichier à part
+ * ([PETS_FILE]), lu et écrit seulement par [com.tamacookie.persist.PetRepository].
+ */
 object Prefs {
+    /** Réglages (nom historique : il contenait aussi l'animal jusqu'au schéma 0). */
     const val FILE = "pet"
+    /** Animaux (schéma versionné, clés par PetId). */
+    const val PETS_FILE = "pets"
 
     /** Le lapin doit tourner (relancé au démarrage du téléphone). */
     const val ENABLED = "enabled"

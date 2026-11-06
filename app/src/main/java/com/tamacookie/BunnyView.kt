@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import com.tamacookie.feature.toy.Food
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -17,64 +18,56 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Dessin et animation de Cookie, entièrement en Canvas (aucune image).
- * Le service pilote la pose / l'expression ; la vue gère le clignement des yeux,
- * les petits mouvements et les particules (cœurs, Zzz, notes...).
+ * Dessin de Cookie, entièrement en Canvas (aucune image). La vue n'affiche qu'un [BunnyRenderState]
+ * immuable ([render]) : elle n'écrit ni ne lit l'état du jeu. L'animation ambiante (clignement,
+ * oreilles, particules) est calculée par son [AmbientAnimator] (aléatoire injectable).
  */
 @SuppressLint("ViewConstructor")
-class BunnyView(context: Context) : View(context) {
+class BunnyView(
+    context: Context,
+    private val ambient: AmbientAnimator = AmbientAnimator(Random(System.nanoTime())),
+) : View(context) {
 
     enum class Pose { IDLE, WALK, AIR, SLEEP, EAT, DRAGGED, SIT }
     enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY }
     enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE }
 
-    private class Particle(
-        var type: PType, var x: Float, var y: Float, var vx: Float, var vy: Float,
-        var life: Float, val maxLife: Float, val size: Float, val rot: Float
-    )
-
-    // --- Pilotage par le service ---
-    var pose = Pose.IDLE
-    var expr = Expr.NORMAL
-    var facing = 1f                 // 1 = droite, -1 = gauche
-    var walkPhase = 0f              // 0..1, cycle de saut pendant la marche
-    var airVy = 0f                  // vitesse verticale (px/s) pour l'étirement en l'air
-    var eatProgress = 0f            // 0..1
-    var foodColor = Color.parseColor("#F28C28")
-        set(v) { field = v; carrot.color = v }
-    var dirty = false
-    var veryDirty = false
+    /** Dernier état affiché. */
+    var state = BunnyRenderState()
+        private set
+    private val pose get() = state.pose
+    private val expr get() = state.expr
+    private val facing get() = state.facing
+    private val walkPhase get() = state.walkPhase
+    private val airVy get() = state.airVy
+    private val eatProgress get() = state.eatProgress
+    private val dirty get() = state.dirty
+    private val look get() = state.look
+    private val t get() = ambient.t
 
     private val d = resources.displayMetrics.density
-    private var t = 0f
-    private var blinkIn = 2.5f
-    private var blink = 0f
-    private var earTwitch = 0f
-    private var earTwitchIn = 4f
-    private val particles = ArrayList<Particle>()
-    private val rnd = Random(System.nanoTime())
 
     // --- Peintures ---
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; color = Color.parseColor("#5B4A55")
+        style = Paint.Style.STROKE; color = Palette.OUTLINE
         strokeWidth = 5f; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND
     }
-    private val fur = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFFBF5") }
-    private val furShade = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F1E6DC") }
-    private val pink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F6AFC0") }
-    private val cheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#66F07893") }
-    private val sickCheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#669BC48A") }
-    private val nose = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F07893") }
-    private val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#3A2E39") }
+    private val fur = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR }
+    private val furShade = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.FUR_SHADE }
+    private val pink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.PINK }
+    private val cheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CHEEK }
+    private val sickCheek = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SICK_CHEEK }
+    private val nose = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.NOSE }
+    private val eye = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.INK }
     private val white = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; color = Color.parseColor("#3A2E39")
+        style = Paint.Style.STROKE; color = Palette.INK
         strokeWidth = 2.6f; strokeCap = Paint.Cap.ROUND
     }
-    private val dirt = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#9C7A5B") }
-    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(45, 0, 0, 0) }
-    private val carrot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#F28C28") }
-    private val leaf = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4CAF50") }
+    private val dirt = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.DIRT }
+    private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SHADOW }
+    private val carrot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CARROT }
+    private val leaf = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LEAF }
     private val pPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.CENTER; isFakeBoldText = true
@@ -89,100 +82,52 @@ class BunnyView(context: Context) : View(context) {
     private val accStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 1.8f; strokeJoin = Paint.Join.ROUND
     }
-    private val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#4A3B45") }
-    private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFD54A") }
-    private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(60, 255, 255, 255) }
+    private val hatPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.HAT }
+    private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.YELLOW }
+    private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LENS }
     private var darkFur = false
+    /** Nourriture dont la couleur est dans [carrot] (parseColor seulement quand elle change). */
+    private var paintedFood = Food.CARROT
 
-    var look: Look = Look()
-        set(v) { field = v.copy(); applyLook() }
-
-    private fun applyLook() {
-        val f = Options.furColor(look.fur)
+    private fun applyLook(look: Look) {
+        val f = Options.color(look.fur)
         fur.color = f
         furShade.color = Options.shade(f, 0.93f)
         darkFur = Options.isDark(f)
-        outline.color = Color.parseColor(if (darkFur) "#1E181C" else "#5B4A55")
-        line.color = Color.parseColor(if (darkFur) "#F3E9DD" else "#3A2E39")
-        eye.color = Options.eyeColor(look.eyes)
+        outline.color = if (darkFur) Palette.OUTLINE_DARK else Palette.OUTLINE
+        line.color = if (darkFur) Palette.CREAM else Palette.INK
+        eye.color = Options.color(look.eyes)
         val lum = 0.299f * Color.red(f) + 0.587f * Color.green(f) + 0.114f * Color.blue(f)
         patch.color = when {
-            lum > 190f -> Color.parseColor("#7A5A48")
+            lum > 190f -> Palette.PATCH_LIGHT
             lum > 110f -> Options.shade(f, 0.55f)
-            else -> Color.parseColor("#F3E9DD")
+            else -> Palette.CREAM
         }
-        acc.color = Options.accColor(look.accColor)
+        acc.color = Options.color(look.accColor)
         accStroke.color = outline.color
+    }
+
+    init { applyLook(state.look) }
+
+    /**
+     * Affiche [s] et avance l'animation ambiante de [dt] secondes. Ne redessine que si l'image change
+     * (état différent, clignement, oreille, particules, ou dessin qui dépend du temps).
+     */
+    fun render(s: BunnyRenderState, dt: Float) {
+        val old = state
+        state = s
+        if (s.look != old.look) applyLook(s.look)
+        if (s.food != paintedFood) { paintedFood = s.food; carrot.color = Color.parseColor(s.food.color) }
+        if (ambient.frame(dt, old, s, width.toFloat(), height.toFloat(), d)) invalidate()
+    }
+
+    /** Ajoute des particules au-dessus de la tête (cœurs, notes…), [facing] = sens du regard. */
+    fun emit(type: PType, count: Int = 1, facing: Float = state.facing) {
+        ambient.emit(type, count, width.toFloat(), height.toFloat(), d, facing)
         invalidate()
     }
 
-    init { applyLook() }
-
-    /** Avance l'animation de [dt] secondes. */
-    fun update(dt: Float) {
-        t += dt
-        // clignement
-        if (blink > 0f) blink -= dt
-        else {
-            blinkIn -= dt
-            if (blinkIn <= 0f) { blink = 0.14f; blinkIn = 2f + rnd.nextFloat() * 4f }
-        }
-        // petit mouvement d'oreille
-        if (earTwitch > 0f) earTwitch -= dt
-        else {
-            earTwitchIn -= dt
-            if (earTwitchIn <= 0f) { earTwitch = 0.35f; earTwitchIn = 3f + rnd.nextFloat() * 6f }
-        }
-        // particules ambiantes
-        if (pose == Pose.SLEEP && rnd.nextFloat() < dt * 0.9f) emit(PType.ZZZ)
-        if (pose == Pose.EAT && rnd.nextFloat() < dt * 4f) emit(PType.CRUMB)
-        if (expr == Expr.SAD && rnd.nextFloat() < dt * 0.4f) emit(PType.DROP)
-        if (expr == Expr.SICK && rnd.nextFloat() < dt * 0.3f) emit(PType.DROP)
-        if (expr == Expr.DIZZY && rnd.nextFloat() < dt * 5f) emit(PType.STAR)
-        if (veryDirty && rnd.nextFloat() < dt * 0.6f) emit(PType.BUBBLE)
-
-        val it = particles.iterator()
-        while (it.hasNext()) {
-            val p = it.next()
-            p.life -= dt
-            if (p.life <= 0f) { it.remove(); continue }
-            p.x += p.vx * dt; p.y += p.vy * dt
-            if (p.type == PType.CRUMB || p.type == PType.DROP) p.vy += 300f * d * dt
-            if (p.type == PType.ZZZ || p.type == PType.NOTE) p.x += sin(t * 3f + p.rot) * 12f * d * dt
-        }
-        invalidate()
-    }
-
-    /** Ajoute une particule au-dessus de la tête. */
-    fun emit(type: PType, count: Int = 1) {
-        repeat(count) {
-            val cx = width / 2f
-            val headY = height - 6f * d - 60f * d * unit()
-            val p = when (type) {
-                PType.HEART -> Particle(type, cx + rnd.nextFloat(-25f, 25f) * d, headY,
-                    rnd.nextFloat(-20f, 20f) * d, -55f * d, 1.4f, 1.4f, rnd.nextFloat(9f, 14f) * d, 0f)
-                PType.ZZZ -> Particle(type, cx + 20f * d * facing, headY + 6f * d, 8f * d * facing,
-                    -28f * d, 2.2f, 2.2f, rnd.nextFloat(11f, 16f) * d, rnd.nextFloat() * 6f)
-                PType.NOTE -> Particle(type, cx + rnd.nextFloat(-30f, 30f) * d, headY,
-                    rnd.nextFloat(-10f, 10f) * d, -45f * d, 1.6f, 1.6f, rnd.nextFloat(13f, 18f) * d, rnd.nextFloat() * 6f)
-                PType.SPARKLE -> Particle(type, cx + rnd.nextFloat(-40f, 40f) * d,
-                    height - rnd.nextFloat(10f, 80f) * d, 0f, -15f * d, 0.8f, 0.8f, rnd.nextFloat(5f, 9f) * d, 0f)
-                PType.DROP -> Particle(type, cx + 16f * d * facing, headY + 8f * d, 6f * d * facing,
-                    -20f * d, 0.9f, 0.9f, 4f * d, 0f)
-                PType.CRUMB -> Particle(type, cx + 24f * d * facing, height - 50f * d, rnd.nextFloat(-30f, 30f) * d,
-                    -40f * d, 0.7f, 0.7f, 2.2f * d, 0f)
-                PType.STAR -> Particle(type, cx, headY - 4f * d, 0f, 0f, 0.6f, 0.6f, 5f * d, rnd.nextFloat() * 6.28f)
-                PType.BUBBLE -> Particle(type, cx + rnd.nextFloat(-20f, 20f) * d, height - 40f * d,
-                    rnd.nextFloat(-6f, 6f) * d, -25f * d, 1.5f, 1.5f, rnd.nextFloat(3f, 6f) * d, 0f)
-            }
-            particles.add(p)
-        }
-    }
-
-    private fun Random.nextFloat(a: Float, b: Float) = a + nextFloat() * (b - a)
-
-    /** Échelle du lapin : 1 unité de dessin = unit() dp. */
-    private fun unit() = 0.95f
+    private fun unit() = AmbientAnimator.UNIT
 
     override fun onDraw(c: Canvas) {
         val cx = width / 2f
@@ -240,6 +185,7 @@ class BunnyView(context: Context) : View(context) {
     private fun drawBunny(c: Canvas) {
         val dragged = pose == Pose.DRAGGED
         // Oreilles : angle selon l'humeur
+        val earTwitch = ambient.earTwitch
         val twitch = if (earTwitch > 0f) sin(earTwitch * 30f) * 8f else 0f
         var a1: Float
         var a2: Float
@@ -265,7 +211,7 @@ class BunnyView(context: Context) : View(context) {
         var b2x = headCx + 7f; var b2y = headCy - 15f
         var earLen = 1f
         when (look.ears) {
-            1 -> { // tombantes (bélier)
+            Ears.LOP -> { // tombantes (bélier)
                 val sway = when {
                     dragged -> sin(t * 7f) * 14f
                     pose == Pose.WALK -> sin(walkPhase * 6.28f) * 7f
@@ -276,7 +222,8 @@ class BunnyView(context: Context) : View(context) {
                 b2x = headCx + 19f; b2y = headCy - 9f
                 earLen = 0.82f
             }
-            2 -> a2 = if (dragged) a2 + 60f else 80f + twitch   // une oreille pliée
+            Ears.ONE_FOLDED -> a2 = if (dragged) a2 + 60f else 80f + twitch   // une oreille pliée
+            Ears.UP -> {}
         }
 
         for (pass in 0..1) {
@@ -296,7 +243,7 @@ class BunnyView(context: Context) : View(context) {
             // corps
             oval(c, bodyCx, bodyCy, bodyRx, bodyRy, if (o) outline else fur)
             if (!o) oval(c, bodyCx + 6f, bodyCy + 6f, bodyRx * 0.55f, bodyRy * 0.6f, furShade)
-            if (!o && look.pattern == 2) {
+            if (!o && look.pattern == Pattern.DUTCH) {
                 // Hollandais : arrière du corps coloré
                 c.save(); clipOval(c, bodyCx, bodyCy, bodyRx, bodyRy)
                 c.drawRect(bodyCx - bodyRx - 2f, bodyCy - bodyRy - 2f, bodyCx - bodyRx * 0.1f, bodyCy + bodyRy + 2f, patch)
@@ -310,9 +257,9 @@ class BunnyView(context: Context) : View(context) {
             }
             // tête
             oval(c, headCx, headCy, 22f, 20f, if (o) outline else fur)
-            if (!o && look.pattern != 0) {
+            if (!o && look.pattern != Pattern.PLAIN) {
                 c.save(); clipOval(c, headCx, headCy, 22f, 20f)
-                if (look.pattern == 1) oval(c, headCx - 7f, headCy - 1f, 8.5f, 7.5f, patch)
+                if (look.pattern == Pattern.EYE_PATCH) oval(c, headCx - 7f, headCy - 1f, 8.5f, 7.5f, patch)
                 else {
                     oval(c, headCx - 15f, headCy - 2f, 12f, 15f, patch)
                     oval(c, headCx + 18f, headCy - 2f, 10f, 15f, patch)
@@ -348,7 +295,7 @@ class BunnyView(context: Context) : View(context) {
         c.translate(x, y)
         c.rotate(angle)
         rect.set(-6.5f, -38f * len, 6.5f, 4f)
-        val furP = if (look.pattern == 2) patch else if (back) furShade else fur
+        val furP = if (look.pattern == Pattern.DUTCH) patch else if (back) furShade else fur
         c.drawOval(rect, if (outlinePass) outline else furP)
         if (!outlinePass) {
             rect.set(-3.2f, -33f * len, 3.2f, -2f)
@@ -362,11 +309,12 @@ class BunnyView(context: Context) : View(context) {
     // ------------------------------------------------------------------
     private fun drawAccessory(c: Canvas, hx: Float, hy: Float, hr: Float, standing: Boolean) {
         when (look.accessory) {
-            1 -> bow(c, hx + hr * 0.6f, hy - hr * 0.85f)
-            2 -> hat(c, hx + 1f, hy - hr * 0.88f)
-            3 -> if (standing) glasses(c, hx, hy)
-            4 -> if (standing) scarf(c, hx, hy)
-            5 -> flowers(c, hx, hy, hr)
+            Accessory.BOW -> bow(c, hx + hr * 0.6f, hy - hr * 0.85f)
+            Accessory.HAT -> hat(c, hx + 1f, hy - hr * 0.88f)
+            Accessory.GLASSES -> if (standing) glasses(c, hx, hy)
+            Accessory.SCARF -> if (standing) scarf(c, hx, hy)
+            Accessory.FLOWERS -> flowers(c, hx, hy, hr)
+            Accessory.NONE -> {}
         }
     }
 
@@ -421,7 +369,7 @@ class BunnyView(context: Context) : View(context) {
 
     private fun drawFace(c: Canvas, hx: Float, hy: Float) {
         val e1x = hx - 7f; val e2x = hx + 9f; val ey = hy - 1f
-        val closed = blink > 0f
+        val closed = ambient.blinking
         when {
             expr == Expr.HAPPY -> { arcEye(c, e1x, ey, up = true); arcEye(c, e2x, ey, up = true) }
             expr == Expr.SURPRISED || pose == Pose.DRAGGED -> { bigEye(c, e1x, ey); bigEye(c, e2x, ey) }
@@ -463,7 +411,7 @@ class BunnyView(context: Context) : View(context) {
     }
 
     private fun dotEye(c: Canvas, x: Float, y: Float) {
-        if (darkFur || look.pattern != 0) oval(c, x, y, 4.6f, 5.4f, white)
+        if (darkFur || look.pattern != Pattern.PLAIN) oval(c, x, y, 4.6f, 5.4f, white)
         oval(c, x, y, 3.4f, 4.2f, eye)
         circle(c, x + 1.2f, y - 1.5f, 1.3f, white)
     }
@@ -550,31 +498,31 @@ class BunnyView(context: Context) : View(context) {
     //  Particules
     // ------------------------------------------------------------------
     private fun drawParticles(c: Canvas) {
-        for (p in particles) {
+        for (p in ambient.particles) {
             val a = (p.life / p.maxLife).coerceIn(0f, 1f)
             val alpha = (min(1f, a * 2.5f) * 255).toInt()
             when (p.type) {
-                PType.HEART -> { pPaint.color = Color.parseColor("#FF5C8A"); pPaint.alpha = alpha; heart(c, p.x, p.y, p.size) }
-                PType.ZZZ -> text(c, "z", p.x, p.y, p.size * (1.4f - a * 0.5f), "#7A8CD6", alpha)
-                PType.NOTE -> text(c, if (p.rot > 3f) "♪" else "♫", p.x, p.y, p.size, "#B05CE0", alpha)
-                PType.SPARKLE -> { pPaint.color = Color.parseColor("#7FD3FF"); pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * (0.6f + a)) }
-                PType.DROP -> { pPaint.color = Color.parseColor("#6EC6FF"); pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
-                PType.CRUMB -> { pPaint.color = Color.parseColor("#F28C28"); pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
+                PType.HEART -> { pPaint.color = Palette.HEART; pPaint.alpha = alpha; heart(c, p.x, p.y, p.size) }
+                PType.ZZZ -> text(c, "z", p.x, p.y, p.size * (1.4f - a * 0.5f), Palette.ZZZ, alpha)
+                PType.NOTE -> text(c, if (p.rot > 3f) "♪" else "♫", p.x, p.y, p.size, Palette.NOTE, alpha)
+                PType.SPARKLE -> { pPaint.color = Palette.SPARKLE; pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * (0.6f + a)) }
+                PType.DROP -> { pPaint.color = Palette.DROP; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
+                PType.CRUMB -> { pPaint.color = Palette.CARROT; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
                 PType.STAR -> {
                     val ang = p.rot + t * 6f
-                    text(c, "★", p.x + cos(ang) * 24f * d, p.y + sin(ang) * 7f * d, 11f * d, "#FFC83D", alpha)
+                    text(c, "★", p.x + cos(ang) * 24f * d, p.y + sin(ang) * 7f * d, 11f * d, Palette.STAR, alpha)
                 }
                 PType.BUBBLE -> {
-                    pPaint.color = Color.parseColor("#8DA05A"); pPaint.alpha = alpha / 2
+                    pPaint.color = Palette.DIRT_BUBBLE; pPaint.alpha = alpha / 2
                     c.drawCircle(p.x, p.y, p.size, pPaint)
                 }
             }
         }
     }
 
-    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: String, alpha: Int) {
+    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, alpha: Int) {
         textPaint.textSize = size
-        textPaint.color = Color.parseColor(color)
+        textPaint.color = color
         textPaint.alpha = alpha
         c.drawText(s, x, y, textPaint)
     }

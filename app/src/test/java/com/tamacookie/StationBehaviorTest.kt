@@ -1,0 +1,311 @@
+package com.tamacookie
+
+import com.tamacookie.BunnyView.Expr
+import com.tamacookie.BunnyView.PType
+import com.tamacookie.BunnyView.Pose
+import com.tamacookie.feature.ActHandler
+import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.Travel
+import com.tamacookie.feature.station.BathStation
+import com.tamacookie.feature.station.CageStation
+import com.tamacookie.feature.station.ChestStation
+import com.tamacookie.feature.station.Occupancy
+import com.tamacookie.feature.station.StationCtx
+import com.tamacookie.feature.station.StationKind
+import com.tamacookie.feature.station.VetStation
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import kotlin.random.Random
+
+/** Faux contrôleur des stations : enregistre les sorties et les panneaux demandés par les comportements. */
+class FakeStationCtx(val fake: FakePetCtx = FakePetCtx()) : StationCtx, PetCtx by fake {
+    val leaves = ArrayList<Boolean>()
+    var vetPanelOpen = false
+    var chestOpened = 0
+
+    override fun leaveStation(pet: Pet, hopOut: Boolean) {
+        world.stationOf(pet)?.let { world.station(it).leave(pet.id) }
+        leaves += hopOut
+    }
+    override fun openVetPanel(pet: Pet) { vetPanelOpen = true }
+    override fun closeVetPanel() { vetPanelOpen = false }
+    override fun openChest() { chestOpened++ }
+}
+
+/** Comportements de station (feature/station) : propriétés, entrée / séjour / sortie, occupation. */
+class StationBehaviorTest {
+
+    private lateinit var ctx: FakeStationCtx
+    private val fake get() = ctx.fake
+    private val pet get() = ctx.pet
+
+    @Before fun setUp() {
+        resetPlatforms()
+        ctx = FakeStationCtx()
+    }
+
+    @After fun tearDown() = resetPlatforms()
+
+    /** Comme `StationController.enterStation`, sans les fenêtres. */
+    private fun enter(k: StationKind, announce: Boolean = true, p: Pet = pet) {
+        assertTrue(ctx.world.station(k).enter(p.id))
+        p.setAct(Act.IN_STATION)
+        k.behavior.onEnter(ctx, p, announce)
+    }
+
+    private fun otherPet(): Pet {
+        return testPet(BunnyPhysics(1f), Random(1), id = "seconde").also { ctx.world.add(it) }
+    }
+
+    // ------------------------------------------------------------------ Exhaustivité et propriétés
+
+    @Test
+    fun `chaque station a un comportement et un nom`() {
+        val behaviors = StationKind.entries.map { it.behavior }
+        assertEquals("un comportement distinct par station", behaviors.size, behaviors.toSet().size)
+        val names = behaviors.map { it.name }
+        for (n in names) assertTrue(n, n.isNotBlank())
+        assertEquals("noms distincts", names.size, names.toSet().size)
+        for (k in StationKind.entries) {
+            val b = k.behavior
+            if (b.acceptsPet) {
+                assertTrue("$k : capacité", b.capacity >= 1)
+                assertTrue("$k : explication au tap", b.tapHint.isNotBlank())
+                assertTrue("$k : réplique occupé", b.busyLine(ctx).isNotBlank())
+            }
+        }
+    }
+
+    @Test
+    fun `ordre et noms des stations inchanges (cles de preferences)`() {
+        assertEquals(listOf("BATH", "VET", "CAGE", "CHEST"), StationKind.entries.map { it.name })
+        assertEquals("st_CAGE_anchor", Prefs.stationAnchor(StationKind.CAGE))
+    }
+
+    @Test
+    fun `proprietes lues sur le comportement`() {
+        assertSame(BathStation, StationKind.BATH.behavior)
+        assertFalse(ChestStation.acceptsPet)
+        // cadence : seule la cage est économe (comme l'ancien Act.CAGED dans Act.SLOW)
+        assertTrue(CageStation.slowFrames)
+        assertFalse(BathStation.slowFrames || VetStation.slowFrames)
+        // voyage : au bain il commente, chez le véto et en cage il se tait
+        assertEquals(Travel.BUSY, BathStation.travel)
+        assertEquals(Travel.IGNORES, VetStation.travel)
+        assertEquals(Travel.IGNORES, CageStation.travel)
+        for (k in StationKind.entries) if (k.behavior.acceptsPet) assertTrue("$k", k.behavior.blocksTravel)
+        // seule la cage garde l'animal d'une vue à l'autre ; seule la baignoire est animée
+        assertEquals(listOf(StationKind.CAGE), StationKind.entries.filter { it.behavior.holdsPet })
+        assertEquals(listOf(StationKind.BATH), StationKind.entries.filter { it.behavior.animated })
+        // places (dp) : celles de l'ancien positionInStation
+        assertEquals(12f, VetStation.seat.dxDp); assertEquals(26f, VetStation.seat.aboveBottomDp)
+        assertEquals(0f, BathStation.seat.dxDp); assertEquals(14f, BathStation.seat.aboveBottomDp)
+        assertEquals(16f, CageStation.seat.aboveBottomDp)
+    }
+
+    // ------------------------------------------------------------------ Occupation et capacité
+
+    @Test
+    fun `une place par station - le coffre n'accueille personne`() {
+        val other = otherPet()
+        val bath = ctx.world.station(StationKind.BATH)
+        assertEquals(1, bath.capacity)
+        assertTrue(bath.enter(pet.id))
+        assertFalse("déjà dedans", bath.enter(pet.id))
+        assertFalse("pleine", bath.canEnter(other.id))
+        assertEquals(listOf(pet.id), bath.occupants)
+        assertTrue(bath.isFull)
+        assertFalse(ctx.world.station(StationKind.CHEST).canEnter(pet.id))
+        assertTrue(bath.leave(pet.id))
+        assertFalse(bath.leave(pet.id))
+        assertTrue(bath.isEmpty && bath.canEnter(other.id))
+    }
+
+    @Test
+    fun `capacite superieure - plusieurs occupants`() {
+        val other = otherPet()
+        val bed = Occupancy(StationKind.BATH, capacity = 2)
+        assertTrue(bed.enter(pet.id))
+        assertTrue(bed.enter(other.id))
+        assertTrue(bed.isFull)
+        assertTrue(bed.has(pet.id) && bed.has(other.id))
+        bed.leave(pet.id)
+        assertEquals(listOf(other.id), bed.occupants)
+    }
+
+    @Test
+    fun `le monde sait ou est chaque animal`() {
+        val other = otherPet()
+        assertNull(ctx.world.stationOf(pet))
+        assertFalse(ctx.world.busy(pet))
+        ctx.world.station(StationKind.VET).enter(pet.id)
+        assertEquals(StationKind.VET, ctx.world.stationOf(pet))
+        assertTrue(ctx.world.busy(pet))
+        assertNull(ctx.world.stationOf(other))
+        assertFalse(ctx.world.busy(other))
+    }
+
+    @Test
+    fun `sayIfBusy - replique de la station occupee`() {
+        assertFalse(ctx.sayIfBusy(pet))
+        assertTrue(fake.said.isEmpty())
+        ctx.world.station(StationKind.BATH).enter(pet.id)
+        assertTrue(ctx.sayIfBusy(pet))
+        assertEquals(BathStation.busyLine(ctx), fake.said.last())
+        ctx.world.station(StationKind.BATH).leave(pet.id)
+        pet.setAct(Act.HIDDEN)
+        assertTrue(ctx.sayIfBusy(pet))
+        assertTrue(fake.said.last().contains("cache-cache"))
+    }
+
+    // ------------------------------------------------------------------ Dispatch Act → fonctionnalité
+
+    @Test
+    fun `registre - l'activite courante choisit le gestionnaire`() {
+        val reg = ActRegistry()
+        val h = object : ActHandler {
+            override val slowFrames = true
+            override fun update(pet: Pet, dt: Float) {}
+        }
+        reg.register(Act.IN_STATION) { p -> if (ctx.world.stationOf(p) != null) h else null }
+        assertNull("autre activité", reg.handlerFor(pet))
+        pet.setAct(Act.IN_STATION)
+        assertNull("station introuvable", reg.handlerFor(pet))
+        ctx.world.station(StationKind.CAGE).enter(pet.id)
+        assertSame(h, reg.handlerFor(pet))
+        assertTrue(reg.handlerFor(pet)!!.slowFrames)
+        assertTrue(h.blocksTravel.not())
+        try { reg.register(Act.IN_STATION) { null }; throw AssertionError("double enregistrement accepté") }
+        catch (_: IllegalStateException) {}
+    }
+
+    @Test
+    fun `IN_STATION n'est dans aucun ensemble d'Act`() {
+        for (set in listOf(Act.MOVING, Act.SLOW, Act.NO_PAGE_FOLLOW, Act.CAN_COME_BACK_OR_PAGE_OUT,
+            Act.RUSH_BACK, Act.BUSY_FOR_TRAVEL, Act.HIDING, Act.FREE)) assertFalse(Act.IN_STATION in set)
+    }
+
+    // ------------------------------------------------------------------ Baignoire
+
+    @Test
+    fun `bain - il se reveille, mousse puis ressort propre`() {
+        pet.stats = pet.stats.copy(sleeping = true)
+        pet.stats = pet.stats.copy(cleanliness = 10f)
+        enter(StationKind.BATH)
+        assertFalse(pet.stats.sleeping)
+        assertEquals(1, fake.said.size)
+        // pendant le bain
+        repeat(30) { pet.body.actTime += 0.1f; BathStation.update(ctx, pet, 0.1f) }
+        assertEquals(Pose.IDLE, pet.body.pose)
+        assertEquals(Expr.HAPPY, pet.mind.exprOverride)
+        assertTrue(fake.emitted.any { it == PType.SPARKLE || it == PType.BUBBLE })
+        assertTrue(ctx.leaves.isEmpty())
+        assertEquals(10f, pet.stats.cleanliness)
+        // fin du bain
+        pet.body.actTime = BathStation.BATH_SECONDS + 0.1f
+        BathStation.update(ctx, pet, 0.1f)
+        assertEquals(100f, pet.stats.cleanliness)
+        assertEquals(listOf(true), ctx.leaves)          // il saute dehors
+        assertNull(ctx.world.stationOf(pet))
+        assertEquals(2, fake.said.size)
+    }
+
+    @Test
+    fun `bain sans annonce - silencieux`() {
+        enter(StationKind.BATH, announce = false)
+        assertTrue(fake.said.isEmpty())
+    }
+
+    // ------------------------------------------------------------------ Véto
+
+    @Test
+    fun `veto - fiche ouverte, assis tourne vers le centre, fiche fermee a la sortie`() {
+        pet.body.fx = 100f; pet.body.facing = -1f
+        enter(StationKind.VET)
+        assertTrue(ctx.vetPanelOpen)
+        VetStation.update(ctx, pet, 0.016f)
+        assertEquals(Pose.SIT, pet.body.pose)
+        assertEquals(1f, pet.body.facing)
+        ctx.world.station(StationKind.VET).leave(pet.id)
+        VetStation.onLeave(ctx, pet)
+        assertFalse(ctx.vetPanelOpen)
+    }
+
+    // ------------------------------------------------------------------ Cage
+
+    @Test
+    fun `cage - enferme, sauvegarde, se plaint, liberte a la sortie`() {
+        enter(StationKind.CAGE)
+        assertTrue(pet.stats.caged)
+        assertTrue(CageStation.restores(pet))
+        assertEquals(Expr.SAD, pet.mind.exprOverride)
+        assertEquals(1, fake.notifications)
+        assertEquals(1, fake.said.size)
+        // il se plaint au bout de 20 s
+        repeat(19) { CageStation.update(ctx, pet, 1f) }
+        assertEquals(1, fake.said.size)
+        assertEquals(Pose.SIT, pet.body.pose)
+        repeat(2) { CageStation.update(ctx, pet, 1f) }
+        assertEquals(2, fake.said.size)
+        assertTrue(pet.mind.chatterIn in 24f..45f)
+        // endormi : il dort sans rien dire
+        pet.stats = pet.stats.copy(sleeping = true)
+        repeat(60) { CageStation.update(ctx, pet, 1f) }
+        assertEquals(Pose.SLEEP, pet.body.pose)
+        assertEquals(2, fake.said.size)
+        // sortie
+        ctx.world.station(StationKind.CAGE).leave(pet.id)
+        CageStation.onLeave(ctx, pet)
+        assertFalse(pet.stats.caged)
+        assertFalse(CageStation.restores(pet))
+        assertEquals(3, fake.emitted.count { it == PType.HEART })
+        assertEquals(Expr.HAPPY, pet.mind.exprOverride)
+        assertEquals(2, fake.notifications)
+    }
+
+    @Test
+    fun `cage restauree au demarrage - sans annonce`() {
+        enter(StationKind.CAGE, announce = false)
+        assertTrue(fake.said.isEmpty())
+        assertNull(pet.mind.exprOverride)
+        assertEquals(1, fake.notifications)
+    }
+
+    @Test
+    fun `caresses - un coeur, et un calin a travers les barreaux`() {
+        enter(StationKind.BATH, announce = false)
+        BathStation.onPet(ctx, pet)
+        assertEquals(listOf(PType.HEART), fake.emitted)
+        ctx.world.station(StationKind.BATH).leave(pet.id)
+        enter(StationKind.CAGE, announce = false)
+        pet.stats = pet.stats.copy(happiness = 50f)
+        CageStation.onPet(ctx, pet)
+        assertTrue(pet.stats.happiness > 50f)
+        assertEquals(2, fake.emitted.count { it == PType.HEART })
+        assertTrue(fake.said.last() in CageStation.PETTED)
+    }
+
+    @Test
+    fun `tap - explication, ou ouverture du coffre`() {
+        BathStation.onTap(ctx)
+        assertTrue(fake.said.last().startsWith(BathStation.tapHint))
+        ChestStation.onTap(ctx)
+        assertEquals(1, ctx.chestOpened)
+    }
+
+    @Test
+    fun `retour de la cage sur la vue - il ne parle que si elle est a l'ecran`() {
+        CageStation.onShownAgain(ctx, pet, onScreen = false)
+        assertTrue(fake.said.isEmpty())
+        CageStation.onShownAgain(ctx, pet, onScreen = true)
+        assertEquals(1, fake.said.size)
+        assertNotNull(fake.said.first())
+    }
+}

@@ -67,10 +67,10 @@ class BunnyPhysicsTest {
         override var x: Float, override var y: Float,
         override var vx: Float = 0f, override var vy: Float = 0f,
         override var onGround: Boolean = false,
-    ) : Body
+    ) : PropBody
 
     /** Balle de référence (paramètres de ToyController) sur l'écran 1080 x 1000. */
-    private fun stepBall(b: Body, dt: Float = 1f / 60f, gFactor: Float = 1f, bounce: Float = 0.62f,
+    private fun stepBall(b: PropBody, dt: Float = 1f / 60f, gFactor: Float = 1f, bounce: Float = 0.62f,
                          wallBounce: Float = 0.8f, friction: Float = 2.2f) =
         BunnyPhysics.stepProp(b, dt, g, gFactor, bounce, wallBounce, friction,
             halfW = 21f, height = 42f, screenW = 1080f, topY = 0f, groundY = 1000f, settleSpeed = Tuning.PROP_SETTLE_DP)

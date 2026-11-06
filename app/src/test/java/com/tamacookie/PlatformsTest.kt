@@ -1,5 +1,7 @@
 package com.tamacookie
 
+import com.tamacookie.feature.toy.Food
+import com.tamacookie.feature.toy.Toy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -92,16 +94,17 @@ class CatalogTest {
 
     @Test
     fun `options de personnalisation non vides`() {
-        assertTrue(Options.furs.isNotEmpty())
-        assertEquals(3, Options.ears.size)
-        assertTrue(Options.eyes.isNotEmpty())
-        assertTrue(Options.accessories.first() == "Aucun")
+        assertTrue(Fur.entries.isNotEmpty())
+        assertEquals(3, Ears.entries.size)
+        assertTrue(EyeColor.entries.isNotEmpty())
+        assertEquals(Accessory.NONE, Accessory.entries.first())
     }
 
     @Test
     fun `les objets nourriture et jouets sont bien classes`() {
-        assertTrue(PropView.Kind.CARROT.isFood)
-        assertTrue(!PropView.Kind.BALL.isFood)
-        assertTrue(!PropView.Kind.POOP.isFood)
+        assertEquals(Food.CARROT, Food.CARROT.spec.food)
+        assertNull(Toy.BALL.spec.food)
+        assertNull(com.tamacookie.feature.toy.Poop.food)
+        assertNull(com.tamacookie.feature.toy.Poop.toy)
     }
 }

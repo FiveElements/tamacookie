@@ -7,13 +7,18 @@ import kotlin.random.Random
 /** Activité courante du lapin (machine à états du service). */
 enum class Act {
     IDLE, WALK, AIR, DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, TRAVEL_OUT, TRAVEL_IN, SIT, DIZZY, DANCE,
-    BATH, VET, CAGED, SQUAT, KNOCK, HIDE_RUN, HIDDEN, PEEK, PAGE_OUT, GOTO_CHEST;
+    /**
+     * Dans une station (bain, véto, cage…) : l'update et les propriétés (cadence, voyage…) sont celles
+     * du comportement de la station occupée (`StationBehavior`), via `ActRegistry`.
+     */
+    IN_STATION,
+    SQUAT, KNOCK, HIDE_RUN, HIDDEN, PEEK, PAGE_OUT, GOTO_CHEST;
 
     companion object {
         /** En mouvement : animation fluide (~60 i/s). */
         val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK)
-        /** Immobile et endormi / enfermé : animation très économe (~12 i/s). */
-        val SLOW: Set<Act> = EnumSet.of(SLEEP, CAGED)
+        /** Immobile et endormi : animation très économe (~12 i/s). Dans une station : `ActHandler.slowFrames`. */
+        val SLOW: Set<Act> = EnumSet.of(SLEEP)
         /** Il ne suit pas le défilement des pages (il est tenu, ou caché). */
         val NO_PAGE_FOLLOW: Set<Act> = EnumSet.of(DRAGGED, HIDE_RUN, HIDDEN, PEEK)
         /** Activités tranquilles pendant lesquelles il peut revenir sur la page affichée. */
@@ -21,8 +26,8 @@ enum class Act {
         val CAN_COME_BACK_OR_PAGE_OUT: Set<Act> = EnumSet.of(IDLE, WALK, SIT, DANCE, PAGE_OUT)
         /** Activités qui le font accourir tout de suite sur la page affichée. */
         val RUSH_BACK: Set<Act> = EnumSet.of(KNOCK, SQUAT, GOTO_FOOD, PLAY)
-        /** Occupé : il ne suit pas l'utilisateur dans une autre application. */
-        val BUSY_FOR_TRAVEL: Set<Act> = EnumSet.of(DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, AIR, BATH, SQUAT, KNOCK)
+        /** Occupé : il ne suit pas l'utilisateur dans une autre application. Dans une station : `ActHandler.travel`. */
+        val BUSY_FOR_TRAVEL: Set<Act> = EnumSet.of(DRAGGED, SLEEP, EAT, GOTO_FOOD, PLAY, AIR, SQUAT, KNOCK)
         val HIDING: Set<Act> = EnumSet.of(HIDE_RUN, HIDDEN, PEEK)
         /** Libre de faire une bêtise. */
         val FREE: Set<Act> = EnumSet.of(IDLE, WALK, SIT)

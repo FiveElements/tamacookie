@@ -47,4 +47,11 @@ class FakeContext(val prefs: FakePrefs = FakePrefs()) : ContextWrapper(null) {
     override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences = prefs
 }
 
-fun newPet(prefs: FakePrefs = FakePrefs()): PetState = PetState(FakeContext(prefs) as Context)
+/** Un animal de test (jauges par défaut, sans persistance). */
+fun testPet(
+    phys: BunnyPhysics = BunnyPhysics(),
+    rnd: kotlin.random.Random = kotlin.random.Random(1),
+    id: String = "test-pet",
+    stats: PetStats = PetStats(),
+    traits: Traits = Traits(),
+): Pet = Pet(Identity(PetId(id), bornAt = 42L), traits, Look(), stats, Body(phys), Mind(rnd))

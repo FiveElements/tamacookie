@@ -59,6 +59,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Couverture des tests JVM (JaCoCo intégré à AGP) : ./gradlew createDebugUnitTestCoverageReport
+            // → app/build/reports/coverage/test/debug/ (index.html + report.xml). R, BuildConfig et Manifest
+            // sont exclus par AGP.
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             if (hasReleaseKey) {
@@ -70,6 +76,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    testCoverage {
+        // Version de JaCoCo plus récente que celle d'AGP 8.5 : lit les classes des JDK récents (21+).
+        jacocoVersion = "0.8.13"
     }
 
     testOptions {

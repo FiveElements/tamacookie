@@ -12,7 +12,7 @@ data class Box(val left: Float, val top: Float, val right: Float, val bottom: Fl
 }
 
 /** Corps soumis à la petite physique des objets (jouets, nourriture). */
-interface Body {
+interface PropBody {
     var x: Float
     var y: Float
     var vx: Float
@@ -193,7 +193,7 @@ class BunnyPhysics(val density: Float = 1f) {
          * le plafond et le sol, frottement au sol. [y] = bas de l'objet, [x] = son centre.
          */
         fun stepProp(
-            b: Body, dt: Float, gravity: Float, gFactor: Float,
+            b: PropBody, dt: Float, gravity: Float, gFactor: Float,
             bounce: Float, wallBounce: Float, groundFriction: Float,
             halfW: Float, height: Float,
             screenW: Float, topY: Float, groundY: Float, settleSpeed: Float,
@@ -213,7 +213,7 @@ class BunnyPhysics(val density: Float = 1f) {
         }
 
         /** Chute de la nourriture (demi-gravité, sans rebond). Retourne true au moment où elle touche le sol. */
-        fun stepFalling(b: Body, dt: Float, gravity: Float, minX: Float, maxX: Float, groundY: Float): Boolean {
+        fun stepFalling(b: PropBody, dt: Float, gravity: Float, minX: Float, maxX: Float, groundY: Float): Boolean {
             if (b.onGround) return false
             b.vy += gravity * 0.5f * dt
             b.x = (b.x + b.vx * dt).coerceIn(minX, maxX)

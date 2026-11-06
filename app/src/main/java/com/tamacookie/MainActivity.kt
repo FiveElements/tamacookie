@@ -1,5 +1,7 @@
 package com.tamacookie
 
+import com.tamacookie.persist.Adoption
+import com.tamacookie.persist.Pets
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -37,6 +39,10 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private lateinit var nameEdit: EditText
     private var lastNs = 0L
     private var previewT = 0f
+    /** Ce qu'affiche l'aperçu (il n'a pas de [Pet] : son état est fabriqué ici). */
+    private var previewLook = Look()
+    private var previewExpr = BunnyView.Expr.NORMAL
+    private var previewFacing = 1f
     /** Le lapin vient d'être lancé : on passera en arrière-plan après la réponse à la demande de permission. */
     private var backgroundAfterPermission = false
 
@@ -73,8 +79,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         preview = BunnyView(this)
         preview.setOnClickListener {
             preview.emit(BunnyView.PType.HEART, 3)
-            preview.expr = BunnyView.Expr.HAPPY
-            preview.postDelayed({ preview.expr = BunnyView.Expr.NORMAL }, 1200)
+            previewExpr = BunnyView.Expr.HAPPY
+            preview.postDelayed({ previewExpr = BunnyView.Expr.NORMAL }, 1200)
         }
         root.addView(preview, LinearLayout.LayoutParams((170 * d).toInt(), (170 * d).toInt()).apply {
             topMargin = (8 * d).toInt()
@@ -83,7 +89,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         // Nom
         val nameRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         nameEdit = EditText(this).apply {
-            setText(PetState(this@MainActivity).load().name)
+            setText(residentName())
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
             hint = "Nom du lapin"
@@ -97,7 +103,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
         // Niveau de bêtises
         section(root, "Bêtises")
-        val prefs = getSharedPreferences("pet", MODE_PRIVATE)
+        val prefs = Prefs.of(this)
         val levels = listOf(
             "😇 Sage" to "Il réclame de l'attention, sans plus",
             "😜 Taquin" to "Frappe à l'écran, s'assoit parfois sur un bouton",
@@ -110,7 +116,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }
         val levelChips = ArrayList<TextView>()
         fun paintLevels() {
-            val cur = prefs.getInt("mischief", 1)
+            val cur = prefs.getInt(Prefs.MISCHIEF, 1)
             levelChips.forEachIndexed { i, c -> c.background = chipBg(i == cur) }
             levelDesc.text = levels[cur].second + if (cur > 0) " (bouton/clavier : nécessite l'accessibilité)" else ""
         }
@@ -120,7 +126,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
                 val p = (10 * d).toInt(); setPadding(p, p, p, p)
                 setOnClickListener {
-                    prefs.edit().putInt("mischief", i).apply()
+                    prefs.edit().putInt(Prefs.MISCHIEF, i).apply()
                     BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
                     paintLevels()
                 }
@@ -204,7 +210,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         setContentView(scroll)
 
         // Premier lancement : écran d'adoption
-        if (!PetState(this).load().adopted) {
+        if (Pets.repository(this).loadResident()?.adopted != true) {
             startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, true))
         }
     }
@@ -217,9 +223,10 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
 
     override fun onResume() {
         super.onResume()
-        val pet = PetState(this).load()
-        preview.look = pet.look
-        nameEdit.setText(pet.name)
+        // Lecture seule : si le service tourne, l'état en mémoire peut être un peu plus récent (jauges)
+        val pet = Pets.repository(this).loadResident()
+        previewLook = pet?.look ?: Look()
+        nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
         refresh()
         Choreographer.getInstance().postFrameCallback(this)
     }
@@ -245,10 +252,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         previewT += dt
         // petite marche sur place dans l'aperçu
         val cycle = previewT % 8f
-        preview.pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE
-        preview.walkPhase = (previewT * 2.2f) % 1f
-        if (cycle < 0.02f) preview.facing = -preview.facing
-        preview.update(dt)
+        if (cycle < 0.02f) previewFacing = -previewFacing
+        preview.render(BunnyRenderState(
+            pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+            expr = previewExpr,
+            facing = previewFacing,
+            walkPhase = (previewT * 2.2f) % 1f,
+            look = previewLook,
+        ), dt)
         Choreographer.getInstance().postFrameCallback(this)
     }
 
@@ -313,11 +324,12 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             .show()
     }
 
+    private fun residentName(): String = Pets.repository(this).loadResident()?.identity?.name ?: Identity.DEFAULT_NAME
+
     private fun rename() {
-        val n = nameEdit.text.toString().trim().take(16)
-        if (n.isEmpty()) return
-        getSharedPreferences("pet", MODE_PRIVATE).edit().putString("name", n).apply()
-        BunnyService.send(this, BunnyService.ACTION_RELOAD)
+        val n = Adoption.cleanName(nameEdit.text.toString()) ?: return
+        // Commande : le service applique et sauvegarde (plus de course avec sa sauvegarde périodique)
+        PetCommands.rename(this, n)
         refresh()
     }
 

@@ -2,54 +2,98 @@ package com.tamacookie
 
 import android.graphics.Color
 
-/** Apparence du lapin, choisie à l'adoption. */
+/**
+ * Une option d'apparence. [id] est **sauvegardé** et échangé ([com.tamacookie.persist.PetSnapshot]) :
+ * ne jamais le changer (le nom d'enum et le libellé peuvent changer, l'ordre aussi).
+ */
+interface LookOption {
+    val id: String
+    val label: String
+}
+
+/** Une option d'apparence qui est une couleur (`#RRGGBB`). */
+interface ColorOption : LookOption {
+    val hex: String
+}
+
+enum class Fur(override val id: String, override val label: String, override val hex: String) : ColorOption {
+    SNOW("snow", "Neige", "#FFFBF5"),
+    CREAM("cream", "Crème", "#F5E2C4"),
+    CARAMEL("caramel", "Caramel", "#DDA463"),
+    CHOCOLATE("chocolate", "Chocolat", "#8C5F3F"),
+    GREY("grey", "Gris", "#B8B4BE"),
+    LICORICE("licorice", "Réglisse", "#3E363B"),
+    PINK("pink", "Rose", "#F8D2DC"),
+}
+
+enum class Ears(override val id: String, override val label: String) : LookOption {
+    UP("up", "Dressées"),
+    /** Tombantes (bélier). */
+    LOP("lop", "Tombantes"),
+    ONE_FOLDED("one_folded", "Une pliée"),
+}
+
+enum class EyeColor(override val id: String, override val label: String, override val hex: String) : ColorOption {
+    HAZEL("hazel", "Noisette", "#3A2E39"),
+    BLUE("blue", "Bleu", "#3D7DD8"),
+    GREEN("green", "Vert", "#3E9B5A"),
+    RUBY("ruby", "Rubis", "#C2334D"),
+}
+
+enum class Pattern(override val id: String, override val label: String) : LookOption {
+    PLAIN("plain", "Uni"),
+    EYE_PATCH("eye_patch", "Tache sur l'œil"),
+    DUTCH("dutch", "Hollandais"),
+}
+
+enum class Accessory(override val id: String, override val label: String) : LookOption {
+    NONE("none", "Aucun"),
+    BOW("bow", "Nœud"),
+    HAT("hat", "Chapeau"),
+    GLASSES("glasses", "Lunettes"),
+    SCARF("scarf", "Écharpe"),
+    FLOWERS("flowers", "Fleurs"),
+}
+
+enum class AccColor(override val id: String, override val label: String, override val hex: String) : ColorOption {
+    PINK("pink", "Rose", "#FF6F9C"),
+    BLUE("blue", "Bleu", "#4F8DF5"),
+    YELLOW("yellow", "Jaune", "#F6C343"),
+    VIOLET("violet", "Violet", "#9B6CF0"),
+    RED("red", "Rouge", "#E5484D"),
+    GREEN("green", "Vert", "#45B86F"),
+}
+
+/** Apparence de l'animal, choisie à l'adoption (immuable ; identifiants stables, plus d'index). */
 data class Look(
-    var fur: Int = 0,          // index dans Options.furs
-    var ears: Int = 0,         // 0 dressées, 1 tombantes, 2 une pliée
-    var eyes: Int = 0,
-    var pattern: Int = 0,      // 0 uni, 1 tache sur l'œil, 2 hollandais
-    var accessory: Int = 0,    // voir Options.accessories
-    var accColor: Int = 0,
-)
+    val fur: Fur = Fur.SNOW,
+    val ears: Ears = Ears.UP,
+    val eyes: EyeColor = EyeColor.HAZEL,
+    val pattern: Pattern = Pattern.PLAIN,
+    val accessory: Accessory = Accessory.NONE,
+    val accColor: AccColor = AccColor.PINK,
+) {
+    companion object {
+        /** L'option d'identifiant [id], ou [default] si inconnu (données d'une autre version, d'un pair…). */
+        fun <E : LookOption> byId(options: List<E>, id: String?, default: E): E = options.firstOrNull { it.id == id } ?: default
 
-enum class Personality(val label: String, val emoji: String, val desc: String) {
-    PLAYFUL("Joueur", "🎾", "Adore jouer, s'ennuie vite"),
-    GLUTTON("Gourmand", "🥕", "A tout le temps faim, adore manger"),
-    LAZY("Paresseux", "😴", "Fait de longues siestes, marche lentement"),
-    CURIOUS("Curieux", "🔍", "Explore les icônes et commente tes apps"),
-    CUDDLY("Câlin", "💕", "Réclame des caresses, très affectueux"),
-}
-
-enum class Toy(val label: String, val emoji: String) {
-    BALL("Balle", "🎾"),
-    BALLOON("Ballon", "🎈"),
-    FRISBEE("Frisbee", "🥏"),
-    PLUSH("Doudou", "🧸"),
-}
-
-enum class Food(val label: String, val emoji: String, val satiety: Float, val happiness: Float, val health: Float, val color: String) {
-    CARROT("Carotte", "🥕", 30f, 4f, 0f, "#F28C28"),
-    LETTUCE("Salade", "🥬", 20f, 2f, 6f, "#7BC96F"),
-    STRAWBERRY("Fraise", "🍓", 10f, 12f, 0f, "#E5484D"),
+        /**
+         * Ancien format (index entiers, schéma 0) : les couleurs étaient bornées à la liste
+         * (comme `Options.furColor`), les autres options hors liste retombaient sur la première.
+         */
+        fun fromLegacyIndexes(fur: Int, ears: Int, eyes: Int, pattern: Int, accessory: Int, accColor: Int) = Look(
+            fur = Fur.entries[fur.coerceIn(0, Fur.entries.lastIndex)],
+            ears = Ears.entries.getOrElse(ears) { Ears.UP },
+            eyes = EyeColor.entries[eyes.coerceIn(0, EyeColor.entries.lastIndex)],
+            pattern = Pattern.entries.getOrElse(pattern) { Pattern.PLAIN },
+            accessory = Accessory.entries.getOrElse(accessory) { Accessory.NONE },
+            accColor = AccColor.entries[accColor.coerceIn(0, AccColor.entries.lastIndex)],
+        )
+    }
 }
 
 object Options {
-    val furs = listOf(
-        "Neige" to "#FFFBF5", "Crème" to "#F5E2C4", "Caramel" to "#DDA463",
-        "Chocolat" to "#8C5F3F", "Gris" to "#B8B4BE", "Réglisse" to "#3E363B", "Rose" to "#F8D2DC",
-    )
-    val ears = listOf("Dressées", "Tombantes", "Une pliée")
-    val eyes = listOf("Noisette" to "#3A2E39", "Bleu" to "#3D7DD8", "Vert" to "#3E9B5A", "Rubis" to "#C2334D")
-    val patterns = listOf("Uni", "Tache sur l'œil", "Hollandais")
-    val accessories = listOf("Aucun", "Nœud", "Chapeau", "Lunettes", "Écharpe", "Fleurs")
-    val accColors = listOf(
-        "Rose" to "#FF6F9C", "Bleu" to "#4F8DF5", "Jaune" to "#F6C343",
-        "Violet" to "#9B6CF0", "Rouge" to "#E5484D", "Vert" to "#45B86F",
-    )
-
-    fun furColor(i: Int) = Color.parseColor(furs[i.coerceIn(0, furs.lastIndex)].second)
-    fun eyeColor(i: Int) = Color.parseColor(eyes[i.coerceIn(0, eyes.lastIndex)].second)
-    fun accColor(i: Int) = Color.parseColor(accColors[i.coerceIn(0, accColors.lastIndex)].second)
+    fun color(o: ColorOption) = Color.parseColor(o.hex)
 
     fun isDark(color: Int): Boolean {
         val l = 0.299 * Color.red(color) + 0.587 * Color.green(color) + 0.114 * Color.blue(color)
