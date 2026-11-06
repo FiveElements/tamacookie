@@ -56,12 +56,15 @@ Rien n'est collecté ni envoyé : tout reste sur l'appareil.
 Prérequis : JDK 17+ et le SDK Android (API 34).
 
 ```bash
-./gradlew testDebugUnitTest   # tests unitaires (JVM)
+./gradlew :core:test testDebugUnitTest   # tests unitaires (JVM) : cœur puis app
 ./gradlew assembleDebug       # APK de debug : app/build/outputs/apk/debug/
-./gradlew createDebugUnitTestCoverageReport   # couverture (JaCoCo) : app/build/reports/coverage/test/debug/index.html
+./gradlew :core:jacocoTestReport createDebugUnitTestCoverageReport   # couverture (JaCoCo) :
+#   core/build/reports/jacoco/test/html/index.html et app/build/reports/coverage/test/debug/index.html
 ```
 
-Le projet n'utilise que le framework Android et la bibliothèque standard Kotlin (aucune dépendance AndroidX).
+Deux modules : `:core` (Kotlin/JVM pur : règles, monde, comportement, ports) et `:app` (Android : service,
+fenêtres, dessin, persistance). Le projet n'utilise que le framework Android et la bibliothèque standard Kotlin
+(aucune dépendance AndroidX).
 
 ### CI / CD (GitHub Actions)
 

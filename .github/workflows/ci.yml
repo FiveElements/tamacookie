@@ -28,17 +28,26 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
+      # Deux modules : :core (Kotlin/JVM pur, `test` + `jacocoTestReport`) et :app (Android, AGP).
       - name: Tests unitaires, couverture, lint et APK debug
-        run: ./gradlew --no-daemon testDebugUnitTest createDebugUnitTestCoverageReport lintDebug assembleDebug
+        run: ./gradlew --no-daemon :core:test :core:jacocoTestReport testDebugUnitTest createDebugUnitTestCoverageReport lintDebug assembleDebug
+
+      # Un dossier par module dans l'artefact : coverage/core/ (jacocoTestReport.xml + html/), coverage/app/ (report.xml + html).
+      - name: Rassembler les rapports de couverture
+        run: |
+          set -euo pipefail
+          mkdir -p coverage/core coverage/app
+          cp -r core/build/reports/jacoco/test/. coverage/core/
+          cp -r app/build/reports/coverage/test/debug/. coverage/app/
 
       - name: Taux de couverture (résumé du job)
-        run: python3 .github/scripts/coverage_badge.py app/build/reports/coverage/test/debug/report.xml /tmp/coverage.svg --summary "$GITHUB_STEP_SUMMARY"
+        run: python3 .github/scripts/coverage_badge.py coverage/core/jacocoTestReport.xml coverage/app/report.xml /tmp/coverage.svg --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Rapport de couverture (HTML + XML)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-report
-          path: app/build/reports/coverage/test/debug/
+          path: coverage/
           if-no-files-found: error
 
       - name: Rapports de tests
@@ -47,6 +56,8 @@ jobs:
         with:
           name: test-reports
           path: |
+            core/build/reports/tests/
+            core/build/test-results/
             app/build/reports/tests/
             app/build/test-results/
             app/build/reports/lint-results-debug.html
@@ -80,7 +91,7 @@ jobs:
       - name: Générer et publier le badge
         run: |
           set -euo pipefail
-          python3 .github/scripts/coverage_badge.py coverage/report.xml "$RUNNER_TEMP/coverage.svg"
+          python3 .github/scripts/coverage_badge.py coverage/core/jacocoTestReport.xml coverage/app/report.xml "$RUNNER_TEMP/coverage.svg"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Commit orphelin construit sans toucher à la copie de travail (pas de checkout).
