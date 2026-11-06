@@ -42,19 +42,21 @@ Chaque release fournit aussi un fichier `SHA256SUMS.txt` pour vérifier l'APK.
 
 ## 🔐 Permissions
 
-| Permission | Pourquoi |
-|---|---|
-| Affichage par-dessus les autres apps | Faire vivre le lapin à l'écran |
-| Notifications | Service au premier plan (obligatoire) et alertes (faim, maladie…) |
-| Accès aux données d'utilisation | Savoir quelle application est ouverte |
-| Accessibilité (optionnel) | Position des icônes, page du bureau, défilement — jamais le texte saisi |
+| Permission | Obligatoire ? | Pourquoi | Où l'accorder |
+|---|---|---|---|
+| Affichage par-dessus les autres apps | **Oui** | Faire vivre le lapin à l'écran (fenêtres flottantes) | Écran principal › « Faire apparaître Cookie », voir [ci-dessous](#1-affichage-par-dessus-les-autres-apps-obligatoire) |
+| Notifications | **Oui** (Android 13+) | Le service tourne au premier plan, avec sa notification (Nourrir, Cacher…) et les alertes (faim, maladie…) | Demandée au premier lancement |
+| Accès aux données d'utilisation | Non | Savoir quelle application est ouverte (sans accessibilité) pour qu'il la commente et la suive | Écran principal › ligne ⚠️, ou Paramètres › Applis › Accès spécial des applis › Accès aux données d'utilisation |
+| Accessibilité | Non | Position des icônes, page du bureau, défilement : il saute sur les icônes et suit les pages. **Jamais** le texte saisi ni le contenu des écrans | Paramètres › Accessibilité › TamaCookie |
+
+Accordées sans rien demander (déclarées dans le manifeste) : service au premier plan, démarrage au boot et après une
+mise à jour, vibration, masquage des fenêtres flottantes d'autres apps pendant les réglages.
 
 Rien n'est collecté ni envoyé : tout reste sur l'appareil.
 
-### Autoriser l'affichage par-dessus les autres apps (obligatoire)
+### 1. Affichage par-dessus les autres apps (obligatoire)
 
-Sans cette autorisation, le lapin ne peut pas apparaître : le bouton « Faire apparaître » de l'écran
-principal ouvre alors directement le bon réglage.
+Sans cette autorisation, le lapin ne peut pas apparaître.
 
 1. Lance **TamaCookie** et touche **« Faire apparaître Cookie »** (ou la ligne ⚠️ *Afficher par-dessus
    les autres apps*) : Android ouvre la page de l'autorisation.
@@ -69,19 +71,47 @@ Si la page ne s'ouvre pas, le réglage se trouve à la main :
 | Pixel / Android d'origine | Paramètres › Applis › **Accès spécial des applis** › **Superposition à d'autres applis** › TamaCookie |
 | Autres | Paramètres › Applications › TamaCookie › *Afficher par-dessus d'autres applis* (ou *Superposition*) |
 
-**Réglage grisé** (« paramètre restreint », APK installé hors du Play Store) : Paramètres › Applications ›
-TamaCookie › ⋮ (en haut à droite) › **Autoriser les paramètres restreints**, puis recommence. C'est la même
-démarche pour le service d'accessibilité.
+### 2. Interrupteur grisé : les « paramètres restreints »
 
-Par ADB (développement) :
+Un APK installé **hors du Play Store** (fichier téléchargé, comme les releases de ce dépôt) est soumis aux
+*paramètres restreints* d'Android : l'interrupteur est grisé, ou il refuse sans explication (« Paramètre
+restreint » / « Pour votre sécurité, ce paramètre n'est pas disponible »).
+
+- Android 13 et 14 : seul le **service d'accessibilité** est concerné.
+- Android 15 et plus récent (vu sur Pixel 7 Pro, Android 17) : l'**affichage par-dessus les autres apps** l'est
+  aussi — c'est le cas le plus fréquent de « je n'arrive pas à l'activer ».
+
+Pour lever la restriction (une fois suffit, pour toutes les autorisations de l'app) :
+
+1. Essaie d'abord d'activer l'autorisation : Android refuse (c'est ce refus qui débloque l'étape suivante).
+2. Paramètres › Applis › **TamaCookie** (*Infos sur l'appli*) › **⋮** en haut à droite › **Autoriser les
+   paramètres restreints** (confirmation par code / empreinte).
+3. Recommence l'activation : l'interrupteur est maintenant actif.
+
+Si le menu ⋮ n'apparaît pas, c'est que l'étape 1 n'a pas encore été tentée.
+
+### 3. Accessibilité (optionnelle)
+
+Paramètres › Accessibilité › **Applications installées** (Samsung) / **Applications téléchargées** (Pixel) ›
+TamaCookie › activer. Grisé : voir « paramètres restreints » ci-dessus. Le service ne lit que la position des
+éléments à l'écran (icônes, boutons, clavier) et le défilement du bureau.
+
+### 4. Par ADB (développement, appareil branché)
 
 ```bash
-adb shell appops set com.tamacookie SYSTEM_ALERT_WINDOW allow
+P=com.tamacookie
+adb shell appops set $P ACCESS_RESTRICTED_SETTINGS allow    # lève les paramètres restreints (APK hors Play Store)
+adb shell appops set $P SYSTEM_ALERT_WINDOW allow           # affichage par-dessus les autres apps
+adb shell pm grant $P android.permission.POST_NOTIFICATIONS # notifications
+adb shell appops set $P GET_USAGE_STATS allow               # données d'utilisation (facultatif)
+adb shell appops get $P                                     # vérifier
 ```
+
+L'accessibilité ne s'active pas proprement par ADB sans écraser les autres services : passer par les Paramètres.
 
 ## 🛠️ Développement
 
-Prérequis : JDK 17+ et le SDK Android (API 34).
+Prérequis : JDK 21 (Gradle s'y lance d'office, voir `gradle/gradle-daemon-jvm.properties`) et le SDK Android (API 34).
 
 ```bash
 ./gradlew :core:test testDebugUnitTest   # tests unitaires (JVM) : cœur puis app
