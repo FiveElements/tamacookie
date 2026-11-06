@@ -53,7 +53,11 @@ interface StationBehavior {
     val holdsPet: Boolean get() = false
     /** Il peut s'y endormir (« Dodo » le laisse dedans au lieu de le faire sortir). */
     val sleepsInside: Boolean get() = holdsPet
-    /** Décor animé : redessiné à chaque image quand elle est visible. */
+    /**
+     * Décor animé quand elle est occupée (bain qui mousse, roue qui tourne) : redessiné à chaque image tant qu'elle
+     * est visible **et** occupée. Vide, elle est dessinée immobile et ne demande pas d'images (la boucle peut se
+     * suspendre).
+     */
     val animated: Boolean get() = false
     val seat: Seat get() = Seat.CENTER
 

@@ -65,6 +65,8 @@ class StationControllerTest {
         return sc[k]
     }
 
+    private fun redraws(s: Station) = overlay.backend.ops.count { it.op == "redraw" && it.id == s.windowId }
+
     @Test fun `une station rangee n'a pas de fenetre, installee elle apparait en fondu`() {
         sc.layout()
         for (k in StationKind.entries) assertFalse(overlay.isAttached(sc[k].windowId))
@@ -178,15 +180,44 @@ class StationControllerTest {
         assertFalse(panels.vetOpen || panels.chestOpen || panels.stationsOpen)
     }
 
-    @Test fun `la baignoire affichee s'anime dans le modele`() {
+    @Test fun `la baignoire occupee et affichee s'anime dans le modele`() {
         val s = install(StationKind.BATH)
+        sc.enterStation(StationKind.BATH)
         sc.update(0.5f)
         assertEquals(0.5f, s.t, 1e-6f)
         assertTrue(sc.animating())
+        sc.leaveStation(hopOut = true)
         ctx.pages.currentView = "com.app.autre"
         sc.layout()
         sc.update(0.5f)
         assertEquals(0.5f, s.t, 1e-6f)          // pas affichée : pas animée
+    }
+
+    @Test fun `une baignoire ou une roue vide affichee ne demande pas d'images`() {
+        for (k in listOf(StationKind.BATH, StationKind.WHEEL)) {
+            val s = install(k)
+            assertTrue(overlay.isAttached(s.windowId))
+            val redraws = redraws(s)
+            sc.update(0.5f)
+            assertEquals(0f, s.t, 1e-6f)            // dessinée immobile
+            assertEquals(redraws, redraws(s))
+            assertFalse(sc.animating())             // la boucle peut se suspendre
+        }
+    }
+
+    @Test fun `la roue s'anime tant qu'il court dedans, puis s'arrete`() {
+        val s = install(StationKind.WHEEL)
+        pet.stats = pet.stats.copy(energy = 90f)
+        sc.enterStation(StationKind.WHEEL)
+        assertTrue(s.occupied)
+        assertTrue(sc.animating())
+        sc.update(0.25f)
+        assertEquals(0.25f, s.t, 1e-6f)
+        sc.leaveStation(hopOut = true)
+        assertFalse(s.occupied)
+        assertFalse(sc.animating())
+        sc.update(0.25f)
+        assertEquals(0.25f, s.t, 1e-6f)
     }
 
     @Test fun `deux animaux dans le lit, chacun a sa place`() {
