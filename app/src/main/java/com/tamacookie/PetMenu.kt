@@ -19,9 +19,11 @@ import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
 
-/** Jauge horizontale arrondie. */
+/** Jauge horizontale arrondie (lue par sa rangée : voir [VetPanel], la barre elle-même est muette). */
 @SuppressLint("ViewConstructor")
 class StatBar(context: Context, private val color: Int) : View(context) {
+    init { importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO }
+
     var value = 0f
         set(v) { field = v; invalidate() }
     private val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = Palette.BAR_BG }
@@ -46,46 +48,63 @@ open class Panel(context: Context) : LinearLayout(context) {
         val pad = (14 * d).toInt()
         setPadding(pad, pad, pad, pad)
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#FFFDF9"))
+            setColor(Palette.UI_PANEL)
             cornerRadius = 22 * d
-            setStroke((2 * d).toInt(), Color.parseColor("#5B4A55"))
+            setStroke((2 * d).toInt(), Palette.OUTLINE)
         }
         elevation = 8 * d
     }
 
+    /**
+     * Titre du panneau, titre de section pour le lecteur d'écran. Le focus n'est pas forcé à l'ouverture (lint
+     * `AccessibilityFocus`) : le titre de fenêtre ([paneTitle]) est annoncé quand le panneau apparaît.
+     */
     protected fun header(title: TextView, onClose: () -> Unit) {
         val header = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-        title.setTextColor(Color.parseColor("#3A2E39"))
+        title.setTextColor(Palette.INK)
         title.paint.isFakeBoldText = true
+        title.isAccessibilityHeading = true
         header.addView(title, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         header.addView(TextView(context).apply {
             setText(R.string.panel_close); setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTextColor(Color.parseColor("#7A6B75"))
+            setTextColor(Palette.UI_MUTED)
+            gravity = Gravity.CENTER
+            touchTarget(d)
             setPadding((10 * d).toInt(), 0, (4 * d).toInt(), 0)
+            contentDescription = context.getString(R.string.access_close)
             setOnClickListener { onClose() }
         })
         addView(header)
     }
 
+    /** Titre de la fenêtre (annoncé par le lecteur d'écran à son apparition). */
+    protected fun paneTitle(title: CharSequence) {
+        accessibilityPaneTitle = SpokenText.plain(title.toString())
+    }
+
     protected fun small(text: String = "") = TextView(context).apply {
         this.text = text
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-        setTextColor(Color.parseColor("#7A6B75"))
+        setTextColor(Palette.UI_MUTED)
     }
 
-    protected fun btnLp() = LayoutParams(0, (56 * d).toInt(), 1f).apply {
+    /** Bouton de panneau : 56 dp de haut au moins, plus si le texte est agrandi (police à 200 %). */
+    protected fun btnLp() = LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
         val m = (3 * d).toInt(); setMargins(m, m, m, m)
     }
 
     @SuppressLint("ClickableViewAccessibility")
     protected fun button(emoji: String, label: String, click: () -> Unit) = TextView(context).apply {
         text = context.getString(R.string.panel_button, emoji, label)
+        describePlain(label)
         gravity = Gravity.CENTER
+        minHeight = (BUTTON_MIN_DP * d).toInt()
+        val p = (4 * d).toInt(); setPadding(p, p, p, p)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-        setTextColor(Color.parseColor("#3A2E39"))
+        setTextColor(Palette.INK)
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#FBEFE6")); cornerRadius = 14 * d
+            setColor(Palette.UI_BUTTON); cornerRadius = 14 * d
         }
         isClickable = true
         setOnTouchListener { v, ev ->
@@ -100,6 +119,11 @@ open class Panel(context: Context) : LinearLayout(context) {
 
     protected fun row() = LinearLayout(context).apply { orientation = HORIZONTAL }
     protected fun rowLp(top: Int = 0) = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { topMargin = (top * d).toInt() }
+
+    private companion object {
+        /** Hauteur minimale d'un bouton de panneau (avant 8d : hauteur fixe, texte coupé à 200 %). */
+        const val BUTTON_MIN_DP = 56
+    }
 }
 
 /**
@@ -147,8 +171,12 @@ class PetMenu(
     fun refresh() {
         val p = pet.personality
         title.text = context.getString(R.string.menu_title, pet.species.emoji, pet.name, p.emoji, p.label)
+        paneTitle(context.getString(R.string.access_menu_pane, pet.name))
         moodText.setText(moodLabel(pet))
-        for ((e, b) in dynamic) b.text = e.text(pet.stats)
+        for ((e, b) in dynamic) {
+            b.text = e.text(pet.stats)
+            b.describePlain(b.text)
+        }
     }
 }
 
@@ -169,6 +197,7 @@ class StationsPanel(
 
     init {
         header(TextView(context).apply { setText(R.string.stations_title) }, onClose)
+        paneTitle(context.getString(R.string.stations_title))
         addView(small(context.getString(R.string.stations_hint)).apply {
             setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
         })
@@ -180,8 +209,9 @@ class StationsPanel(
             row.addView(info, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
             val btn = TextView(context).apply {
                 gravity = Gravity.CENTER
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Color.parseColor("#3A2E39"))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Palette.INK)
                 val p = (10 * d).toInt(); setPadding(p + p / 2, p, p + p / 2, p)
+                touchTarget(d)
                 setOnClickListener { onToggle(k); refresh() }
             }
             row.addView(btn, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
@@ -202,10 +232,15 @@ class StationsPanel(
                 else -> context.getString(R.string.stations_stored)
             }
             info.text = context.getString(R.string.stations_row, info.tag, place)
+            info.describePlain(info.text)
             btn.setText(if (st == 0) R.string.stations_store else R.string.stations_put_here)
+            val name = SpokenText.plain(info.tag.toString())
+            btn.contentDescription = context.getString(
+                if (st == 0) R.string.access_station_store else R.string.access_station_put_here, name,
+            )
             btn.background = GradientDrawable().apply {
                 cornerRadius = 12 * d
-                setColor(Color.parseColor(if (st == 0) "#FBEFE6" else "#FFE0E8"))
+                setColor(if (st == 0) Palette.UI_BUTTON else Palette.UI_SELECTED)
             }
         }
     }
@@ -221,7 +256,9 @@ class ChestPanel(
     private val onClose: () -> Unit,
 ) : Panel(context) {
     init {
-        header(TextView(context).apply { text = context.getString(R.string.chest_title, pet.name) }, onClose)
+        val title = context.getString(R.string.chest_title, pet.name)
+        header(TextView(context).apply { text = title }, onClose)
+        paneTitle(title)
         addView(small(context.getString(R.string.chest_food)).apply { setPadding(0, (6 * d).toInt(), 0, 0) })
         for (chunk in Food.entries.chunked(PER_ROW)) {
             val foods = row()
@@ -233,7 +270,11 @@ class ChestPanel(
             val toys = row()
             for (t in chunk) {
                 val label = if (t == pet.favoriteToy) context.getString(R.string.chest_favorite, t.label) else t.label
-                toys.addView(button(t.emoji, label) { onToy(t) }, btnLp())
+                val b = button(t.emoji, label) { onToy(t) }
+                if (t == pet.favoriteToy) {
+                    b.contentDescription = context.getString(R.string.access_favorite_toy, SpokenText.plain(t.label))
+                }
+                toys.addView(b, btnLp())
             }
             addView(toys, rowLp(2))
         }
@@ -270,28 +311,43 @@ class VetPanel(
     private val diag = TextView(context)
     private val bars = ArrayList<StatBar>()
     private val values = ArrayList<TextView>()
+    /** Une rangée par jauge, lue d'un bloc par le lecteur d'écran (« Satiété 80 % ») + son nom parlé. */
+    private val rows = ArrayList<Pair<LinearLayout, String>>()
     private val healBtn: TextView
 
     init {
         header(title, onClose)
         info.setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
         addView(info)
-        for ((label, color) in listOf(
-            R.string.vet_gauge_satiety to "#F28C28", R.string.vet_gauge_happiness to "#FF5C8A",
-            R.string.vet_gauge_energy to "#F5C542", R.string.vet_gauge_cleanliness to "#4FB3E8",
-            R.string.vet_gauge_health to "#5CC489",
+        for ((gauge, color) in listOf(
+            (R.string.vet_gauge_satiety to A11yTexts.SATIETY) to "#F28C28",
+            (R.string.vet_gauge_happiness to A11yTexts.HAPPINESS) to "#FF5C8A",
+            (R.string.vet_gauge_energy to A11yTexts.ENERGY) to "#F5C542",
+            (R.string.vet_gauge_cleanliness to A11yTexts.CLEANLINESS) to "#4FB3E8",
+            (R.string.vet_gauge_health to A11yTexts.HEALTH) to "#5CC489",
         )) {
-            val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val (label, spoken) = gauge
+            val row = LinearLayout(context).apply {
+                orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                isScreenReaderFocusable = true
+            }
+            // Largeurs minimales (et non fixes) : rien n'est coupé quand la police est agrandie
             row.addView(TextView(context).apply {
-                setText(label); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setSingleLine()
-                setTextColor(Color.parseColor("#3A2E39"))
-            }, LayoutParams((112 * d).toInt(), LayoutParams.WRAP_CONTENT))
+                setText(label); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(Palette.INK)
+                minWidth = (112 * d).toInt()
+                importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
             val bar = StatBar(context, Color.parseColor(color))
             row.addView(bar, LayoutParams(0, (10 * d).toInt(), 1f))
-            val v = small().apply { gravity = Gravity.END }
-            row.addView(v, LayoutParams((36 * d).toInt(), LayoutParams.WRAP_CONTENT))
+            val v = small().apply {
+                gravity = Gravity.END
+                minWidth = (36 * d).toInt()
+                importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            row.addView(v, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
             addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
-            bars.add(bar); values.add(v)
+            bars.add(bar); values.add(v); rows.add(row to spoken)
         }
         diag.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         diag.setTextColor(Color.parseColor("#3A2E39"))
@@ -308,6 +364,7 @@ class VetPanel(
     fun refresh() {
         val res = context.resources
         title.text = context.getString(R.string.vet_title, pet.name)
+        paneTitle(title.text)
         val days = pet.identity.ageDays(System.currentTimeMillis())
         val apps = pet.stats.visitedApps
         info.text = context.getString(R.string.vet_info, pet.personality.emoji, pet.personality.label,
@@ -317,6 +374,8 @@ class VetPanel(
         v.forEachIndexed { i, x ->
             bars[i].value = x
             values[i].text = context.getString(R.string.vet_gauge_value, x.toInt())
+            val (row, spoken) = rows[i]
+            row.contentDescription = A11yTexts.gauge(spoken, x)
         }
         val issues = ArrayList<String>()
         if (pet.stats.isSick) issues += context.getString(R.string.vet_issue_sick)

@@ -30,48 +30,4 @@
             file="src/main/res/mipmap-anydpi-v26"/>
     </issue>
 
-    <issue
-        id="ClickableViewAccessibility"
-        message="Custom view ``StationsPanel`` has `setOnTouchListener` called on it but does not override `performClick`"
-        errorLine1="        panel.setOnTouchListener { _, ev ->"
-        errorLine2="        ^">
-        <location
-            file="src/main/java/com/tamacookie/StationController.kt"
-            line="383"
-            column="9"/>
-    </issue>
-
-    <issue
-        id="ClickableViewAccessibility"
-        message="`onTouch` lambda should call `View#performClick` when a click is detected"
-        errorLine1="        panel.setOnTouchListener { _, ev ->"
-        errorLine2="                                 ^">
-        <location
-            file="src/main/java/com/tamacookie/StationController.kt"
-            line="383"
-            column="34"/>
-    </issue>
-
-    <issue
-        id="ClickableViewAccessibility"
-        message="Custom view ``ChestPanel`` has `setOnTouchListener` called on it but does not override `performClick`"
-        errorLine1="        panel.setOnTouchListener { _, ev ->"
-        errorLine2="        ^">
-        <location
-            file="src/main/java/com/tamacookie/StationController.kt"
-            line="422"
-            column="9"/>
-    </issue>
-
-    <issue
-        id="ClickableViewAccessibility"
-        message="`onTouch` lambda should call `View#performClick` when a click is detected"
-        errorLine1="        panel.setOnTouchListener { _, ev ->"
-        errorLine2="                                 ^">
-        <location
-            file="src/main/java/com/tamacookie/StationController.kt"
-            line="422"
-            column="34"/>
-    </issue>
-
 </issues>

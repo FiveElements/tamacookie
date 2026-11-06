@@ -60,6 +60,13 @@ class TouchHandler(
 
     fun refreshMenu() { menu?.refresh() }
 
+    /** Lecteur d'écran (étape 8d) : les mêmes gestes, en actions sur la fenêtre de chaque animal. */
+    val accessibility = PetAccessibility(context, windows, ctx, stations, object : PetAccessibility.Gestures {
+        override fun tap() = onPetTap()
+        override fun menu() = toggleMenu()
+        override fun grab() = startDrag()
+    })
+
     // =====================================================================
     //  Toucher, glisser, lancer
     // =====================================================================
@@ -137,6 +144,7 @@ class TouchHandler(
         }
         listeners[bunny] = l
         bunny.setOnTouchListener(l)
+        accessibility.attach(bunny, petOf)
     }
 
     /** La fenêtre [view] est retirée pour de bon (compagnon parti) : son écouteur est oublié. */

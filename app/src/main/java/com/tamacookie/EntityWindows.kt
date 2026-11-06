@@ -2,10 +2,15 @@ package com.tamacookie
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.VelocityTracker
+import android.view.View
 import android.view.ViewConfiguration
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import kotlin.math.hypot
 
 /**
@@ -21,6 +26,10 @@ class EntityWindows(
     private val toys: ToyController,
     private val stations: StationController,
     private val forwardToPet: (Station, MotionEvent) -> Boolean,
+    /** Lecteur d'écran : caresse l'occupant de la station (faux = station vide). */
+    private val caressOccupant: (Station) -> Boolean,
+    /** Lecteur d'écran : [block] est une réponse à l'utilisateur (sa bulle est annoncée). */
+    private val asUser: (block: () -> Unit) -> Unit,
 ) {
     fun create(id: WindowId): Win? = when (id) {
         is WindowId.Prop -> world.props.firstOrNull { it.id == id.id }?.let(::propWindow)
@@ -36,7 +45,40 @@ class EntityWindows(
         val lp = windows.params(p.w, p.h, p.spec.touchable)
         if (p.toy != null) setupToyTouch(v, p)
         else if (p.isPoop) v.setOnClickListener { toys.pickUp(p) }
+        describeProp(v, p)
         return Win(v, lp)
+    }
+
+    /**
+     * Lecteur d'écran (étape 8d) : « Balle, jouet » (action « Lancer » : l'équivalent d'un lancer au doigt, vers
+     * le milieu de l'écran) ; « Crotte de Cookie » (double toucher = ramasser) ; la nourriture est seulement
+     * décrite.
+     */
+    private fun describeProp(v: PropView, p: Prop) {
+        v.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        v.accessibilityDelegate = object : View.AccessibilityDelegate() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                info.contentDescription = A11yTexts.prop(p, p.owner?.let { world.pets[it]?.name })
+                if (p.toy != null) {
+                    val label = context.getString(R.string.access_action_throw)
+                    info.addAction(AccessibilityAction(R.id.access_action_throw, label))
+                } else if (p.isPoop) {
+                    info.addAction(AccessibilityAction(ACTION_CLICK, context.getString(R.string.access_action_pick_up)))
+                }
+            }
+
+            override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean {
+                if (action != R.id.access_action_throw || p.toy == null) {
+                    return super.performAccessibilityAction(host, action, args)
+                }
+                val m = context.resources.displayMetrics
+                val dir = if (p.x < m.widthPixels / 2f) 1f else -1f
+                toys.grab(p)
+                toys.release(p, dir * THROW_VX_DP * m.density, -THROW_VY_DP * m.density)
+                return true
+            }
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -75,7 +117,33 @@ class EntityWindows(
         val v = StationView(context, s)
         val lp = windows.params(s.w, s.h, touchable = true)
         setupStationTouch(v, s)
+        describeStation(v, s)
         return Win(v, lp)
+    }
+
+    /**
+     * Lecteur d'écran (étape 8d) : « Baignoire, vide » / « Baignoire, Cookie dedans » ; double toucher = le tap
+     * (explication, ouverture du coffre) ou, occupée, une caresse à l'occupant. Pour y mettre l'animal : action
+     * « Mettre dans … » de l'animal ([TouchHandler]). Déplacer une station (appui long + glisser) : panneau 🏠.
+     */
+    private fun describeStation(v: StationView, s: Station) {
+        v.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+        // Les vrais touchers sont consommés par l'écouteur : ce clic ne vient que du lecteur d'écran
+        v.setOnClickListener { if (!caressOccupant(s)) asUser { stations.tapStation(s) } }
+        v.accessibilityDelegate = object : View.AccessibilityDelegate() {
+            override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+                super.onInitializeAccessibilityNodeInfo(host, info)
+                val b = s.behavior
+                val occupants = world.station(s.kind).occupants.mapNotNull { world.pets[it]?.name }
+                info.contentDescription = A11yTexts.station(b.name, occupants, b.acceptsPet)
+                val label = when {
+                    occupants.isNotEmpty() -> R.string.access_action_pet
+                    b.acceptsPet -> R.string.access_action_explain
+                    else -> R.string.access_action_open
+                }
+                info.addAction(AccessibilityAction(ACTION_CLICK, context.getString(label)))
+            }
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -117,5 +185,11 @@ class EntityWindows(
             }
             true
         }
+    }
+
+    private companion object {
+        /** Lancer d'un jouet au lecteur d'écran (dp/s) : un lancer moyen, sans « Quel lancer ! ». */
+        const val THROW_VX_DP = 500f
+        const val THROW_VY_DP = 900f
     }
 }

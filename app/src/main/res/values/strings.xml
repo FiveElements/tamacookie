@@ -219,4 +219,34 @@
     <string name="tile_label">Cookie</string>
     <!-- Lu par l'accessibilité : nom, ce que fera un toucher -->
     <string name="tile_description">%1$s : %2$s</string>
+    <!-- Lecteur d'écran (étape 8d) : libellés fixes ; les descriptions calculées (animal, jauges, stations,
+         objets) sont dans le cœur (A11yTexts). Voir CLAUDE.md, « Accessibilité ». -->
+    <string name="access_close">Fermer</string>
+    <string name="access_action_pet">Caresser</string>
+    <string name="access_action_menu">Ouvrir le menu</string>
+    <!-- %1$s = nom de la station -->
+    <string name="access_action_put_in">Mettre dans %1$s</string>
+    <string name="access_action_leave">Sortir de %1$s</string>
+    <string name="access_action_open">Ouvrir</string>
+    <string name="access_action_explain">Expliquer</string>
+    <string name="access_action_throw">Lancer</string>
+    <string name="access_action_pick_up">Ramasser</string>
+    <string name="access_dock_home">Objets de cette page</string>
+    <string name="access_dock_hiding">Cache-cache en cours. Objets de cette page</string>
+    <string name="access_menu_pane">Menu de %1$s</string>
+    <!-- Ligne d'un animal (écran principal) : nom, rôle, « dort hors écran » éventuel, jauges -->
+    <string name="access_pet_row">%1$s, %2$s%3$s. %4$s</string>
+    <string name="access_role_resident">résident</string>
+    <string name="access_role_companion">compagnon</string>
+    <string name="access_offscreen">", dort hors écran"</string>
+    <string name="access_remove_pet">Retirer %1$s</string>
+    <string name="access_perm_granted">%1$s : autorisé</string>
+    <string name="access_perm_missing">%1$s : non autorisé, %2$s. Touche deux fois pour autoriser</string>
+    <!-- Panneau 🏠 : bouton d'une station -->
+    <string name="access_station_store">Ranger %1$s</string>
+    <string name="access_station_put_here">Mettre ici %1$s</string>
+    <string name="access_favorite_toy">%1$s, jouet préféré</string>
+    <string name="access_widget_title">%1$s, %2$s</string>
+    <string name="access_widget_feed">Nourrir %1$s</string>
+    <string name="access_widget_call">Appeler %1$s</string>
 </resources>
