@@ -12,6 +12,9 @@ import com.tamacookie.feature.toy.Food
 /**
  * Gamelle (de foin) : il renifle ; s'il a faim ([hungry]), il mange ([EAT_SECONDS], comme un repas
  * ordinaire : `PetEvent.Fed(Food.HAY)`), puis ressort. Sinon il ressort tout de suite.
+ *
+ * Il y va aussi **de lui-même** quand il a faim et qu'elle l'attend sur sa page (`Act.GOTO_BOWL`,
+ * `StationController.bowlAvailable`).
  */
 object BowlStation : StationBehavior {
     const val SNIFF_SECONDS = 1f
@@ -24,7 +27,15 @@ object BowlStation : StationBehavior {
     override val travel = Travel.BUSY
     override val seat = Seat(0f, 12f)
 
-    override fun busyLine(ctx: PetCtx) = "Je mange ma gamelle ! 🥣"
+    /** Il arrive dans la gamelle (déposé, ou venu de lui-même). */
+    val ENTER = arrayOf("La gamelle ! 🥣", "Qu'est-ce qu'il y a à manger ?", "Snif snif…")
+    /** Il ressort sans manger (pas faim). */
+    val NOT_HUNGRY = arrayOf("Pas faim pour l'instant…", "Je garde ça pour plus tard !")
+    /** Il part de lui-même vers la gamelle (`Act.GOTO_BOWL`). */
+    val GOING = arrayOf("J'ai un petit creux… 🥣", "À la gamelle !", "Miam, la gamelle m'attend !")
+    const val BUSY = "Je mange ma gamelle ! 🥣"
+
+    override fun busyLine(ctx: PetCtx) = BUSY
 
     /** Il a faim : sous [com.tamacookie.GameRules.bowlHungryBelow], et il ne refuserait pas le repas. */
     fun hungry(ctx: PetCtx, pet: Pet): Boolean =
@@ -32,7 +43,7 @@ object BowlStation : StationBehavior {
 
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
         pet.body.eatProgress = 0f
-        if (announce) ctx.say(ctx.pick("La gamelle ! 🥣", "Qu'est-ce qu'il y a à manger ?", "Snif snif…"))
+        if (announce) ctx.say(ctx.pick(*ENTER))
     }
 
     override fun update(ctx: StationCtx, pet: Pet, dt: Float) {
@@ -40,7 +51,7 @@ object BowlStation : StationBehavior {
         if (b.actTime < SNIFF_SECONDS) { b.pose = Pose.IDLE; return }
         if (!hungry(ctx, pet)) {
             b.pose = Pose.IDLE
-            ctx.say(ctx.pick("Pas faim pour l'instant…", "Je garde ça pour plus tard !"))
+            ctx.say(ctx.pick(*NOT_HUNGRY))
             ctx.leaveStation(pet, hopOut = true)
             return
         }

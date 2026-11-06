@@ -20,11 +20,14 @@ enum class Act {
      */
     SOCIAL,
     /** Bêtises de l'évolution 4a : il tire la langue (réaction à un toucher), il mâchouille le bord de l'écran. */
-    TEASE, CHEW_EDGE;
+    TEASE, CHEW_EDGE,
+    /** Il va de lui-même à la gamelle (faim, gamelle libre sur sa page) : il y entre en arrivant. */
+    GOTO_BOWL;
 
     companion object {
         /** En mouvement : animation fluide (~60 i/s). */
-        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL, CHEW_EDGE)
+        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL, CHEW_EDGE,
+            GOTO_BOWL)
         /** Immobile et endormi : animation très économe (~12 i/s). Dans une station : `ActHandler.slowFrames`. */
         val SLOW: Set<Act> = EnumSet.of(SLEEP)
         /** Il ne suit pas le défilement des pages (il est tenu, ou caché). */
@@ -73,6 +76,11 @@ data class BrainInput(
     val nowMs: Long = 0L,
     /** Dernière fois qu'il s'est servi seul dans le coffre. */
     val lastSelfServeMs: Long = 0L,
+    /**
+     * La gamelle l'attend : affichée sur sa page, libre, acceptée par son espèce, personne d'autre n'y va, et
+     * il a faim sans refuser le repas (calculé par l'hôte, sans aléatoire). Faux = aucun tirage de plus.
+     */
+    val bowlAvailable: Boolean = false,
     /** L'animal le plus proche sur sa page (null = il est seul) : perception sociale. */
     val nearest: Neighbor? = null,
 )
@@ -86,6 +94,8 @@ sealed class Decision {
     /** Il a fait une bêtise pour attirer l'attention (déjà exécutée par le rappel). */
     object AttentionSought : Decision()
     object GoToChest : Decision()
+    /** Il va à la gamelle ([BrainInput.bowlAvailable]). */
+    object GoToBowl : Decision()
     object PageWander : Decision()
     /** Il va vers [other] (une interaction sociale : suivre, câlin…). */
     data class Socialize(val other: Neighbor) : Decision()
@@ -117,6 +127,8 @@ class BunnyBrain(private val rnd: Random, private val species: Species = Species
         if (!s.elsewhere && wantsChest(s.nowMs, s.lastSelfServeMs, s.hasToyOrFood, s.chestVisible, s.satiety, s.happiness, s.energy)) {
             return Decision.GoToChest
         }
+        // Après le coffre (sa logique ne change pas) : la gamelle, si elle l'attend — tirage seulement dans ce cas
+        if (!s.elsewhere && s.bowlAvailable && rnd.nextFloat() < BOWL_CHANCE) return Decision.GoToBowl
         // Un autre animal tranquille, pas trop loin : il va le voir (seulement s'il n'est pas seul : un
         // animal seul ne tire pas ce sort, ses décisions sont celles d'avant l'étape 7)
         val n = s.nearest
@@ -213,6 +225,9 @@ class BunnyBrain(private val rnd: Random, private val species: Species = Species
     companion object {
         /** Distance (dp) en deçà de laquelle il peut aller voir un autre animal. */
         const val SOCIAL_RANGE_DP = 600f
+
+        /** Chance d'aller à la gamelle quand elle l'attend ([BrainInput.bowlAvailable]), à chaque décision. */
+        const val BOWL_CHANCE = 0.5f
 
         fun isNight(hour: Int) = hour >= 22 || hour < 7
 

@@ -20,8 +20,8 @@ enum class SpeechPriority {
  * arriver qu'**une fois à la fois** sur l'écran.
  *
  * - **Bêtises** : un seul animal en fait une ([mayStartMischief], [mischiefOwner]) ;
- * - **coffre** : un seul animal va s'y servir ([mayUseChest]) ; les stations de capacité 1 sont gardées
- *   par l'occupation du monde (`Occupancy.canEnter`) ;
+ * - **coffre**, **gamelle** : un seul animal va s'y servir de lui-même ([mayHeadTo]) ; les stations de
+ *   capacité 1 sont gardées par l'occupation du monde (`Occupancy.canEnter`) ;
  * - **nourriture** : quand deux animaux courent vers la même, le plus proche l'emporte ([foodWinner]),
  *   l'autre renonce à celle-ci ([mayChaseFood]) ;
  * - **bulles** : une seule réplique à l'écran à la fois, les autres attendent par priorité ([bubbles]) ;
@@ -51,14 +51,19 @@ class Director(private val world: World) {
     private fun inMischief(p: Pet) = p.act in MISCHIEF_ACTS || p.mind.mischief.hidingView != null
 
     // =====================================================================
-    //  Coffre : un seul animal à la fois
+    //  Coffre, gamelle : un seul animal à la fois
     // =====================================================================
-    /** [p] peut aller se servir au coffre : aucun autre n'y va ni n'y est. */
-    fun mayUseChest(p: Pet): Boolean {
-        val chest = world.station(StationKind.CHEST)
+    /**
+     * [p] peut aller de lui-même à la station [k] (se servir au coffre, manger à la gamelle) : aucun autre
+     * animal n'est en route ([GOING_TO]) ni dedans. Pas de course à deux : le premier qui décide part, les
+     * autres ne la voient plus (le cerveau ne tire même pas au sort).
+     */
+    fun mayHeadTo(p: Pet, k: StationKind): Boolean {
+        val going = GOING_TO[k]
+        val occ = world.station(k)
         for (q in world.pets.values) {
             if (q === p) continue
-            if (q.act == Act.GOTO_CHEST || chest.has(q.id)) return false
+            if ((going != null && q.act == going) || occ.has(q.id)) return false
         }
         return true
     }
@@ -217,6 +222,9 @@ class Director(private val world: World) {
     }
 
     companion object {
+        /** Station → activité « il y va de lui-même » ([mayHeadTo]). */
+        private val GOING_TO = mapOf(StationKind.CHEST to Act.GOTO_CHEST, StationKind.BOWL to Act.GOTO_BOWL)
+
         /** Activités d'une bêtise (celles de [Mischiefs.ALL]). */
         val MISCHIEF_ACTS: Set<Act> = EnumSet.noneOf(Act::class.java).apply { for (m in Mischiefs.ALL) addAll(m.acts) }
     }

@@ -53,6 +53,7 @@ object A11yTexts {
         put(Act.EAT, "mange")
         put(Act.GOTO_FOOD, "court vers à manger")
         put(Act.GOTO_CHEST, "va au coffre")
+        put(Act.GOTO_BOWL, "va à la gamelle")
         put(Act.PLAY, "joue")
         put(Act.AIR, "en l'air")
         put(Act.DRAGGED, "tenu")
