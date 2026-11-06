@@ -1,7 +1,6 @@
 package com.tamacookie
 
 import android.content.SharedPreferences
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActRegistry
 import kotlin.random.Random
 
@@ -15,18 +14,22 @@ import kotlin.random.Random
 interface PetCtx {
     // --- Monde ---
     val world: World
-    /** L'animal courant (le résident tant qu'il n'y en a qu'un). */
-    val pet: Pet get() = world.resident
+    /** L'animal courant ([World.current]) : celui dont on s'occupe (boucle, toucher, commande), sinon le résident. */
+    val pet: Pet get() = world.current
     val arena: Arena
     val actor: BunnyActor
     val clock: Clock
-    /** Aléatoire partagé (répliques, objets). Le cerveau de chaque animal a le sien ([Mind.rnd]). */
+    /** Aléatoire de l'animal courant ([Mind.rnd] : répliques, objets, décisions) — chaque animal a le sien. */
     val rnd: Random
     val prefs: SharedPreferences
     /** Vues / pages du bureau et défilement (où se trouve chaque chose). */
     val pages: PageTracker
+    /** Ce que voit le service d'accessibilité : plateformes, clavier, pages du bureau, signaux de l'utilisateur. */
+    val screen: ScreenSensor
     /** Quelle fonctionnalité prend en charge l'activité courante d'un animal (stations…). */
     val acts: ActRegistry
+    /** L'arbitre global entre animaux (une bêtise à la fois, le coffre, la nourriture, les bulles). */
+    val director: Director
 
     // --- Jauges et sauvegarde (l'hôte est la seule autorité sur l'état des animaux) ---
     /**
@@ -87,9 +90,15 @@ interface PetCtx {
     val overlay: OverlayHost
     fun applyView()
     fun layoutAnchored()
-    /** Fenêtre de l'animal retirée (en cage sur une autre page, caché). */
-    val bunnyAway: Boolean
-    fun setBunnyAway(away: Boolean, fadeIn: Boolean = false)
-    fun placeBunny()
+    /** Fenêtre de [pet] retirée (en cage sur une autre page, caché). */
+    fun isAway(pet: Pet): Boolean
+    /** Retire ([away]) ou réaffiche la fenêtre de [pet] ([fadeIn] : petite apparition en fondu). */
+    fun setAway(pet: Pet, away: Boolean, fadeIn: Boolean = false)
+    /** Fenêtre de [pet] à sa position (regroupé : au plus un déplacement par image). */
+    fun place(pet: Pet)
+    /** Raccourcis sur l'animal courant ([pet]). */
+    val bunnyAway: Boolean get() = isAway(pet)
+    fun setBunnyAway(away: Boolean, fadeIn: Boolean = false) = setAway(pet, away, fadeIn)
+    fun placeBunny() = place(pet)
     fun setDockHiding(hiding: Boolean)
 }

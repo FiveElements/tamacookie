@@ -1,7 +1,7 @@
 package com.tamacookie.feature.station
 
 import android.graphics.Canvas
-import com.tamacookie.BunnyView.PType
+import com.tamacookie.PType
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
 import com.tamacookie.StationView

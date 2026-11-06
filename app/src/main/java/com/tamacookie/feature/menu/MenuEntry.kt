@@ -1,8 +1,7 @@
 package com.tamacookie.feature.menu
 
 import com.tamacookie.Act
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.Lines
+import com.tamacookie.Expr
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
 import com.tamacookie.PetEvent
@@ -43,10 +42,10 @@ object MenuEntries {
         if (st.sleeping) {
             ctx.on(pet, PetEvent.Woken(grumpy = false))
             pet.express(Expr.SLEEPY, 2f)
-            ctx.say(Lines.GETTING_UP)
+            ctx.say(pet.species.lines.GETTING_UP)
             pet.setActOrAfterAir(Act.IDLE, 3f)
         } else if (st.energy > ctx.rules.notTiredAbove) {
-            ctx.speech.sayOneOf(Lines.NOT_TIRED)
+            ctx.speech.sayOneOf(pet.species.lines.NOT_TIRED)
         } else ctx.startSleep(pet)
     }
 

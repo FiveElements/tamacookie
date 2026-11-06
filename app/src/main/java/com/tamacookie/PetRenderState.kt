@@ -1,15 +1,22 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.toy.Food
+
+/** Posture affichée (commune aux espèces : chaque renderer la dessine à sa façon). */
+enum class Pose { IDLE, WALK, AIR, SLEEP, EAT, DRAGGED, SIT }
+
+/** Expression du visage. */
+enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY }
+
+/** Particules émises au-dessus de la tête (dessinées par [PetView], communes aux espèces). */
+enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE }
 
 /**
  * Ce qu'affiche la fenêtre d'un animal à une image donnée (immuable). Produit à chaque tick à partir
- * du [Pet] par [of] ; [BunnyView.render] ne lit que ça (la vue n'écrit ni ne lit l'état du jeu).
+ * du [Pet] par [of] ; [PetView.render] ne lit que ça (la vue n'écrit ni ne lit l'état du jeu).
  * Les aperçus (accueil, adoption) en fabriquent eux-mêmes.
  */
-data class BunnyRenderState(
+data class PetRenderState(
     val pose: Pose = Pose.IDLE,
     val expr: Expr = Expr.NORMAL,
     /** 1 = vers la droite, -1 = vers la gauche. */
@@ -28,10 +35,10 @@ data class BunnyRenderState(
 ) {
     companion object {
         /** L'état affiché de [pet] ([Look] est immuable : partagée sans copie). */
-        fun of(pet: Pet, rules: GameRules = GameRules.DEFAULT): BunnyRenderState {
+        fun of(pet: Pet, rules: GameRules = GameRules.DEFAULT): PetRenderState {
             val b = pet.body
             val st = pet.stats
-            return BunnyRenderState(
+            return PetRenderState(
                 pose = b.pose,
                 expr = pet.mind.exprOverride ?: moodExpr(st.mood),
                 facing = b.facing,

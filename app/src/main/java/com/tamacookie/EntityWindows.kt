@@ -11,7 +11,7 @@ import kotlin.math.hypot
 /**
  * Renderers des entités (adaptateur Android) : fabrique la fenêtre d'un objet ou d'une station la
  * première fois que l'[OverlayManager] l'affiche, et traduit les gestes sur ces fenêtres en appels aux
- * contrôleurs (Kotlin pur). [forwardToPet] : transmet un geste à la fenêtre de l'animal (la cage lui
+ * contrôleurs (Kotlin pur). [forwardToPet] : transmet un geste à la fenêtre de l'animal qui occupe la station (la cage lui
  * passe les touchers).
  */
 class EntityWindows(
@@ -20,7 +20,7 @@ class EntityWindows(
     private val world: World,
     private val toys: ToyController,
     private val stations: StationController,
-    private val forwardToPet: (MotionEvent) -> Boolean,
+    private val forwardToPet: (Station, MotionEvent) -> Boolean,
 ) {
     fun create(id: WindowId): Win? = when (id) {
         is WindowId.Prop -> world.props.firstOrNull { it.id == id.id }?.let(::propWindow)
@@ -92,7 +92,7 @@ class EntityWindows(
         v.setOnTouchListener { _, ev ->
             if (ev.actionMasked == MotionEvent.ACTION_DOWN) forwarding = stations.touchGoesToPet(s)
             // Lapin à l'intérieur : les touchers vont au lapin (pour le sortir / le caresser)
-            if (forwarding) return@setOnTouchListener forwardToPet(ev)
+            if (forwarding) return@setOnTouchListener forwardToPet(s, ev)
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = ev.rawX; downY = ev.rawY; startCx = s.cx; startCy = s.cy

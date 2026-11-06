@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Pose
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.sign

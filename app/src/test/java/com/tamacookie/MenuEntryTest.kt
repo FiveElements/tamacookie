@@ -1,6 +1,6 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
+import com.tamacookie.species.rabbit.RabbitLines
 import com.tamacookie.feature.menu.MenuCtx
 import com.tamacookie.feature.menu.MenuEntries
 import com.tamacookie.feature.menu.MenuEntry
@@ -54,7 +54,7 @@ class MenuEntryTest {
         c.pet.stats = c.pet.stats.copy(energy = 95f)
         MenuEntries.SLEEP.run(c, c.pet)
         assertEquals(0, c.base.sleepRequests)
-        assertTrue(c.base.said.single() in Lines.NOT_TIRED)
+        assertTrue(c.base.said.single() in RabbitLines.NOT_TIRED)
     }
 
     @Test
@@ -69,7 +69,7 @@ class MenuEntryTest {
         assertEquals(listOf(c.pet.id), c.base.saved)       // réveil sauvegardé tout de suite
         assertEquals(Act.IDLE, c.pet.act)
         assertEquals(Expr.SLEEPY, c.pet.mind.exprOverride)
-        assertEquals(listOf(Lines.GETTING_UP), c.base.said)
+        assertEquals(listOf(RabbitLines.GETTING_UP), c.base.said)
     }
 
     @Test

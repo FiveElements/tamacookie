@@ -8,8 +8,6 @@ import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.menu.MenuCtx
 import com.tamacookie.feature.menu.MenuEntries
 import kotlin.math.abs
@@ -19,8 +17,10 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /**
- * Interactions tactiles avec le lapin : toucher (caresses, chatouilles, réveil),
+ * Interactions tactiles avec les animaux : toucher (caresses, chatouilles, réveil),
  * glisser / lancer (dépôt dans une station), et menu de soins (double toucher / appui long).
+ * Chaque fenêtre d'animal a son écouteur ([attach]) : le geste agit sur **l'animal touché** (il devient
+ * l'animal courant, `World.asPet`, le temps du geste) ; le menu agit sur l'animal pour lequel il a été ouvert.
  *
  * Adaptateur d'entrée : passe par [PetCtx] pour l'animal, et reçoit explicitement les deux
  * contrôleurs qu'il pilote ([StationController] : survol / dépôt / panneau ; [MischiefController] :
@@ -40,11 +40,15 @@ class TouchHandler(
 
     private val tapTimes = ArrayDeque<Long>()
     private var menu: PetMenu? = null
+    /** L'animal pour lequel le menu est ouvert. */
+    private var menuPet: PetId? = null
     private var lastMenuClose = 0L
 
-    /** Écouteur posé sur la fenêtre du lapin (réutilisé par la cage pour lui transmettre les gestes). */
-    var listener: View.OnTouchListener? = null
-        private set
+    /** Écouteur posé sur la fenêtre de chaque animal (réutilisé par la cage pour lui transmettre les gestes). */
+    private val listeners = HashMap<View, View.OnTouchListener>()
+
+    /** Transmet un geste à la fenêtre [view] d'un animal (la cage lui passe les touchers). */
+    fun forward(view: View, ev: MotionEvent): Boolean = listeners[view]?.onTouch(view, ev) ?: false
 
     val menuOpen: Boolean get() = menu != null
 
@@ -59,14 +63,17 @@ class TouchHandler(
     // =====================================================================
     //  Toucher, glisser, lancer
     // =====================================================================
+    /** Pose l'écouteur sur la fenêtre [bunny] de l'animal [petOf] (relu à chaque geste : la fenêtre peut changer d'animal). */
     @SuppressLint("ClickableViewAccessibility")
-    fun attach(bunny: BunnyView) {
+    fun attach(bunny: PetView, petOf: () -> Pet?) {
         val slop = ViewConfiguration.get(context).scaledTouchSlop * 1.5f
+        /** Le geste agit sur l'animal de cette fenêtre. */
+        fun touched(block: () -> Unit) { val p = petOf() ?: return; ctx.speech.at(SpeechPriority.HIGH) { ctx.world.asPet(p, block) } }
         val gd = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
-            override fun onSingleTapConfirmed(e: MotionEvent): Boolean { onPetTap(); return true }
-            override fun onDoubleTap(e: MotionEvent): Boolean { toggleMenu(); return true }
-            override fun onLongPress(e: MotionEvent) {
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean { touched { onPetTap() }; return true }
+            override fun onDoubleTap(e: MotionEvent): Boolean { touched { toggleMenu() }; return true }
+            override fun onLongPress(e: MotionEvent) = touched {
                 ctx.haptic(pet, HapticFeedbackConstants.LONG_PRESS)
                 toggleMenu()
             }
@@ -77,7 +84,7 @@ class TouchHandler(
         var lastRawX = 0f
         var vt: VelocityTracker? = null
 
-        val l = View.OnTouchListener { _, ev ->
+        fun onTouch(ev: MotionEvent): Boolean {
             val e2 = MotionEvent.obtain(ev); e2.setLocation(ev.rawX, ev.rawY)
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -114,7 +121,7 @@ class TouchHandler(
                         dragging = false
                         vt?.recycle(); vt = null
                         e2.recycle()
-                        return@OnTouchListener true   // pas de "tap" après un lancer
+                        return true   // pas de "tap" après un lancer
                     }
                     vt?.recycle(); vt = null
                 }
@@ -122,17 +129,24 @@ class TouchHandler(
             vt?.addMovement(e2)
             e2.recycle()
             if (!dragging) gd.onTouchEvent(ev)
-            true
+            return true
         }
-        listener = l
+        val l = View.OnTouchListener { _, ev ->
+            val p = petOf() ?: return@OnTouchListener false
+            ctx.speech.at(SpeechPriority.HIGH) { ctx.world.asPet(p) { onTouch(ev) } }
+        }
+        listeners[bunny] = l
         bunny.setOnTouchListener(l)
     }
+
+    /** La fenêtre [view] est retirée pour de bon (compagnon parti) : son écouteur est oublié. */
+    fun detach(view: View) { listeners.remove(view); view.setOnTouchListener(null) }
 
     private fun startDrag() {
         if (pet.body.act == Act.PEEK) {
             mischief.endHiding()
             ctx.on(pet, PetEvent.Found)
-            ctx.say(Lines.FOUND_WHILE_DRAGGED, 1.5f)
+            ctx.say(pet.species.lines.FOUND_WHILE_DRAGGED, 1.5f)
         } else if (pet.isHiding) mischief.endHiding()
         closeMenu()
         pet.body.platform = null
@@ -142,14 +156,14 @@ class TouchHandler(
         ctx.world.dropHeldToy()
         ctx.noteInteraction()
         pet.setAct(Act.DRAGGED)
-        ctx.speech.sayOneOf(Lines.DRAGGED, 1.8f)
+        ctx.speech.sayOneOf(pet.species.lines.DRAGGED, 1.8f)
         ctx.haptic(pet, HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     private fun release(vxPx: Float, vyPx: Float) {
         val phys = pet.body.phys
         phys.release(vxPx, vyPx)
-        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * arena.d) ctx.speech.sayOneOf(Lines.THROWN, 1.6f)
+        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * arena.d) ctx.speech.sayOneOf(pet.species.lines.THROWN, 1.6f)
         pet.body.afterAir = Act.IDLE
         pet.setAct(Act.AIR)
     }
@@ -163,7 +177,7 @@ class TouchHandler(
         if (pet.body.act == Act.SLEEP || pet.stats.sleeping) {
             ctx.on(pet, PetEvent.Woken(grumpy = true))
             pet.express(Expr.ANGRY, 2.5f)
-            ctx.speech.sayOneOf(Lines.WOKEN_BY_TAP)
+            ctx.speech.sayOneOf(pet.species.lines.WOKEN_BY_TAP)
             pet.setActOrAfterAir(Act.IDLE, 3f)
             return
         }
@@ -172,7 +186,7 @@ class TouchHandler(
         if (tapTimes.size >= Tuning.TICKLE_TAPS) {
             tapTimes.clear()
             pet.express(Expr.HAPPY, 1.5f)
-            ctx.speech.sayOneOf(Lines.TICKLED)
+            ctx.speech.sayOneOf(pet.species.lines.TICKLED)
             val fx = pet.body.fx; val screenW = arena.screenW
             pet.body.targetX = if (fx > screenW / 2) fx - screenW * 0.35f else fx + screenW * 0.35f
             pet.setActOrAfterAir(Act.WALK)
@@ -181,7 +195,7 @@ class TouchHandler(
         ctx.on(pet, PetEvent.Petted)
         ctx.emit(pet, PType.HEART, 2 + ctx.rnd.nextInt(3))
         pet.express(Expr.HAPPY, 1.6f)
-        if (ctx.rnd.nextFloat() < 0.45f) ctx.speech.sayOneOf(Lines.PETTED, 2f)
+        if (ctx.rnd.nextFloat() < 0.45f) ctx.speech.sayOneOf(pet.species.lines.PETTED, 2f)
         val act = pet.body.act
         if (act == Act.IDLE || act == Act.WALK || act == Act.SIT) {
             if (ctx.rnd.nextFloat() < 0.35f) ctx.actor.jump(pet, -560 * arena.d, 0f, then = Act.IDLE) else pet.setAct(Act.IDLE, 2.5f)
@@ -198,10 +212,14 @@ class TouchHandler(
         val d = arena.d
         lateinit var m: PetMenu
         // Un seul menu à la fois (id [WindowId.Menu]) : un ancien panneau a déjà été retiré en ouvrant le nouveau
-        m = PetMenu(context, pet, MenuEntries.ALL,
+        val target = pet
+        m = PetMenu(context, target, MenuEntries.ALL,
             onEntry = { e ->
                 closeMenu()
-                e.run(menuCtx, pet)
+                // l'animal a pu partir (compagnon retiré) : rien à faire
+                if (ctx.world.pets[target.id] === target) {
+                    ctx.speech.at(SpeechPriority.HIGH) { ctx.world.asPet(target) { e.run(menuCtx, target) } }
+                }
             },
             onClose = { if (menu === m) closeMenu() },
         )
@@ -224,6 +242,7 @@ class TouchHandler(
         m.alpha = 0f; m.scaleX = 0.9f; m.scaleY = 0.9f
         m.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start()
         menu = m
+        menuPet = target.id
         if (pet.body.act == Act.WALK) pet.setAct(Act.IDLE, 6f)
     }
 
@@ -233,5 +252,9 @@ class TouchHandler(
             lastMenuClose = ctx.clock.wallMs()
         }
         menu = null
+        menuPet = null
     }
+
+    /** Ferme le menu s'il est ouvert pour [id] (l'animal disparaît / sa fenêtre est retirée). */
+    fun closeMenuOf(id: PetId) { if (menuPet == id) closeMenu() }
 }

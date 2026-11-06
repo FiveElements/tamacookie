@@ -41,5 +41,14 @@ interface PetStore {
     /** Ajoute [record] et en fait le résident ; [replacing] (l'ancien résident) est effacé. */
     fun adopt(record: PetRecord, replacing: PetId?)
 
+    /** Ajoute [record] comme compagnon du résident (le résident ne change pas). */
+    fun addCompanion(record: PetRecord)
+
+    /** Les compagnons (tous les animaux sauf le résident), dans l'ordre d'arrivée. */
+    fun companions(): List<PetRecord> {
+        val r = residentId()
+        return ids().filter { it != r }.mapNotNull(::load)
+    }
+
     fun remove(id: PetId)
 }

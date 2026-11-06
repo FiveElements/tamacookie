@@ -1,8 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel
@@ -63,7 +60,8 @@ class ToyController(private val ctx: PetCtx) {
         acts.register(Act.EAT) { eating }
     }
 
-    fun poopCount(): Int = props.count { it.isPoop }
+    /** Crottes à l'écran ([owner] : celles de cet animal ; null = toutes). */
+    fun poopCount(owner: PetId? = null): Int = props.count { it.isPoop && (owner == null || it.owner == owner) }
 
     /** Un objet bouge (en vol, tenu par l'utilisateur) : animation fluide. */
     fun anyMoving(): Boolean = toyHeldByUser || props.any { !it.isPoop && !it.onGround }
@@ -173,6 +171,11 @@ class ToyController(private val ctx: PetCtx) {
             pet.body.pose = Pose.IDLE
             pet.body.facing = sign(c.x - pet.body.fx).takeIf { it != 0f } ?: pet.body.facing
             pet.express(Expr.SURPRISED, 0.3f)
+        } else if (ctx.director.foodWinner(c).let { it != null && it !== pet }) {
+            // Un autre animal est plus près : l'arbitre lui donne la nourriture, celui-ci renonce (la dispute
+            // est mise en scène par le système social : `CarrotDispute`)
+            ctx.director.loseFood(pet, c, ctx.director.foodWinner(c))
+            pet.setAct(Act.IDLE, 2f)
         } else if (ctx.actor.walkToward(pet, c.x, 130 * d, dt, stopDist = 26 * d)) {
             pet.body.eatingFood = c.food!!
             removeProp(c)
@@ -190,7 +193,7 @@ class ToyController(private val ctx: PetCtx) {
             ctx.on(pet, PetEvent.Fed(b.eatingFood))
             ctx.emit(pet, PType.HEART, 3)
             pet.express(Expr.HAPPY, 2f)
-            ctx.speech.sayOneOf(Lines.ATE)
+            ctx.speech.sayOneOf(pet.species.lines.ATE)
             pet.setAct(Act.IDLE, 3f)
         }
     }
@@ -198,34 +201,44 @@ class ToyController(private val ctx: PetCtx) {
     // =====================================================================
     //  Crottes
     // =====================================================================
-    fun spawnPoop(x: Float) {
+    /** Une crotte de [owner] (l'animal courant : sa page) tombe en [x]. */
+    fun spawnPoop(x: Float, owner: Pet = pet) {
         val p = addProp(Poop)
+        p.owner = owner.id
         p.anchor = ctx.pages.bunnyView()
         p.x = x; p.y = arena.groundY
         placeProp(p)
     }
 
-    /** On a touché une crotte : ramassée. */
+    /** On a touché une crotte : ramassée (c'est son auteur qui remercie). */
     fun pickUp(p: Prop) {
         if (!p.isPoop || p !in props) return
         removeProp(p)
-        ctx.on(pet, PetEvent.PoopRemoved)
-        ctx.emit(pet, PType.SPARKLE, 4)
-        pet.express(Expr.HAPPY, 1.5f)
-        ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
-    }
-
-    fun restorePoops() {
-        repeat(pet.stats.poops) {
-            spawnPoop(arena.minX + ctx.rnd.nextFloat() * (arena.maxX - arena.minX))
+        val owner = p.owner?.let { ctx.world.pets[it] } ?: pet
+        ctx.world.asPet(owner) {
+            ctx.on(owner, PetEvent.PoopRemoved)
+            ctx.emit(owner, PType.SPARKLE, 4)
+            owner.express(Expr.HAPPY, 1.5f)
+            ctx.say(ctx.pick("Merci ! ✨", "Ouf, ça sentait…", "Tu es le meilleur !"), 2f)
         }
     }
+
+    /** Au démarrage (ou quand il apparaît) : les crottes sauvegardées de l'animal courant reviennent. */
+    fun restorePoops(owner: Pet = pet) {
+        repeat(owner.stats.poops - poopCount(owner.id)) {
+            spawnPoop(arena.minX + ctx.rnd.nextFloat() * (arena.maxX - arena.minX), owner)
+        }
+    }
+
+    /** L'animal [id] est parti : ses crottes disparaissent. */
+    fun removePoopsOf(id: PetId) { props.filter { it.isPoop && it.owner == id }.forEach(::removeProp) }
 
     // =====================================================================
     //  Jouets
     // =====================================================================
     fun startPlay(toy: Toy, from: Station? = null) {
         val rnd = ctx.rnd
+        if (!pet.species.accepts(toy)) return
         if (refuses(pet, "Chut… il dort", noteFirst = false)) return
         if (ctx.on(pet, PetEvent.PlayStarted).refused) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
         props.filter { it.toy != null }.forEach { removeProp(it) }
@@ -256,7 +269,7 @@ class ToyController(private val ctx: PetCtx) {
         val p = ctx.world.currentToy()
         pet.mind.playTime += dt
         if (p == null) { pet.setAct(Act.IDLE); return }
-        val limit = if (pet.personality == Personality.PLAYFUL) 50f else 35f
+        val limit = pet.species.behavior(pet.personality).playSeconds
         if (pet.mind.playTime > limit || pet.stats.energy < ctx.rules.playStopEnergyBelow) { endPlay(p); return }
         p.toy!!.spec.play(tctx, pet, p, dt)
     }

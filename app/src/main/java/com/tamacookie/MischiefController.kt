@@ -15,19 +15,20 @@ import com.tamacookie.feature.mischief.UserEvents
  * chaque bêtise est dans son `object` (`feature/mischief/`) ; ses activités passent par [ActRegistry]
  * ([registerActs]).
  *
- * Ne dépend que de [PetCtx] (testable avec `FakePetCtx`) ; agit sur [PetCtx.pet].
+ * Ne dépend que de [PetCtx] (testable avec `FakePetCtx`) ; agit sur [PetCtx.pet]. Les clics / frappes /
+ * défilements arrivent par [PetCtx.screen] ([ScreenSensor.takeSignals]), sans perte.
  */
 class MischiefController(private val ctx: PetCtx, private val all: List<Mischief> = Mischiefs.ALL) {
     /** 0 sage, 1 taquin, 2 petit monstre. */
     var level = 1
     private var cooldownUntil = 0L
-    private var seenClick = -1
-    private var seenTyping = -1
-    private var seenScroll = -1
+    /** Premier passage fait : les signaux reçus avant (lapin pas encore là) sont ignorés. */
+    private var primed = false
     private val events = UserEvents()
-    private val state = MischiefState()
 
+    /** L'animal courant (celui qui décide, qu'on touche…) ; l'état de sa bêtise est dans son esprit. */
     private val pet: Pet get() = ctx.pet
+    private val shownBuf = ArrayList<Pet>()
 
     /** Ce que reçoivent les bêtises : la façade + niveau, délai et état. */
     private val mctx: MischiefCtx = object : MischiefCtx, PetCtx by ctx {
@@ -35,7 +36,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
         override var cooldownUntil: Long
             get() = this@MischiefController.cooldownUntil
             set(v) { this@MischiefController.cooldownUntil = v }
-        override val state: MischiefState get() = this@MischiefController.state
+        override val state: MischiefState get() = ctx.pet.mind.mischief
     }
 
     /** Une bêtise en cours : la boucle et le toucher lui délèguent ses activités. */
@@ -54,19 +55,20 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
         }
     }
 
-    /** Vue où il s'est caché (null = pas de cache-cache). */
-    val hidingView: String? get() = state.hidingView
+    /** Vue où un animal s'est caché (null = pas de cache-cache). */
+    val hidingView: String? get() = ctx.world.pets.values.firstNotNullOfOrNull { it.mind.mischief.hidingView }
 
     fun loadLevel() { level = ctx.prefs.getInt(Prefs.MISCHIEF, 1) }
 
     private fun exemptApp(): Boolean {
-        val pkg = (Platforms.foregroundPkg ?: ctx.foregroundPkg() ?: "").lowercase()
+        val pkg = (ctx.screen.snapshot.foregroundPkg ?: ctx.foregroundPkg() ?: "").lowercase()
         return EXEMPT.any { it in pkg }
     }
 
     /** Appelé quand il choisit quoi faire : s'il est ignoré depuis longtemps, il fait une bêtise. */
     fun maybeSeekAttention(): Boolean {
         if (ctx.world.stationOf(pet) != null) return false
+        if (!ctx.director.mayStartMischief(pet)) return false          // un autre animal fait déjà une bêtise
         val now = ctx.clock.wallMs()
         val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.personality)
         if (!BunnyBrain.canSeekAttention(now, ctx.lastInteraction, cooldownUntil, thresholdMs)) return false
@@ -81,27 +83,73 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
         return Mischiefs.seek(all, level, ctx.rnd, { it.canStart(mctx, p) }, { it.start(mctx, p) }) != null
     }
 
-    /** Réagit à ce que fait l'utilisateur (clics, frappe au clavier, défilement). */
+    /**
+     * Réagit à ce que fait l'utilisateur (clics, frappe au clavier, défilement), une fois par image.
+     * Chaque frappe compte ; chaque clic est proposé aux bêtises, dans l'ordre, jusqu'à la première qui
+     * réagit ; le défilement compte une fois par image (il arrive en rafale).
+     */
     fun checkUserEvents() {
-        val cv = Platforms.clickVersion; val tv = Platforms.typingVersion; val sv = Platforms.scrollVersion
-        val newClick = seenClick != -1 && cv != seenClick
-        val newType = seenTyping != -1 && tv != seenTyping
-        val newScroll = seenScroll != -1 && sv != seenScroll
-        seenClick = cv; seenTyping = tv; seenScroll = sv
-        if (level == 0 || pet.stats.sleeping || ctx.world.stationOf(pet) != null || ctx.hidden) return
-        if (newType) events.typing++
+        val signals = ctx.screen.takeSignals().let { if (primed) it else emptyList() }
+        primed = true
+        if (level == 0 || ctx.hidden) return
+        val p = reactingPet() ?: return
+        ctx.world.asPet(p) { react(p, signals) }
+    }
+
+    /**
+     * L'animal qui réagit à l'utilisateur : le premier affiché ni endormi ni dans une station, de
+     * préférence libre ([Act.FREE]) ; null = aucun (les signaux sont consommés sans réaction).
+     */
+    private fun reactingPet(): Pet? {
+        // Une bêtise en cours : c'est son auteur qui réagit (les autres n'en commencent pas une deuxième)
+        ctx.director.mischiefOwner()?.let { return it.takeIf { o -> ctx.world.isShown(o) && !o.stats.sleeping && ctx.world.stationOf(o) == null } }
+        var first: Pet? = null
+        for (q in ctx.world.shown(shownBuf)) {
+            if (q.stats.sleeping || ctx.world.stationOf(q) != null) continue
+            if (q.body.act in Act.FREE) return q
+            if (first == null) first = q
+        }
+        return first
+    }
+
+    private fun react(pet: Pet, signals: List<UserSignal>) {
+        var clicked = false
+        var scrolled = false
+        for (s in signals) when (s) {
+            UserSignal.Typing -> events.typing++
+            UserSignal.Scroll -> scrolled = true
+            is UserSignal.Click -> clicked = true
+        }
         val now = ctx.clock.wallMs()
         if (pet.body.act !in Act.FREE || now < cooldownUntil || exemptApp()) return
-        events.click = newClick; events.scroll = newScroll; events.now = now
+        events.scroll = scrolled; events.now = now
         val p = pet
-        Mischiefs.react(all) { it.react(mctx, p, events) }
+        if (!clicked) {
+            events.click = null
+            Mischiefs.react(all) { it.react(mctx, p, events) }
+            return
+        }
+        for (s in signals) {
+            if (s !is UserSignal.Click) continue
+            events.click = s.box
+            if (Mischiefs.react(all) { it.react(mctx, p, events) } != null) break
+            events.scroll = false                                   // le défilement n'est proposé qu'une fois
+        }
+        events.click = null
     }
 
     // --- Cache-cache (menu, changement de vue, dodo, glisser) ---
-    fun startHideSeek(fromMenu: Boolean): Boolean = HideSeekMischief.startFrom(mctx, pet, fromMenu)
+    fun startHideSeek(fromMenu: Boolean): Boolean {
+        val other = ctx.director.mischiefOwner()?.takeIf { it !== pet }
+        if (other != null) {
+            if (fromMenu) ctx.say("${other.name} fait déjà des bêtises… une à la fois ! 😅", 2.5f)
+            return false
+        }
+        return HideSeekMischief.startFrom(mctx, pet, fromMenu)
+    }
 
-    /** Fin du cache-cache (attrapé, dodo…). */
-    fun endHiding() = HideSeekMischief.end(mctx)
+    /** Fin du cache-cache de [p] (attrapé, dodo…). */
+    fun endHiding(p: Pet = pet) = ctx.world.asPet(p) { HideSeekMischief.end(mctx) }
 
     fun onViewChanged() = HideSeekMischief.onViewChanged(mctx, pet)
 

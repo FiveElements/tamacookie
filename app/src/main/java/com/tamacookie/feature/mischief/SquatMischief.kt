@@ -1,13 +1,12 @@
 package com.tamacookie.feature.mischief
 
-import android.graphics.Rect
 import com.tamacookie.PetEvent
 import com.tamacookie.Act
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
+import com.tamacookie.Expr
+import com.tamacookie.PType
+import com.tamacookie.Pose
 import com.tamacookie.Pet
-import com.tamacookie.Platforms
+import com.tamacookie.Box
 import java.util.EnumSet
 import kotlin.math.abs
 
@@ -21,7 +20,7 @@ object SquatMischief : Mischief {
 
     override fun chance(level: Int) = if (level == 2) 0.6f else 0.35f
 
-    override fun canStart(ctx: MischiefCtx, pet: Pet) = Platforms.list.isNotEmpty()
+    override fun canStart(ctx: MischiefCtx, pet: Pet) = ctx.screen.snapshot.platforms.isNotEmpty()
 
     /** Ignoré : il s'installe sur une des icônes les plus centrales. */
     override fun start(ctx: MischiefCtx, pet: Pet): Boolean {
@@ -29,9 +28,9 @@ object SquatMischief : Mischief {
         val d = a.d
         val midY = (a.topY + a.groundY) / 2
         val w = a.screenW
-        val p = Platforms.list.sortedBy { abs(it.rect.exactCenterX() - w / 2) + abs(it.rect.exactCenterY() - midY) }
+        val p = ctx.screen.snapshot.platforms.items.sortedBy { abs(it.box.centerX - w / 2) + abs(it.box.centerY - midY) }
             .take(4).random(ctx.rnd)
-        squatOn(ctx, pet, p.rect, (p.rect.exactCenterY() + 46 * d).coerceAtMost(a.groundY), if (ctx.level == 2) 60f else 25f,
+        squatOn(ctx, pet, p.box, (p.box.centerY + 46 * d).coerceAtMost(a.groundY), if (ctx.level == 2) 60f else 25f,
             ctx.pick("Je m'installe ici ! 😼", "Tu ne m'as pas vu ? Et là ? 😏", "Coucou ! Je bloque ? 😇"), kbd = false)
         return true
     }
@@ -42,14 +41,14 @@ object SquatMischief : Mischief {
         val d = a.d
         val rnd = ctx.rnd
         val level = ctx.level
-        if (ev.click) {
-            val r = Platforms.clickRect
-            if (r != null && rnd.nextFloat() < (if (level == 2) 0.22f else 0.10f)) {
-                if (level == 2 && r.width() < 600 * d && r.height() < 300 * d && r.top > a.topY + 120 * d) {
-                    squatOn(ctx, pet, r, (r.exactCenterY() + 46 * d).coerceAtMost(a.groundY), 40f,
+        val r = ev.click
+        if (r != null) {
+            if (rnd.nextFloat() < (if (level == 2) 0.22f else 0.10f)) {
+                if (level == 2 && r.width < 600 * d && r.height < 300 * d && r.top > a.topY + 120 * d) {
+                    squatOn(ctx, pet, r, (r.centerY + 46 * d).coerceAtMost(a.groundY), 40f,
                         ctx.pick("C'est MON bouton maintenant 😼", "Tu voulais appuyer ici ? Trop tard ! 😜"), kbd = false)
                 } else {
-                    ctx.actor.faceToward(pet, r.exactCenterX())
+                    ctx.actor.faceToward(pet, r.centerX)
                     pet.express(Expr.SURPRISED, 1f)
                     ctx.say(ctx.pick("Ooh, qu'est-ce que tu as touché ? 👀", "Je peux appuyer aussi ?", "Clic clic !"))
                     ctx.cooldownUntil = ev.now + 30_000
@@ -58,11 +57,11 @@ object SquatMischief : Mischief {
             }
         }
         if (ev.takeTypingBurst()) {
-            val ime = Platforms.ime
+            val ime = ctx.screen.snapshot.ime
             if (ime != null && rnd.nextFloat() < 0.5f) {
                 if (level == 2) {
-                    val x = ime.left + ime.width() * (0.25f + rnd.nextFloat() * 0.5f)
-                    squatOn(ctx, pet, Rect(x.toInt() - 1, ime.top, x.toInt() + 1, ime.top), ime.top.toFloat(), 15f,
+                    val x = (ime.left + ime.width * (0.25f + rnd.nextFloat() * 0.5f)).toInt()
+                    squatOn(ctx, pet, Box(x - 1f, ime.top, x + 1f, ime.top), ime.top, 15f,
                         ctx.pick("Je t'aide à écrire ! ⌨️", "Tu écris à qui ? 👀 Je regarde !"), kbd = true)
                 } else {
                     ctx.say(ctx.pick("Tu écris à qui ? 👀", "Tu tapes vite !", "Dis-lui que je fais coucou !"))
@@ -74,16 +73,16 @@ object SquatMischief : Mischief {
         return false
     }
 
-    private fun squatOn(ctx: MischiefCtx, pet: Pet, rect: Rect, feetY: Float, limit: Float, line: String, kbd: Boolean) {
+    private fun squatOn(ctx: MischiefCtx, pet: Pet, rect: Box, feetY: Float, limit: Float, line: String, kbd: Boolean) {
         val a = ctx.arena
         val s = ctx.state
         // Les coordonnées du bouton sont celles de l'écran affiché : il doit d'abord être sur cette page
         ctx.pages.rebaseToActivePage()
-        s.squatRect = Rect(rect); s.squatKbd = kbd; s.squatLimit = limit
-        s.squatVersion = Platforms.version
+        s.squatRect = rect; s.squatKbd = kbd; s.squatLimit = limit
+        s.squatVersion = ctx.screen.snapshot.platforms.version
         pet.mind.chatterIn = 7f
         ctx.cooldownUntil = ctx.clock.wallMs() + 60_000
-        ctx.actor.jumpTo(pet, rect.exactCenterX().coerceIn(a.minX, a.maxX), feetY, Act.SQUAT)
+        ctx.actor.jumpTo(pet, rect.centerX.coerceIn(a.minX, a.maxX), feetY, Act.SQUAT)
         pet.body.phys.airLandY = feetY
         ctx.say(line, 2.5f)
     }
@@ -98,10 +97,12 @@ object SquatMischief : Mischief {
             return
         }
         // L'élément sous lui a disparu (défilement, autre app, clavier fermé) : il tombe
-        val gone = if (s.squatKbd) Platforms.ime == null
-        else Platforms.version != s.squatVersion && Platforms.connected &&
-            Platforms.list.none { Rect.intersects(it.rect, s.squatRect) }
-        if (s.squatKbd || Platforms.version != s.squatVersion) s.squatVersion = Platforms.version
+        val screen = ctx.screen.snapshot
+        val version = screen.platforms.version
+        val gone = if (s.squatKbd) screen.ime == null
+        else version != s.squatVersion && screen.connected &&
+            screen.platforms.items.none { it.box.intersects(s.squatRect) }
+        if (s.squatKbd || version != s.squatVersion) s.squatVersion = version
         if (gone) {
             pet.body.phys.stop(); pet.body.afterAir = Act.IDLE
             ctx.say(ctx.pick("Whoaaa !", "Oups, tout a bougé !"), 1.4f)

@@ -9,6 +9,13 @@ import kotlin.math.sqrt
 data class Box(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val centerX: Float get() = (left + right) / 2f
     val centerY: Float get() = (top + bottom) / 2f
+    val width: Float get() = right - left
+    val height: Float get() = bottom - top
+    /** Vide (comme `Rect.isEmpty`). */
+    val isEmpty: Boolean get() = left >= right || top >= bottom
+
+    /** Les deux rectangles se chevauchent (comme `Rect.intersects` : bords stricts). */
+    fun intersects(o: Box): Boolean = left < o.right && o.left < right && top < o.bottom && o.top < bottom
 }
 
 /** Corps soumis à la petite physique des objets (jouets, nourriture). */

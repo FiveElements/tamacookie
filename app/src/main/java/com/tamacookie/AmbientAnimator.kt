@@ -1,8 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -38,7 +35,7 @@ class AmbientAnimator(private val rnd: Random) {
      * Avance de [dt] secondes pour l'état [s]. Renvoie vrai si l'image affichée change
      * (sinon la vue n'a pas besoin d'être redessinée).
      */
-    fun update(dt: Float, s: BunnyRenderState, w: Float, h: Float, d: Float): Boolean {
+    fun update(dt: Float, s: PetRenderState, w: Float, h: Float, d: Float): Boolean {
         val active = blink > 0f || earTwitch > 0f || particles.isNotEmpty()
         t += dt
         // clignement
@@ -77,7 +74,7 @@ class AmbientAnimator(private val rnd: Random) {
      * Une image de la vue : avance de [dt] pour l'état [s] (le précédent était [old]) et renvoie s'il faut
      * redessiner (état différent ou animation ambiante).
      */
-    fun frame(dt: Float, old: BunnyRenderState, s: BunnyRenderState, w: Float, h: Float, d: Float): Boolean =
+    fun frame(dt: Float, old: PetRenderState, s: PetRenderState, w: Float, h: Float, d: Float): Boolean =
         update(dt, s, w, h, d) || s != old
 
     /** Ajoute [count] particules au-dessus de la tête (vue [w] × [h], densité [d], regard [facing]). */
@@ -115,9 +112,9 @@ class AmbientAnimator(private val rnd: Random) {
         /**
          * Le dessin de [s] dépend du temps (respiration au repos, au sommeil, en mangeant, tenu en l'air,
          * oreilles joyeuses, yeux en spirale, écharpe…). La marche et le vol dépendent seulement de
-         * l'état ([BunnyRenderState.walkPhase], [BunnyRenderState.airVy]).
+         * l'état ([PetRenderState.walkPhase], [PetRenderState.airVy]).
          */
-        fun movesWithTime(s: BunnyRenderState): Boolean =
+        fun movesWithTime(s: PetRenderState): Boolean =
             (s.pose != Pose.WALK && s.pose != Pose.AIR) ||
                 s.expr == Expr.HAPPY || s.expr == Expr.DIZZY ||
                 s.look.accessory == Accessory.SCARF ||

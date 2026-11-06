@@ -1,5 +1,7 @@
 package com.tamacookie.persist
 
+import com.tamacookie.Tuning
+import com.tamacookie.species.Species
 import android.content.SharedPreferences
 import com.tamacookie.Accessory
 import com.tamacookie.AccColor
@@ -84,6 +86,35 @@ class PetRepository private constructor(
         e.putString(KEY_IDS, ids.joinToString(ID_SEP) { it.value })
         e.putString(KEY_RESIDENT, record.id.value)
         e.apply()
+    }
+
+    override fun addCompanion(record: PetRecord) {
+        require(isValidId(record.id.value)) { "identifiant invalide" }
+        require(record.id != residentId()) { "le résident n'est pas son propre compagnon" }
+        val e = prefs.edit()
+        val ids = ids().filter { it != record.id } + record.id
+        PetFields.write(e, record.copy(lastUpdate = clock.wallMs()))
+        e.putString(KEY_IDS, ids.joinToString(ID_SEP) { it.value })
+        e.apply()
+    }
+
+    /**
+     * Adopte un compagnon **quand le service ne tourne pas** (sinon : commande `ACTION_ADOPT_COMPANION`).
+     * Toujours un nouvel animal (nouvel id, jauges neuves) ; null si le plafond [Tuning.MAX_PETS] est atteint
+     * ou s'il n'y a pas encore de résident.
+     */
+    fun adoptCompanion(a: Adoption): PetRecord? {
+        if (residentId() == null || ids().size >= Tuning.MAX_PETS) return null
+        val rec = a.copy(isNew = true).apply(null, ::newPetId, clock.wallMs())
+        addCompanion(rec)
+        return rec
+    }
+
+    /** Retire le compagnon [id] **quand le service ne tourne pas** ; false = c'est le résident (ou inconnu). */
+    fun removeCompanion(id: PetId): Boolean {
+        if (id == residentId() || id !in ids()) return false
+        remove(id)
+        return true
     }
 
     /**
@@ -193,7 +224,7 @@ internal object PetFields {
                 id = id,
                 name = prefs.getString(p + NAME, null) ?: Identity.DEFAULT_NAME,
                 bornAt = bornAt,
-                species = prefs.getString(p + SPECIES, null) ?: Identity.RABBIT,
+                species = prefs.getString(p + SPECIES, null) ?: Species.DEFAULT.id,
             ),
             traits = Traits(
                 personality = enumOr(prefs.getString(p + PERSONALITY, null), Personality.CUDDLY),

@@ -7,10 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.content.pm.ApplicationInfo
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -20,30 +18,30 @@ import android.os.VibratorManager
 import android.provider.Settings
 import android.util.Log
 import android.view.Choreographer
-import android.view.HapticFeedbackConstants
+import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActRegistry
-import com.tamacookie.feature.Travel
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
 import com.tamacookie.persist.Pets
+import com.tamacookie.social.SocialSystem
+import com.tamacookie.species.Species
 import java.util.Calendar
-import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.sign
 import kotlin.random.Random
 
 /**
- * Service de premier plan qui fait vivre Cookie en surimpression sur l'écran.
+ * Service de premier plan qui fait vivre les animaux en surimpression sur l'écran.
  *
- * Orchestrateur : cycle de vie, notification, boucle d'animation, machine à états [Act]
- * et câblage des domaines. Possède le [World] (l'animal résident et les objets) et implémente
- * [PetCtx], la façade que reçoivent les contrôleurs :
+ * Orchestrateur : cycle de vie, notification, boucle d'animation et câblage des domaines. Possède le
+ * [World] (le résident, ses compagnons et les objets) et implémente [PetCtx], la façade que reçoivent
+ * les contrôleurs. À chaque image, chaque animal **affiché** ([World.shown], au plus
+ * [Tuning.MAX_PETS_SHOWN]) passe dans [PetBehavior] (corps, sommeil, voyage, décisions) ou la
+ * fonctionnalité qui le tient ([ActRegistry]), avec lui pour animal courant ([World.asPet]) ;
+ * les autres « dorment hors écran » (leurs jauges seulement).
+ *
  * [BunnyPhysics] (vol), [BunnyBrain] (décisions), [BunnyActor] (gestes), [PageTracker] (vues / pages du bureau),
  * [OverlayManager] (toutes les fenêtres, ids par entité), [OverlayWindows] (bulles, dock, panneaux),
  * [StationController] (bain, véto, cage, coffre),
@@ -81,12 +79,14 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override val arena = Arena()
     override val actor = BunnyActor(arena)
     override val clock: Clock = AndroidClock
-    override val rnd = Random(System.nanoTime())
-    /** L'animal résident (seul animal du monde pour l'instant). */
-    private lateinit var resident: Pet
+    /** Aléatoire du résident (et, avant l'étape 7, de tout le service) ; chaque compagnon a le sien. */
+    private val residentRnd = Random(System.nanoTime())
+    /** Aléatoire de l'animal courant. */
+    override val rnd: Random get() = pet.mind.rnd
+    /** L'animal résident (celui de ce téléphone). */
+    private val resident: Pet get() = world.resident
     /** Seule classe qui lit / écrit les animaux ; le service en est l'autorité tant qu'il tourne. */
     private lateinit var repo: PetRepository
-    override val pet: Pet get() = resident
 
     // --- Fenêtres ---
     private lateinit var wm: WindowManager
@@ -94,27 +94,48 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private lateinit var overlayManager: OverlayManager
     override val overlay: OverlayHost get() = overlayManager
     private lateinit var windows: OverlayWindows
-    /** Fenêtre de chaque animal (vue + paramètres). */
-    private class PetWindow(val id: WindowId, val view: BunnyView, val lp: WindowManager.LayoutParams)
+    /** Fenêtre de chaque animal affiché (vue + paramètres). */
+    private class PetWindow(val id: WindowId, val view: PetView, val lp: WindowManager.LayoutParams)
     private val petWindows = HashMap<PetId, PetWindow>()
-    /** Vue du résident (gestes, aperçu des effets). */
-    private val bunny: BunnyView get() = petWindows.getValue(resident.id).view
+    /** À qui appartient chaque vue (relu à chaque geste : la vue du résident est réutilisée à l'adoption). */
+    private val viewOwner = HashMap<View, PetId>()
+    /** Animaux dont la fenêtre est retirée (en cage sur une autre page, caché). */
+    private val awayPets = HashSet<PetId>()
+    private val shownBuf = ArrayList<Pet>()
+    private val shown: List<Pet> get() = world.shown(shownBuf)
+    /** Animaux de l'image en cours (copie : un animal peut partir pendant l'image). */
+    private val framePets = ArrayList<Pet>()
 
     // --- Domaines ---
     override lateinit var pages: PageTracker
         private set
     /** Activités prises en charge par une fonctionnalité (stations : [Act.IN_STATION]). */
     override val acts = ActRegistry()
+    override val director = Director(world)
     private lateinit var stations: StationController
     private lateinit var toys: ToyController
     private lateinit var mischief: MischiefController
+    private lateinit var behavior: PetBehavior
+    private lateinit var social: SocialSystem
     private val handler = Handler(Looper.getMainLooper())
-    /** Paroles : bulle (si les fenêtres existent) + reprise de la boucle. */
-    override val speech = Speech(rnd) { text, seconds ->
+    /**
+     * Paroles : bulle de l'animal courant (si les fenêtres existent) + reprise de la boucle. Une seule bulle
+     * à la fois quand plusieurs animaux parlent : l'arbitre ([Director.bubbles]) fait attendre les autres.
+     */
+    override val speech: Speech = Speech({ pet.mind.rnd }) { text, seconds ->
         if (::windows.isInitialized) {
-            if (!hidden && !bunnyAway) windows.say(resident.id, text, seconds)
+            val p = pet
+            if (!hidden && !isAway(p) && world.isShown(p) &&
+                director.bubbles.request(Director.BubbleQueue.Line(p.id, text, seconds, speech.priority))
+            ) showBubble(p.id, text, seconds)
             requestFrames()
         }
+    }
+
+    /** Affiche la bulle de [id] ; celle d'un autre animal, interrompue, disparaît. */
+    private fun showBubble(id: PetId, text: String, seconds: Float) {
+        for (q in world.pets.keys) if (q != id) windows.hideBubble(q)
+        windows.say(id, text, seconds)
     }
     private lateinit var notifier: PetNotifier
     private lateinit var touch: TouchHandler
@@ -122,16 +143,13 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Fenêtres créées et domaines câblés : les intents peuvent être traités. */
     private var ready = false
 
-    // --- Plateformes (icônes / boutons) détectées : cache partagé, converti une fois par version ---
-    private var platCacheVersion = -1
-    private var platList: List<Platforms.P> = emptyList()
-    private var platBoxes: List<Box> = emptyList()
+    // --- Adaptateurs du processus ([AppGraph]) ---
+    private val graph: AppGraph by lazy { AppGraph.of(this) }
+    /** Ce que voit le service d'accessibilité (plateformes, pages, signaux). */
+    override val screen: ScreenSensor get() = graph.screen
 
     // --- Visibilité ---
     override var hidden = false
-        private set
-    /** Invisible ici (en cage sur une autre page, ou caché) : sa fenêtre est retirée. */
-    override var bunnyAway = false
         private set
 
     // --- Boucle ---
@@ -151,7 +169,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         super.onCreate()
         notifier = PetNotifier(
             this,
-            pet = { if (::resident.isInitialized) resident else null },
+            pet = { if (world.pets.isEmpty()) null else resident },
+            director = { director },
             hidden = { hidden },
             hiding = { ::mischief.isInitialized && mischief.hidingView != null },
         )
@@ -163,13 +182,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         val d = resources.displayMetrics.density
         arena.d = d
-        arena.bw = (Tuning.BUNNY_W_DP * d).toInt()
-        arena.bh = (Tuning.BUNNY_H_DP * d).toInt()
-        arena.feetPad = Tuning.FEET_PAD_DP * d
+        // Fenêtre commune à tous les animaux : gabarit de l'espèce par défaut (la seule aujourd'hui)
+        val spec = Species.DEFAULT.spec
+        arena.bw = (spec.windowWDp * d).toInt()
+        arena.bh = (spec.windowHDp * d).toInt()
+        arena.feetPad = spec.feetPadDp * d
         repo = Pets.repository(this)
-        resident = loadResident(BunnyPhysics(d))
-        world.add(resident)
-        watcher = ForegroundAppWatcher(this)
+        world.add(loadResident(BunnyPhysics(d)), resident = true)
+        for (id in repo.ids()) if (id != resident.id) loadPet(id, BunnyPhysics(d))?.let { world.add(it) }
+        watcher = graph.foregroundWatcher()
         wm = getSystemService(WindowManager::class.java)
         overlayManager = OverlayManager(wm)
         windows = OverlayWindows(this, arena, { prefs }, overlayManager, bubbleAnchor)
@@ -180,14 +201,18 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         stations.registerActs(acts)
         mischief = MischiefController(this)
         mischief.registerActs(acts)
+        social = SocialSystem(this)
+        social.registerActs(acts)
+        behavior = PetBehavior(this, behaviorHooks)
         touch = TouchHandler(this, windows, this, stations, mischief)
-        val entities = EntityWindows(this, windows, world, toys, stations) { ev ->
-            touch.listener?.onTouch(bunny, ev) ?: false
+        val entities = EntityWindows(this, windows, world, toys, stations) { s, ev ->
+            val view = stations.occupantOf(s)?.let { petWindows[it.id]?.view }
+            if (view != null) touch.forward(view, ev) else false
         }
         overlayManager.factory = entities::create
 
         computeBounds()
-        dropIn(resident)
+        for (p in world.pets.values) dropIn(p)
         mischief.loadLevel()
 
         // La fenêtre du lapin est ajoutée AVANT startForeground : sur Android 15+, une fenêtre
@@ -205,11 +230,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         running = true
         ready = true
 
-        toys.restorePoops()
+        for (p in shown) world.asPet(p) { toys.restorePoops(p) }
         handler.postDelayed({
             if (!ready) return@postDelayed
             pages.currentView = pages.computeView()
-            stations.restore(resident)
+            for (p in shown) world.asPet(p) { stations.restore(p) }
             applyView()
         }, 300)
         lastTickWall = clock.wallMs()
@@ -222,15 +247,26 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         startLoop()
         handler.postDelayed(appPoll, 2000)
         handler.postDelayed({
-            say(speech.greeting(resident.name, resident.stats.mood, Calendar.getInstance().get(Calendar.HOUR_OF_DAY)))
+            say(speech.greeting(resident.name, resident.stats.mood, hourNow(), resident.species.lines))
         }, 900)
     }
 
     /** Charge le résident (créé au premier lancement) et rattrape explicitement le temps passé hors-ligne. */
     private fun loadResident(phys: BunnyPhysics): Pet {
-        val now = clock.wallMs()
         val rec = repo.residentOrCreate()
-        val p = Pet.fromRecord(rec, phys, rnd)
+        return catchUp(Pet.fromRecord(rec, phys, residentRnd), rec)
+    }
+
+    /** Charge le compagnon [id] (avec son propre aléatoire) et rattrape le temps passé hors-ligne. */
+    private fun loadPet(id: PetId, phys: BunnyPhysics): Pet? {
+        val rec = repo.load(id) ?: return null
+        return catchUp(Pet.fromRecord(rec, phys, newPetRandom(id)), rec)
+    }
+
+    private fun newPetRandom(id: PetId) = Random(System.nanoTime() xor id.value.hashCode().toLong())
+
+    private fun catchUp(p: Pet, rec: PetRecord): Pet {
+        val now = clock.wallMs()
         p.on(PetEvent.Elapsed((now - rec.lastUpdate) / 3_600_000f), now)
         save(p)
         return p
@@ -239,17 +275,19 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Il tombe du haut de l'écran en arrivant. */
     private fun dropIn(p: Pet) {
         val b = p.body
-        b.fx = arena.screenW * (0.3f + rnd.nextFloat() * 0.4f)
+        b.fx = arena.screenW * (0.3f + p.mind.rnd.nextFloat() * 0.4f)
         b.fy = arena.topY + Tuning.SPAWN_DROP_DP * arena.d
         b.phys.vy = 0f
         b.setAct(Act.AIR); b.afterAir = Act.IDLE
     }
 
+    private fun hourNow() = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+
     /** Nom, apparence ou réglages changés : petite fête. */
-    private fun showNewLook() {
+    private fun showNewLook(p: Pet = resident) = world.asPet(p) {
         applyView()
-        emit(resident, PType.SPARKLE, 6)
-        speech.sayOneOf(Lines.newLook(resident.name))
+        emit(p, PType.SPARKLE, 6)
+        speech.sayOneOf(p.species.lines.newLook(p.name))
         requestFrames()
     }
 
@@ -268,33 +306,86 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /**
      * Un nouveau lapin remplace le résident, sans redémarrer le service : l'ancien quitte proprement
      * cache-cache, station, menu, panneaux et objets ; ses clés sont effacées ; la fenêtre est réutilisée.
+     * Les compagnons restent.
      */
     private fun replaceResident(rec: PetRecord) {
         val old = resident
-        if (old.isHiding) mischief.endHiding()
+        if (old.isHiding) mischief.endHiding(old)
         if (world.stationOf(old) != null) stations.leaveStation(old, hopOut = false)
         closeMenu()
         stations.closePanels()
         toys.clear()
         windows.forgetBubble(old.id)
+        director.bubbles.forget(old.id)
         val w = petWindows.remove(old.id)
         if (w != null) overlayManager.release(w.id)
-        world.pets.remove(old.id)
+        awayPets.remove(old.id)
+        world.remove(old.id)
         repo.adopt(rec, replacing = old.id)
 
-        val p = Pet.fromRecord(rec, BunnyPhysics(arena.d), rnd)
-        resident = p
-        world.add(p)
+        val p = Pet.fromRecord(rec, BunnyPhysics(arena.d), residentRnd)
+        world.add(p, resident = true)
         computeBounds()
-        pages.resetBunny()
         dropIn(p)
-        if (w != null) petWindows[p.id] = PetWindow(WindowId.Pet(p.id), w.view, w.lp)
-        bunnyAway = false
+        if (w != null) {
+            petWindows[p.id] = PetWindow(WindowId.Pet(p.id), w.view, w.lp)
+            viewOwner[w.view] = p.id
+        }
         if (!hidden) attachPet(p)
+        // les crottes des compagnons ont été retirées avec le reste : elles reviennent
+        for (c in shown) if (c !== p) world.asPet(c) { toys.restorePoops(c) }
         applyView()
         lastTickWall = clock.wallMs()
         emit(p, PType.SPARKLE, 6)
-        say(speech.greeting(p.name, p.stats.mood, Calendar.getInstance().get(Calendar.HOUR_OF_DAY)))
+        say(speech.greeting(p.name, p.stats.mood, hourNow(), p.species.lines))
+        updateNotification(force = true)
+        requestFrames()
+    }
+
+    /** Un compagnon rejoint le résident (commande [PetCommands.ACTION_ADOPT_COMPANION]) : il tombe du ciel. */
+    private fun adoptCompanion(a: Adoption) {
+        if (world.pets.size >= Tuning.MAX_PETS) { say("On est déjà assez nombreux ici ! 🐾"); return }
+        val rec = a.copy(isNew = true).apply(null, repo::newPetId, clock.wallMs())
+        repo.addCompanion(rec)
+        val p = Pet.fromRecord(rec, BunnyPhysics(arena.d), newPetRandom(rec.id))
+        world.add(p)
+        computeBounds()
+        dropIn(p)
+        if (world.isShown(p)) showPet(p)
+        updateNotification(force = true)
+        requestFrames()
+    }
+
+    /** [p] apparaît à l'écran (nouveau compagnon, ou un compagnon qui dormait hors écran prend une place). */
+    private fun showPet(p: Pet) = world.asPet(p) {
+        ensurePetWindow(p)
+        if (!hidden) attachPet(p)
+        toys.restorePoops(p)
+        emit(p, PType.SPARKLE, 6)
+        say(speech.greeting(p.name, p.stats.mood, hourNow(), p.species.lines))
+    }
+
+    /** Un compagnon s'en va (commande [PetCommands.ACTION_REMOVE_PET]) ; le résident ne peut pas être retiré. */
+    private fun removeCompanion(id: PetId) {
+        val p = world.pets[id] ?: return
+        if (p === resident) return
+        if (p.isHiding) mischief.endHiding(p)
+        if (world.stationOf(p) != null) stations.leaveStation(p, hopOut = false)
+        touch.closeMenuOf(id)
+        windows.forgetBubble(id)
+        director.bubbles.forget(id)
+        petWindows.remove(id)?.let { w ->
+            overlayManager.release(w.id)
+            touch.detach(w.view)
+            viewOwner.remove(w.view)
+        }
+        awayPets.remove(id)
+        toys.removePoopsOf(id)
+        world.remove(id)
+        repo.remove(id)
+        // Un compagnon qui dormait hors écran prend la place libérée
+        for (q in shown.toList()) if (q.id !in petWindows) { dropIn(q); showPet(q) }
+        say("Au revoir ${p.name} ! 👋")
         updateNotification(force = true)
         requestFrames()
     }
@@ -311,7 +402,11 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         false
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int =
+        speech.at(SpeechPriority.HIGH) { command(intent) }
+
+    /** Une commande (notification, activités) : réponse à l'utilisateur, ses répliques passent devant. */
+    private fun command(intent: Intent?): Int {
         if (!ready) {
             // Vues non initialisées (permission manquante, démarrage refusé…) : on ignore
             if (intent?.action == ACTION_STOP) stop(this)
@@ -330,6 +425,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 showNewLook()
             }
             PetCommands.ACTION_ADOPT -> PetCommands.adoptionFrom(intent)?.let(::adopt)
+            PetCommands.ACTION_ADOPT_COMPANION -> PetCommands.adoptionFrom(intent)?.let(::adoptCompanion)
+            PetCommands.ACTION_REMOVE_PET -> intent.getStringExtra(PetCommands.EXTRA_ID)?.let { removeCompanion(PetId(it)) }
         }
         return START_STICKY
     }
@@ -342,7 +439,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         stopLoop()
         if (wasReady) {
             try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
-            save(resident)
+            saveAll()
             removeAllWindows()
         }
         super.onDestroy()
@@ -355,16 +452,18 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             computeBounds()
             // nouvelle orientation : la largeur des pages du bureau change
             pages.onScreenResized()
-            val b = resident.body
-            b.fx = b.fx.coerceIn(arena.minX, arena.maxX)
-            b.platform = null
-            if (b.act != Act.AIR && b.act != Act.DRAGGED) b.fy = arena.groundY
+            for (p in world.pets.values) {
+                val b = p.body
+                b.fx = b.fx.coerceIn(arena.minX, arena.maxX)
+                b.platform = null
+                if (b.act != Act.AIR && b.act != Act.DRAGGED) b.fy = arena.groundY
+            }
             toys.onScreenResized()
             closeMenu()
             // stations et dock : recalculés depuis les fractions sauvegardées
             stations.reloadPositions()
             windows.reloadDockPosition()
-            stations.repositionOccupant(resident)
+            for (p in shown) world.asPet(p) { stations.repositionOccupant(p) }
             stations.repositionPanels()
             requestFrames()
         }
@@ -373,7 +472,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             when (i.action) {
-                Intent.ACTION_SCREEN_OFF -> { awake = false; stopLoop(); handler.removeCallbacks(appPoll); save(resident) }
+                Intent.ACTION_SCREEN_OFF -> { awake = false; stopLoop(); handler.removeCallbacks(appPoll); saveAll() }
                 // Écran allumé mais verrouillé : rien à animer derrière l'écran de verrouillage
                 Intent.ACTION_SCREEN_ON -> if (!isLocked()) wakeUp(greet = false)
                 Intent.ACTION_USER_PRESENT -> wakeUp(greet = true)
@@ -392,20 +491,30 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         handler.postDelayed(appPoll, 1500)
         tickStats(force = true)
         if (!hidden) startLoop()
-        if (greet && !resident.stats.sleeping) speech.sayOneOf(Lines.WELCOME_BACK)
+        if (greet && !resident.stats.sleeping) speech.sayOneOf(resident.species.lines.WELCOME_BACK)
     }
+
+    private fun saveAll() { for (p in world.pets.values) save(p) }
 
     // =====================================================================
     //  Fenêtres
     // =====================================================================
     private fun createWindows() {
-        val v = BunnyView(this)
-        v.render(BunnyRenderState.of(resident), 0f)
-        petWindows[resident.id] = PetWindow(WindowId.Pet(resident.id), v, windows.params(arena.bw, arena.bh, touchable = true))
-        attachPet(resident)
-        touch.attach(v)
+        for (p in shown) {
+            ensurePetWindow(p)
+            attachPet(p)
+        }
         stations.create()
         windows.createDock { stations.toggleStationsPanel() }
+    }
+
+    /** La vue de [p] (créée à sa première apparition, avec l'écouteur des gestes). */
+    private fun ensurePetWindow(p: Pet): PetWindow = petWindows.getOrPut(p.id) {
+        val v = PetView(this, p.species)
+        v.render(PetRenderState.of(p), 0f)
+        viewOwner[v] = p.id
+        touch.attach(v) { viewOwner[v]?.let { world.pets[it] } }
+        PetWindow(WindowId.Pet(p.id), v, windows.params(arena.bw, arena.bh, touchable = true))
     }
 
     /** Affiche la fenêtre de [p] à sa position. */
@@ -436,31 +545,33 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         if (!hidden) return
         hidden = false
         computeBounds()
-        bunnyAway = false
-        attachPet(resident)
+        awayPets.clear()
+        for (p in shown) attachPet(p)
         toys.reattach()
         windows.addDock()
         layoutAnchored()
         applyView()   // gère aussi le lapin en cage sur une autre vue
         stations.reopenVetPanelIfNeeded()
         startLoop()
-        speech.sayOneOf(Lines.SHOWN)
+        speech.sayOneOf(resident.species.lines.SHOWN)
         updateNotification(force = true)
     }
 
+    override fun isAway(pet: Pet): Boolean = pet.id in awayPets
+
     /**
-     * Rend le lapin invisible ici (fenêtre retirée) ou le réaffiche.
+     * Rend [pet] invisible ici (fenêtre retirée) ou le réaffiche.
      * [fadeIn] : petite apparition en fondu.
      */
-    override fun setBunnyAway(away: Boolean, fadeIn: Boolean) {
-        if (away == bunnyAway) return
-        bunnyAway = away
-        val w = petWindows[resident.id] ?: return
+    override fun setAway(pet: Pet, away: Boolean, fadeIn: Boolean) {
+        if (away == isAway(pet)) return
+        if (away) awayPets.add(pet.id) else awayPets.remove(pet.id)
+        val w = petWindows[pet.id] ?: return
         if (away) {
-            closeMenu(); windows.hideBubble(resident.id)
+            touch.closeMenuOf(pet.id); windows.hideBubble(pet.id); director.bubbles.forget(pet.id)
             overlayManager.detach(w.id)
         } else {
-            attachPet(resident, fadeIn)
+            attachPet(pet, fadeIn)
             requestFrames()
         }
     }
@@ -478,29 +589,30 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         arena.topY = ins.top.toFloat()
         arena.minX = ins.left + Tuning.SIDE_MARGIN_DP * d
         arena.maxX = arena.screenW - ins.right - Tuning.SIDE_MARGIN_DP * d
-        resident.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
+        for (p in world.pets.values) p.body.phys.setBounds(arena.minX, arena.maxX, arena.topY, arena.groundY)
     }
 
-    /** Coin haut gauche de la fenêtre de [p] (ses pieds en bas au centre, décalage du défilement compris). */
-    private fun petX(p: Pet) = (p.body.fx - arena.bw / 2f + pages.bunnyShift).roundToInt()
+    /** Coin haut gauche de la fenêtre de [p] (ses pieds en bas au centre, décalage de sa page compris). */
+    private fun petX(p: Pet) = (p.body.fx - arena.bw / 2f + p.body.pageShift).roundToInt()
     private fun petY(p: Pet) = (p.body.fy - (arena.bh - arena.feetPad)).roundToInt()
 
-    override fun placeBunny() {
+    override fun place(pet: Pet) {
         // Boucle suspendue : il est hors de l'écran, inutile de déplacer la fenêtre (fait à la reprise)
         if (loop.suspended) return
-        val w = petWindows[resident.id] ?: return
-        overlay.move(w.id, petX(resident), petY(resident))
+        val w = petWindows[pet.id] ?: return
+        overlay.move(w.id, petX(pet), petY(pet))
     }
 
     /** Position des bulles : au-dessus de la tête de chaque animal, à l'écran. */
     private val bubbleAnchor = object : OverlayWindows.BubbleAnchor {
         override fun headX(pet: PetId): Float {
             val p = world.pets[pet] ?: return 0f
-            return p.body.fx + pages.bunnyShift
+            return p.body.fx + p.body.pageShift
         }
         override fun headTop(pet: PetId): Float {
             val p = world.pets[pet] ?: return 0f
-            return p.body.fy - (if (p.act == Act.SLEEP) 70 else 112) * arena.d
+            val spec = p.species.spec
+            return p.body.fy - (if (p.act == Act.SLEEP) spec.headTopSleepingDp else spec.headTopDp) * arena.d
         }
     }
 
@@ -517,24 +629,29 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         if (hidden) return
         stations.layout()
         toys.layoutPoops()
-        val holder = stations.holdingStation(resident)
-        if (holder != null) stations.followHolder(holder, resident) else pages.updateBunnyPage()
+        for (p in shown) world.asPet(p) {
+            val holder = stations.holdingStation(p)
+            if (holder != null) stations.followHolder(holder, p) else pages.updateBunnyPage()
+        }
     }
 
     /** Changement de vue : bain/véto interrompus, cache-cache. */
     override fun applyView() {
         if (hidden) return
-        val st = world.stationOf(resident)
-        if (st != null && !st.behavior.holdsPet && !stations.anchoredHere(st)) stations.leaveStation(resident, hopOut = false)
+        for (p in shown) world.asPet(p) {
+            val st = world.stationOf(p)
+            if (st != null && !st.behavior.holdsPet && !stations.anchoredHere(st)) stations.leaveStation(p, hopOut = false)
+        }
         stations.refreshStationsPanel()
-        mischief.onViewChanged()
-        if (stations.holdingStation(resident) != null) { layoutAnchored(); return }
-        setBunnyAway(resident.act == Act.HIDDEN, fadeIn = true)
+        for (p in shown) world.asPet(p) {
+            mischief.onViewChanged()
+            if (stations.holdingStation(p) == null) setAway(p, p.act == Act.HIDDEN, fadeIn = true)
+        }
         layoutAnchored()
     }
 
     // =====================================================================
-    //  Boucle d'animation (fréquence adaptée à l'activité, suspendue s'il est invisible)
+    //  Boucle d'animation (fréquence adaptée à l'activité, suspendue si rien n'est visible)
     // =====================================================================
     private fun startLoop() {
         if (hidden || !awake) return
@@ -547,18 +664,18 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun requestFrames() { loop.resume() }
 
     private fun targetFps(): Int {
-        val act = resident.act
-        return when {
-            act in Act.MOVING || toys.anyMoving() || pages.scrollingRecently() -> Tuning.FPS_MOVING
-            act in Act.SLOW || acts.handlerFor(resident)?.slowFrames == true -> Tuning.FPS_SLEEP
-            else -> Tuning.FPS_IDLE
-        }
+        val pets = shown
+        if (pets.any { it.act in Act.MOVING } || toys.anyMoving() || pages.scrollingRecently()) return Tuning.FPS_MOVING
+        val allSlow = pets.all { it.act in Act.SLOW || acts.handlerFor(it)?.slowFrames == true }
+        return if (allSlow) Tuning.FPS_SLEEP else Tuning.FPS_IDLE
     }
 
-    /** Rien de visible à animer : lapin caché / en cage ailleurs / hors de l'écran sur une autre page. */
+    /** Rien de visible à animer : chaque animal est caché / en cage ailleurs / hors de l'écran sur une autre page. */
     private fun canSuspend(): Boolean {
-        val invisible = resident.act == Act.HIDDEN || bunnyAway || pages.bunnyOffscreen()
-        if (!invisible) return false
+        for (p in shown) {
+            val invisible = p.act == Act.HIDDEN || isAway(p) || world.asPet(p) { pages.bunnyOffscreen() }
+            if (!invisible) return false
+        }
         return !touch.menuOpen && !windows.anyBubbleShown && !pages.scrollingRecently() &&
             !world.hasToyOrFood() && !toys.anyMoving() && !stations.animating()
     }
@@ -581,27 +698,41 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     private val loop: FrameLoop = FrameLoop(
         frameScheduler, uptimeMs = { clock.uptimeMs() }, targetFps = ::targetFps, canSuspend = ::canSuspend,
-        onError = { what, e -> Log.e(TAG, what, e) }, onResume = { placeBunny() },
+        onError = { what, e -> Log.e(TAG, what, e) }, onResume = { for (p in shown) place(p) },
     ) { dt -> update(dt) }
 
+    /**
+     * Une image : vue et pages, signaux de l'utilisateur, stations, jauges et objets, puis **chaque animal
+     * affiché** (plateforme, comportement, coffre) avec lui pour animal courant, et le rendu.
+     * Avec un seul animal, l'ordre est celui d'avant l'étape 7.
+     */
     private fun update(dt: Float) {
-        val p = resident
-        p.body.actTime += dt
-        p.mind.tick(dt)
+        val pets = framePets
+        pets.clear(); pets.addAll(shown)
+        for (p in pets) { p.body.actTime += dt; p.mind.tick(dt) }
         checkView()
-        pages.checkPageReturn()
+        for (p in pets) world.asPet(p) { pages.checkPageReturn() }
         mischief.checkUserEvents()
         stations.update(dt)
 
         tickStats(force = false)
         toys.update(dt)
-        checkPlatform(p)
-        updateBehavior(p, dt)
-        stations.checkChestBump(dt)
+        for (p in pets) if (world.pets[p.id] === p) world.asPet(p) {
+            behavior.checkPlatform(p)
+            behavior.update(p, dt)
+        }
+        social.update(dt)
+        stations.tickChest(dt)
+        for (p in pets) world.asPet(p) { stations.checkChestBump() }
 
         // Rendu : chaque animal affiché reçoit son état de l'image
-        for (pet in world.pets.values) petWindows[pet.id]?.view?.render(BunnyRenderState.of(pet), dt)
-        placeBunny()
+        for (p in pets) petWindows[p.id]?.view?.render(PetRenderState.of(p), dt)
+        for (p in pets) place(p)
+        // Bulle suivante (plusieurs animaux) : celle qui attendait son tour
+        director.bubbles.tick(dt)?.let { l ->
+            val p = world.pets[l.pet]
+            if (p != null && !hidden && !isAway(p) && world.isShown(p)) showBubble(l.pet, l.text, l.seconds)
+        }
         windows.updateBubbles(dt)
         // Au plus un updateViewLayout par fenêtre et par image
         overlayManager.flush()
@@ -612,236 +743,53 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         if (notifTimer > 20f) { notifTimer = 0f; updateNotification(force = false); notifier.checkAlerts() }
     }
 
+    /**
+     * Jauges de **tous** les animaux (y compris ceux qui dorment hors écran) ; les crottes n'apparaissent
+     * que pour les animaux affichés.
+     */
     private fun tickStats(force: Boolean) {
         val now = clock.wallMs()
         if (!force && now - lastTickWall < Tuning.STATS_EVERY_MS) return
         val hours = (now - lastTickWall) / 3_600_000f
         lastTickWall = now
-        val p = resident
-        val newPoops = on(p, PetEvent.Elapsed(hours)).newPoops
-        repeat(newPoops) {
-            if (toys.poopCount() < p.stats.poops) {
-                toys.spawnPoop((p.body.fx - p.body.facing * 40 * arena.d).coerceIn(arena.minX, arena.maxX))
-            }
-        }
-        if (newPoops > 0 && p.act != Act.SLEEP) speech.sayOneOf(Lines.POOPED)
-        if (now - lastSaveWall > Tuning.SAVE_EVERY_MS) { save(p); lastSaveWall = now }
-    }
-
-    // =====================================================================
-    //  Comportement (machine à états)
-    // =====================================================================
-    private fun updateBehavior(p: Pet, dt: Float) {
-        val b = p.body
-        val m = p.mind
-        val st = p.stats
-        val d = arena.d
-        // Activité prise en charge par une fonctionnalité (stations…) : elle fait tout
-        acts.handlerFor(p)?.let { it.update(p, dt); return }
-        when (b.act) {
-            Act.IDLE -> {
-                b.pose = Pose.IDLE
-                b.fy = actor.surfaceY(p)
-                if (world.hasToy()) { p.setAct(Act.PLAY); return }
-                if (world.hasFood()) { p.setAct(Act.GOTO_FOOD); return }
-                m.chatterIn -= dt
-                if (m.chatterIn <= 0f) { m.chatterIn = 50f + rnd.nextFloat() * 80f; chatter(p) }
-                if (b.actTime > b.actDuration) decideNext(p)
-            }
-            Act.WALK -> {
-                val speed = when {
-                    st.isSick || st.energy < rules.walkSlowEnergyBelow -> Tuning.WALK_SLOW_DP * d
-                    st.happiness > rules.walkHappyAbove -> Tuning.WALK_HAPPY_DP * d
-                    else -> Tuning.WALK_NORMAL_DP * d
-                } * (if (p.personality == Personality.LAZY) Tuning.LAZY_SPEED_FACTOR else 1f)
-                if (actor.walkToward(p, b.targetX, speed, dt)) p.setAct(Act.IDLE, 2f + rnd.nextFloat() * 4f)
-            }
-            Act.AIR -> stepAir(p, dt)
-            Act.DRAGGED -> b.pose = Pose.DRAGGED
-            Act.SLEEP -> {
-                b.pose = Pose.SLEEP
-                b.fy = actor.surfaceY(p)
-                if (!st.sleeping) {
-                    p.express(Expr.HAPPY, 2f)
-                    speech.sayOneOf(Lines.WOKE_UP)
-                    p.setAct(Act.IDLE, 3f)
-                }
-            }
-            Act.TRAVEL_OUT -> {
-                if (actor.walkToward(p, b.targetX, Tuning.TRAVEL_OUT_DP * d, dt, clamp = false)) {
-                    // Il "passe" dans l'application suivante : réapparaît de l'autre côté
-                    b.fx = if (b.targetX < 0) arena.screenW + arena.bw else -arena.bw.toFloat()
-                    b.targetX = arena.screenW * (0.2f + rnd.nextFloat() * 0.6f)
-                    if (m.travelThen == Act.SIT) b.targetX = arena.maxX - 10 * d
-                    p.setAct(Act.TRAVEL_IN)
-                }
-            }
-            Act.TRAVEL_IN -> {
-                if (actor.walkToward(p, b.targetX, Tuning.TRAVEL_IN_DP * d, dt, clamp = false)) {
-                    m.travelComment?.let { say(it, 4.5f) }
-                    m.travelComment = null
-                    when (m.travelThen) {
-                        Act.SIT -> p.setAct(Act.SIT, 40f)
-                        Act.DANCE -> startDance(p)
-                        else -> p.setAct(Act.IDLE, 4f)
+        for (p in world.pets.values.toList()) world.asPet(p) {
+            val newPoops = on(p, PetEvent.Elapsed(hours)).newPoops
+            if (world.isShown(p)) {
+                repeat(newPoops) {
+                    if (toys.poopCount(p.id) < p.stats.poops) {
+                        toys.spawnPoop((p.body.fx - p.body.facing * 40 * arena.d).coerceIn(arena.minX, arena.maxX), p)
                     }
                 }
+                if (newPoops > 0 && p.act != Act.SLEEP) speech.sayOneOf(p.species.lines.POOPED)
             }
-            Act.PAGE_OUT -> pages.updatePageOut(p, dt)
-            Act.SIT -> {
-                b.pose = Pose.SIT
-                b.facing = -1f
-                if (b.actTime > b.actDuration) p.setAct(Act.IDLE, 2f)
-            }
-            Act.DIZZY -> {
-                b.pose = Pose.IDLE
-                p.express(Expr.DIZZY, 0.2f)
-                if (b.actTime > 2.2f) { m.exprOverride = null; p.setAct(Act.IDLE, 2f) }
-            }
-            Act.DANCE -> {
-                b.pose = Pose.IDLE
-                m.danceTime += dt
-                m.danceHopIn -= dt
-                if (m.danceTime > 9f) { p.setAct(Act.IDLE, 3f); return }
-                if (m.danceHopIn <= 0f) {
-                    m.danceHopIn = 0.55f
-                    b.facing = -b.facing
-                    emit(p, PType.NOTE)
-                    actor.jump(p, -420 * d, 0f, then = Act.DANCE)
-                }
-            }
-            // Activité d'une fonctionnalité sans gestionnaire (station introuvable…) : il ne reste pas figé
-            else -> p.setAct(Act.IDLE, 2f)
         }
+        if (now - lastSaveWall > Tuning.SAVE_EVERY_MS) { saveAll(); lastSaveWall = now }
     }
 
-    private fun decideNext(p: Pet) {
-        val b = p.body
-        val st = p.stats
-        val boxes = platforms()
-        val input = BrainInput(
-            energy = st.energy, satiety = st.satiety, happiness = st.happiness,
-            personality = p.personality, hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
-            x = b.fx, facing = b.facing, minX = arena.minX, maxX = arena.maxX, screenW = arena.screenW, density = arena.d,
-            platform = b.platform, platforms = boxes,
-            elsewhere = pages.bunnyElsewhere(),
-            canPageWander = pages.canPageWander(),
-            chestVisible = stations.visibleChest() != null,
-            hasToyOrFood = world.hasToyOrFood(),
-            nowMs = clock.wallMs(),
-            lastSelfServeMs = stations.selfServeAt,
-        )
-        when (val dec = p.mind.brain.decide(input) { mischief.maybeSeekAttention() }) {
-            Decision.Sleep -> startSleep(p)
-            Decision.AttentionSought -> {}
-            Decision.GoToChest -> { stations.selfServeAt = input.nowMs; p.setAct(Act.GOTO_CHEST) }
-            Decision.PageWander -> pages.startPageWander()
-            is Decision.JumpDown -> actor.jumpTo(p, dec.targetX, arena.groundY, Act.IDLE)
-            is Decision.JumpToPlatform -> {
-                b.facing = sign(dec.target.centerX - b.fx)
-                actor.jumpTo(p, dec.target.centerX, dec.target.top, Act.IDLE)
-            }
-            is Decision.TurnAround -> { b.facing = -b.facing; p.setAct(Act.IDLE, dec.idleSeconds) }
-            is Decision.Idle -> p.setAct(Act.IDLE, dec.seconds)
-            is Decision.Walk -> { b.targetX = dec.targetX; p.setAct(Act.WALK) }
-            is Decision.Hop -> actor.jump(p, dec.vy, dec.vx, then = Act.IDLE)
-        }
+    /** Ce que le comportement demande aux autres domaines. */
+    private val behaviorHooks = object : PetBehavior.Hooks {
+        override fun chestVisible(p: Pet) = stations.visibleChest() != null && director.mayUseChest(p)
+        override val lastSelfServe: Long get() = stations.selfServeAt
+        override fun goToChest(p: Pet, now: Long) { stations.selfServeAt = now }
+        override fun seekAttention(p: Pet) = mischief.maybeSeekAttention()
+        override fun startPageWander(p: Pet) { pages.startPageWander() }
+        override fun hour() = hourNow()
+        override fun nearest(p: Pet) = social.nearest(p)
+        override fun socialize(p: Pet, other: Neighbor) = social.tryStart(p, other)
     }
 
-    /** Icônes détectées, converties une seule fois par version de la liste. */
-    private fun platforms(): List<Box> {
-        val v = Platforms.version
-        if (v != platCacheVersion) {
-            platCacheVersion = v
-            platList = Platforms.list
-            platBoxes = platList.map { it.rect.toBox() }
-        }
-        return platBoxes
-    }
-
-    private fun Rect.toBox() = Box(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
-
-    /** Si l'icône sous ses pattes a bougé ou disparu (défilement, changement d'app) : il tombe. */
-    private fun checkPlatform(p: Pet) {
-        val b = p.body
-        val cur = b.platform ?: return
-        if (b.act == Act.AIR || b.act == Act.DRAGGED) return
-        val boxes = platforms()
-        if (platCacheVersion == b.platVersionSeen) return
-        b.platVersionSeen = platCacheVersion
-        val same = boxes.firstOrNull {
-            abs(it.top - cur.top) < Tuning.PLATFORM_SAME_DP * arena.d && b.fx >= it.left && b.fx <= it.right
-        }
-        if (same != null) {
-            b.platform = same
-            b.fy = same.top
-            return
-        }
-        b.platform = null
-        b.phys.stop()
-        b.afterAir = if (b.act == Act.SLEEP) Act.SLEEP else Act.IDLE
-        p.express(Expr.SURPRISED, 1f)
-        if (b.act != Act.SLEEP) speech.sayOneOf(Lines.PLATFORM_LOST, 1.5f)
-        p.setAct(Act.AIR)
-    }
-
-    private fun stepAir(p: Pet, dt: Float) {
-        val b = p.body
-        b.pose = Pose.AIR
-        val ev = b.phys.stepAir(dt, platforms())
-        if (b.phys.facing != 0f) b.facing = b.phys.facing
-        when (ev) {
-            AirEvent.ForcedLanded -> p.setAct(b.afterAir, 3f)
-            AirEvent.Bounced -> haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
-            is AirEvent.Landed -> onLanded(p, ev)
-            AirEvent.Flying, AirEvent.HitWall -> {}
-        }
-    }
-
-    /** Atterrissage sur une icône ou au sol : étourdi si brutal, sinon il reprend l'activité prévue. */
-    private fun onLanded(p: Pet, ev: AirEvent.Landed) {
-        val b = p.body
-        if (ev.onPlatform) {
-            b.platform = platBoxes[ev.platform]
-            b.platformLabel = platList.getOrNull(ev.platform)?.label
-            b.platVersionSeen = platCacheVersion
-            haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
-        }
-        if (ev.hard) {
-            if (ev.onPlatform) speech.sayOneOf(Lines.HARD_LANDING_PLATFORM)
-            else {
-                speech.sayOneOf(Lines.HARD_LANDING_GROUND)
-                on(p, PetEvent.HardLanding)
-            }
-            p.setAct(Act.DIZZY)
-            return
-        }
-        val next = b.afterAir
-        val idle = if (ev.onPlatform) 2f + rnd.nextFloat() * 3f else 1.5f + rnd.nextFloat() * 2f
-        p.setAct(next, if (next == Act.IDLE) idle else 3f)
-        val lbl = b.platformLabel
-        if (ev.onPlatform && !lbl.isNullOrBlank() && next == Act.IDLE && rnd.nextFloat() < 0.35f) {
-            speech.sayOneOf(Lines.onPlatform(lbl), 2.2f)
-        }
-    }
-
-    override fun startSleep(pet: Pet) {
+    override fun startSleep(pet: Pet) = world.asPet(pet) {
         // Dodo pendant le cache-cache : la partie s'arrête proprement
         if (pet.isHiding) {
-            mischief.endHiding()
+            mischief.endHiding(pet)
             pet.body.fx = pet.body.fx.coerceIn(arena.minX, arena.maxX)
         }
         on(pet, PetEvent.FellAsleep)
-        speech.sayOneOf(Lines.GOING_TO_SLEEP)
+        speech.sayOneOf(pet.species.lines.GOING_TO_SLEEP)
         val k = world.stationOf(pet)
-        if (k != null && k.behavior.holdsPet) return   // il dort dans sa cage
+        if (k != null && k.behavior.holdsPet) return@asPet   // il dort dans sa cage
         if (k != null) stations.leaveStation(pet, hopOut = false)
         pet.setActOrAfterAir(Act.SLEEP)
-    }
-
-    private fun startDance(p: Pet) {
-        p.mind.danceTime = 0f; p.mind.danceHopIn = 0f
-        p.setAct(Act.DANCE)
     }
 
     // =====================================================================
@@ -850,19 +798,14 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun closeMenu() { if (::touch.isInitialized) touch.closeMenu() }
 
     // =====================================================================
-    //  Paroles (répliques dans [Lines], tirage et bulle dans [Speech])
+    //  Paroles (répliques de l'espèce, tirage et bulle dans [Speech])
     // =====================================================================
     override fun say(text: String, seconds: Float) = speech.say(text, seconds)
 
     override fun pick(vararg s: String) = speech.pick(*s)
 
-    private fun chatter(p: Pet) {
-        say(speech.chatterLine(p.stats.mood))
-        if (p.stats.mood == Mood.HAPPY && rnd.nextFloat() < 0.3f) startDance(p)
-    }
-
     // =====================================================================
-    //  Voyage d'application en application
+    //  Voyage d'application en application : voir [PetBehavior.onAppChanged]
     // =====================================================================
     override fun foregroundPkg(): String? = if (::watcher.isInitialized) watcher.currentPkg else null
 
@@ -870,7 +813,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         override fun run() {
             if (awake && !hidden) {
                 try {
-                    watcher.poll()?.let { onAppChanged(resident, it) }
+                    watcher.poll()?.let { app ->
+                        for (p in shown.toList()) world.asPet(p) { behavior.onAppChanged(p, app) }
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "poll", e)
                 }
@@ -878,38 +823,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             handler.postDelayed(this, 1500)
         }
     }
-
-    private fun onAppChanged(p: Pet, app: ForegroundAppWatcher.AppInfo) {
-        on(p, PetEvent.AppVisited)
-        val comment = commentFor(app)
-        val then = when (app.category) {
-            ApplicationInfo.CATEGORY_VIDEO -> Act.SIT
-            ApplicationInfo.CATEGORY_AUDIO -> Act.DANCE
-            else -> Act.IDLE
-        }
-        val act = p.act
-        if (p.isHiding) return
-        val feature = acts.handlerFor(p)
-        if (feature?.travel == Travel.IGNORES) return
-        if (act in Act.BUSY_FOR_TRAVEL || feature?.blocksTravel == true) {
-            if (act != Act.SLEEP && rnd.nextFloat() < 0.5f) say(comment, 3f)
-            return
-        }
-        val now = clock.wallMs()
-        if (now - p.mind.lastTravelAt < Tuning.TRAVEL_COOLDOWN_MS) { say(comment, 3f); return }
-        p.mind.lastTravelAt = now
-        closeMenu()
-        p.mind.travelComment = comment
-        p.mind.travelThen = then
-        // Il court vers le bord le plus proche et "saute" dans la nouvelle app
-        p.body.targetX = if (p.body.fx < arena.screenW / 2) -arena.bw.toFloat() else arena.screenW + arena.bw
-        speech.sayOneOf(Lines.FOLLOWING, 1.5f)
-        p.setAct(Act.TRAVEL_OUT)
-        requestFrames()
-    }
-
-    private fun commentFor(app: ForegroundAppWatcher.AppInfo): String =
-        speech.appComment(app.label, app.pkg, app.category, app.isHome)
 
     // =====================================================================
     //  Notifications : voir [PetNotifier]

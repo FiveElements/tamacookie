@@ -1,9 +1,6 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.station.StationKind
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -20,7 +17,6 @@ class MischiefControllerTest {
     private val pet get() = ctx.pet
 
     @Before fun setUp() {
-        resetPlatforms()
         ctx = FakePetCtx()
         mis = MischiefController(ctx)
         mis.registerActs(ctx.acts)
@@ -31,8 +27,6 @@ class MischiefControllerTest {
 
     /** Tap sur l'animal, comme `TouchHandler.onPetTap` (via le registre). */
     private fun tap(): Boolean = ctx.acts.handlerFor(pet)?.onPet(pet) ?: false
-
-    @After fun tearDown() = resetPlatforms()
 
     /** Ignoré longtemps : appelle [MischiefController.maybeSeekAttention] jusqu'à ce que le tirage réussisse. */
     private fun seekUntilSomethingHappens(): Boolean {
@@ -104,9 +98,7 @@ class MischiefControllerTest {
 
     @Test
     fun `cache-cache complet - il se cache, depasse, et on le trouve`() {
-        Platforms.connected = true
-        Platforms.pageCount = 3
-        Platforms.launcherPkg = "launcher"
+        ctx.screen.update { copy(connected = true, pageCount = 3, launcherPkg = "launcher") }
         ctx.pages.currentView = "launcher#p1"
         val happy = pet.stats.happiness
 
@@ -166,7 +158,7 @@ class MischiefControllerTest {
     fun `sage il ignore clics et frappe`() {
         mis.level = 0
         mis.checkUserEvents()                            // première lecture des compteurs
-        Platforms.clickVersion++; Platforms.typingVersion++; Platforms.scrollVersion++
+        ctx.screen.emit(UserSignal.Click(Box(0f, 500f, 100f, 600f)), UserSignal.Typing, UserSignal.Scroll)
         repeat(20) { mis.checkUserEvents() }
         assertTrue(ctx.said.isEmpty())
         assertEquals(Act.IDLE, pet.act)

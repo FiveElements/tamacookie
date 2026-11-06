@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.species.Species
 import java.util.EnumSet
 import kotlin.math.abs
 import kotlin.random.Random
@@ -12,11 +13,16 @@ enum class Act {
      * du comportement de la station occupée (`StationBehavior`), via `ActRegistry`.
      */
     IN_STATION,
-    SQUAT, KNOCK, HIDE_RUN, HIDDEN, PEEK, PAGE_OUT, GOTO_CHEST;
+    SQUAT, KNOCK, HIDE_RUN, HIDDEN, PEEK, PAGE_OUT, GOTO_CHEST,
+    /**
+     * Avec un autre animal (suivre, câlin, dispute…) : l'update et les propriétés sont celles de l'interaction
+     * en cours (`SocialInteraction`), via `ActRegistry`.
+     */
+    SOCIAL;
 
     companion object {
         /** En mouvement : animation fluide (~60 i/s). */
-        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK)
+        val MOVING: Set<Act> = EnumSet.of(AIR, WALK, PLAY, DRAGGED, TRAVEL_OUT, TRAVEL_IN, PAGE_OUT, GOTO_FOOD, GOTO_CHEST, HIDE_RUN, KNOCK, SOCIAL)
         /** Immobile et endormi : animation très économe (~12 i/s). Dans une station : `ActHandler.slowFrames`. */
         val SLOW: Set<Act> = EnumSet.of(SLEEP)
         /** Il ne suit pas le défilement des pages (il est tenu, ou caché). */
@@ -65,7 +71,12 @@ data class BrainInput(
     val nowMs: Long = 0L,
     /** Dernière fois qu'il s'est servi seul dans le coffre. */
     val lastSelfServeMs: Long = 0L,
+    /** L'animal le plus proche sur sa page (null = il est seul) : perception sociale. */
+    val nearest: Neighbor? = null,
 )
+
+/** Ce qu'un animal perçoit d'un autre : qui, ce qu'il fait, à quelle distance (px, horizontale). */
+data class Neighbor(val id: PetId, val act: Act, val distance: Float)
 
 /** Ce que le lapin décide de faire ensuite ; le service l'exécute. */
 sealed class Decision {
@@ -74,6 +85,8 @@ sealed class Decision {
     object AttentionSought : Decision()
     object GoToChest : Decision()
     object PageWander : Decision()
+    /** Il va vers [other] (une interaction sociale : suivre, câlin…). */
+    data class Socialize(val other: Neighbor) : Decision()
     /** Redescend de son icône vers le sol en [targetX]. */
     data class JumpDown(val targetX: Float) : Decision()
     /** Saute sur l'icône [index] de [BrainInput.platforms]. */
@@ -87,9 +100,10 @@ sealed class Decision {
 }
 
 /**
- * Décisions du lapin, sans Android : [Random] injecté, heure et état passés en paramètre.
+ * Décisions d'un animal, sans Android : [Random] injecté, heure et état passés en paramètre ; l'influence du
+ * caractère vient de son espèce ([Species.behavior]). Nom historique (il sert à toutes les espèces).
  */
-class BunnyBrain(private val rnd: Random) {
+class BunnyBrain(private val rnd: Random, private val species: Species = Species.DEFAULT) {
 
     /**
      * Choisit l'activité suivante. [seekAttention] est appelé (après la vérification du sommeil) :
@@ -101,8 +115,14 @@ class BunnyBrain(private val rnd: Random) {
         if (!s.elsewhere && wantsChest(s.nowMs, s.lastSelfServeMs, s.hasToyOrFood, s.chestVisible, s.satiety, s.happiness, s.energy)) {
             return Decision.GoToChest
         }
+        // Un autre animal tranquille, pas trop loin : il va le voir (seulement s'il n'est pas seul : un
+        // animal seul ne tire pas ce sort, ses décisions sont celles d'avant l'étape 7)
+        val n = s.nearest
+        if (n != null && !s.elsewhere && n.act in Act.FREE && n.distance < SOCIAL_RANGE_DP * s.density &&
+            rnd.nextFloat() < species.behavior(s.personality).socialChance
+        ) return Decision.Socialize(n)
         if (!s.elsewhere && s.platform == null &&
-            rnd.nextFloat() < (if (s.personality == Personality.CURIOUS) 0.12f else 0.06f) && s.canPageWander
+            rnd.nextFloat() < species.behavior(s.personality).pageWanderChance && s.canPageWander
         ) return Decision.PageWander
 
         val d = s.density
@@ -115,7 +135,7 @@ class BunnyBrain(private val rnd: Random) {
             if (r < 0.75f) return Decision.TurnAround(2f + rnd.nextFloat() * 3f)
             return Decision.Idle(3f + rnd.nextFloat() * 5f)
         }
-        val platChance = if (s.personality == Personality.CURIOUS) 0.6f else 0.35f
+        val platChance = species.behavior(s.personality).platformChance
         if (!s.elsewhere && r < platChance && s.energy > 25f) pickPlatform(s)?.let { return it }
         return when {
             r < 0.55f -> Decision.Walk((s.x + (rnd.nextFloat() * 2f - 1f) * s.screenW * 0.45f).coerceIn(s.minX, s.maxX))
@@ -127,10 +147,10 @@ class BunnyBrain(private val rnd: Random) {
 
     /** Envie de dormir : énergie basse, nuit, ou paresse. */
     fun wantsSleep(s: BrainInput): Boolean {
-        val lazy = s.personality == Personality.LAZY
-        return s.energy < (if (lazy) 30f else 12f) ||
-            (isNight(s.hour) && s.energy < (if (lazy) 75f else 55f) && rnd.nextFloat() < 0.5f) ||
-            (lazy && s.energy < 60f && rnd.nextFloat() < 0.12f)
+        val m = species.behavior(s.personality)
+        return s.energy < m.sleepEnergyBelow ||
+            (isNight(s.hour) && s.energy < m.nightSleepEnergyBelow && rnd.nextFloat() < 0.5f) ||
+            (m.napEnergyBelow > 0f && s.energy < m.napEnergyBelow && rnd.nextFloat() < m.napChance)
     }
 
     /** Une icône à portée (ni trop près ni trop loin, dans l'écran, pas celle où il est déjà). */
@@ -189,12 +209,15 @@ class BunnyBrain(private val rnd: Random) {
     }
 
     companion object {
+        /** Distance (dp) en deçà de laquelle il peut aller voir un autre animal. */
+        const val SOCIAL_RANGE_DP = 600f
+
         fun isNight(hour: Int) = hour >= 22 || hour < 7
 
         /** Temps sans interaction avant qu'il cherche l'attention, selon le niveau de bêtises et le caractère. */
-        fun attentionThresholdMs(mischief: Int, personality: Personality): Long {
+        fun attentionThresholdMs(mischief: Int, personality: Personality, species: Species = Species.DEFAULT): Long {
             val minutes = when (mischief) { 0 -> 12f; 1 -> 6f; else -> 3f } *
-                (if (personality == Personality.CUDDLY) 0.6f else 1f)
+                species.behavior(personality).attentionFactor
             return (minutes * 60_000).toLong()
         }
 

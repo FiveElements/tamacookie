@@ -10,12 +10,14 @@ import android.content.Intent
 /**
  * Notifications du service : notification permanente (premier plan) et alertes de besoins.
  *
- * Dépendances étroites : l'état est lu au moment de construire la notification via [pet]
- * (null tant que le service n'est pas initialisé), [hidden] et [hiding].
+ * Dépendances étroites : l'état est lu au moment de construire la notification via [pet] (le résident,
+ * null tant que le service n'est pas initialisé), [hidden] et [hiding] ; avec des compagnons, titre,
+ * ligne et alertes résument tous les animaux ([Director.title], [Director.statusLine], [Director.alerts]).
  */
 class PetNotifier(
     private val ctx: Context,
     private val pet: () -> Pet?,
+    private val director: () -> Director,
     private val hidden: () -> Boolean,
     private val hiding: () -> Boolean,
 ) {
@@ -51,7 +53,6 @@ class PetNotifier(
     }
 
     private var lastNotifText = ""
-    private var lastAlertMood: Mood? = null
 
     private val nm: NotificationManager get() = ctx.getSystemService(NotificationManager::class.java)
 
@@ -85,8 +86,8 @@ class PetNotifier(
         val hidden = hidden()
         val moodTxt = moodText(p.stats.mood, p.stats.sleeping, hiding())
         return b
-            .setContentTitle("${p.name} $moodTxt" + (if (p.stats.caged) " (en cage 🔒)" else "") + if (hidden) " (caché)" else "")
-            .setContentText(statusLine(p))
+            .setContentTitle(director().title { "$moodTxt" + (if (p.stats.caged) " (en cage 🔒)" else "") } + if (hidden) " (caché)" else "")
+            .setContentText(director().statusLine(::statusLine))
             .addAction(Notification.Action.Builder(null, "🥕 Nourrir", pi(BunnyService.ACTION_FEED, 1)).build())
             .addAction(Notification.Action.Builder(null, if (hidden) "Montrer" else "Cacher", pi(BunnyService.ACTION_TOGGLE, 2)).build())
             .addAction(Notification.Action.Builder(null, "Ranger", pi(BunnyService.ACTION_STOP, 3)).build())
@@ -96,7 +97,7 @@ class PetNotifier(
     /** Met à jour la notification permanente si son contenu a changé (ou si [force]). */
     fun update(force: Boolean) {
         val p = pet() ?: return
-        val key = statusLine(p) + p.stats.mood + hidden()
+        val key = director().statusLine(::statusLine) + p.stats.mood + hidden() + director().title { "" }
         if (!force && key == lastNotifText) return
         lastNotifText = key
         nm.notify(NOTIF_ID, build())
@@ -104,11 +105,8 @@ class PetNotifier(
 
     /** Alerte quand l'humeur bascule vers un besoin (faim, saleté, maladie, ennui). */
     fun checkAlerts() {
-        val p = pet() ?: return
-        val m = p.stats.mood
-        if (m == lastAlertMood) return
-        lastAlertMood = m
-        val txt = alertText(p.name, m) ?: return
+        pet() ?: return
+        val txt = director().alerts { alertText(it.name, it.stats.mood) } ?: return
         val n = Notification.Builder(ctx, CH_ALERT)
             .setSmallIcon(R.drawable.ic_bunny)
             .setContentTitle(txt)

@@ -6,8 +6,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import com.tamacookie.PetEvent
 import com.tamacookie.BunnyPhysics
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
+import com.tamacookie.Expr
+import com.tamacookie.PType
 import com.tamacookie.Palette
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx

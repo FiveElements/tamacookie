@@ -9,7 +9,7 @@ import org.junit.Test
 
 class PlatformsTest {
 
-    private fun page(desc: String): Pair<Int, Int>? = Platforms.parsePage(desc)
+    private fun page(desc: String): Pair<Int, Int>? = ScreenScan.parsePage(desc)
 
     @Test
     fun `indicateur de page Samsung en francais`() {
@@ -55,10 +55,10 @@ class PlatformsTest {
     fun `zone de detection non vide en paysage et en portrait`() {
         val d = 2.75f
         // Téléphone en paysage : 1080 px de haut
-        val (minL, maxL) = Platforms.detectionBand(1080, d)
+        val (minL, maxL) = ScreenScan.detectionBand(1080, d)
         assertTrue("paysage : $minL..$maxL", maxL - minL > 300)
         // Portrait : 2400 px de haut
-        val (minP, maxP) = Platforms.detectionBand(2400, d)
+        val (minP, maxP) = ScreenScan.detectionBand(2400, d)
         assertTrue(minP >= 120 * d && maxP <= 2400 - 90 * d && maxP > minP)
     }
 
@@ -70,12 +70,11 @@ class PlatformsTest {
 
     @Test
     fun `defilement - les deux derniers evenements sont conserves`() {
-        Platforms.pushScroll(100, 10)
-        Platforms.pushScroll(300, 110)
-        assertEquals(100, Platforms.scrollX0)
-        assertEquals(300, Platforms.scrollX1)
-        assertEquals(10L, Platforms.scrollT0)
-        assertEquals(110L, Platforms.scrollT1)
+        val s = ScrollSamples().push(100, 10).push(300, 110)
+        assertEquals(100, s.x0)
+        assertEquals(300, s.x1)
+        assertEquals(10L, s.t0)
+        assertEquals(110L, s.t1)
     }
 }
 

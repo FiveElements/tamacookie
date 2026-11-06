@@ -1,10 +1,7 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -23,13 +20,10 @@ class ToyControllerTest {
     private val dt = 1f / 60f
 
     @Before fun setUp() {
-        resetPlatforms()
         ctx = FakePetCtx()
         toys = ToyController(ctx)
         toys.registerActs(ctx.acts)
     }
-
-    @After fun tearDown() = resetPlatforms()
 
     /** Une image : physique des objets puis application des déplacements. */
     private fun frame() { toys.update(dt); overlay.flush() }

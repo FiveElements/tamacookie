@@ -25,18 +25,28 @@ import kotlin.random.Random
 /**
  * Création / personnalisation du lapin : nom, pelage, oreilles, yeux, motif,
  * accessoire et caractère. Aperçu animé en direct.
+ *
+ * Trois modes : personnaliser le résident ([EXTRA_NEW] faux), adopter un nouveau lapin qui **remplace**
+ * le résident ([EXTRA_NEW] vrai — avec, si un résident existe déjà, le choix de l'adopter plutôt comme
+ * compagnon), ou adopter directement un **compagnon** ([EXTRA_COMPANION]).
  */
 @SuppressLint("SetTextI18n")
 class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
-    companion object { const val EXTRA_NEW = "new" }
+    companion object {
+        const val EXTRA_NEW = "new"
+        /** Adopter un compagnon (le résident reste). */
+        const val EXTRA_COMPANION = "companion"
+        private val COMPANION_NAMES = listOf("Noisette", "Praline", "Caramel", "Biscuit", "Guimauve", "Pistache")
+    }
 
     private val d by lazy { resources.displayMetrics.density }
-    private lateinit var preview: BunnyView
+    private lateinit var preview: PetView
     private lateinit var nameEdit: EditText
     private var look = Look()
     private var personality = Personality.CUDDLY
     private var isNew = true
+    private var asCompanion = false
     private var lastNs = 0L
     private var t = 0f
     private var previewFacing = 1f
@@ -51,13 +61,19 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
 
         // Lecture seule (pas de rattrapage ni d'écriture) : le service ou PetCommands appliqueront le choix
-        val pet = Pets.repository(this).loadResident()
+        val repo = Pets.repository(this)
+        val pet = repo.loadResident()
         val adopted = pet?.adopted == true
-        isNew = intent.getBooleanExtra(EXTRA_NEW, !adopted)
-        if (pet != null && (!isNew || adopted)) {
+        asCompanion = adopted && intent.getBooleanExtra(EXTRA_COMPANION, false)
+        isNew = asCompanion || intent.getBooleanExtra(EXTRA_NEW, !adopted)
+        val taken = (listOfNotNull(pet) + repo.companions()).map { it.identity.name }.toSet()
+        if (asCompanion) {
+            randomLook(Random(System.nanoTime()))
+        } else if (pet != null && (!isNew || adopted)) {
             look = pet.look
             personality = pet.traits.personality
         }
+        val canAddCompanion = adopted && repo.ids().size < Tuning.MAX_PETS
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,18 +86,22 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         }
 
         root.addView(TextView(this).apply {
-            text = if (isNew) "Adopte ton lapin 🐰" else "Personnaliser 🐰"
+            text = when {
+                asCompanion -> "Adopte un compagnon 🐰"
+                isNew -> "Adopte ton lapin 🐰"
+                else -> "Personnaliser 🐰"
+            }
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
             setTextColor(Color.parseColor("#3A2E39")); paint.isFakeBoldText = true
             gravity = Gravity.CENTER
         })
 
-        preview = BunnyView(this)
-        preview.setOnClickListener { preview.emit(BunnyView.PType.HEART, 3) }
+        preview = PetView(this)
+        preview.setOnClickListener { preview.emit(PType.HEART, 3) }
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
         nameEdit = EditText(this).apply {
-            setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
+            setText(if (asCompanion) (COMPANION_NAMES.firstOrNull { it !in taken } ?: "") else pet?.identity?.name ?: Identity.DEFAULT_NAME)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setSingleLine()
             hint = "Nom du lapin"
@@ -132,6 +152,16 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         btnRow.addView(bigButton(if (isNew) "Adopter ! 💕" else "Enregistrer ✨", "#F07893", "#FFFFFF") { validate() },
             LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         root.addView(btnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (22 * d).toInt() })
+        // Nouveau lapin alors qu'un résident existe : il peut aussi le rejoindre au lieu de le remplacer
+        if (isNew && !asCompanion && canAddCompanion) {
+            root.addView(bigButton("…ou l'adopter comme compagnon 💞", "#E3F4E8", "#3A2E39") { asCompanion = true; validate() },
+                LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (10 * d).toInt() })
+            root.addView(TextView(this).apply {
+                text = "« Adopter ! » remplace ${pet?.identity?.name ?: "ton lapin"} ; un compagnon vit avec lui."
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+                gravity = Gravity.CENTER
+            }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (6 * d).toInt() })
+        }
 
         scroll.filterTouchesWhenObscured = true
         setContentView(scroll)
@@ -148,8 +178,8 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         val cycle = t % 7f
         if (cycle < 0.02f) previewFacing = -previewFacing
         // L'aperçu affiche l'apparence en cours de choix ([Look] est immuable)
-        preview.render(BunnyRenderState(
-            pose = if (cycle < 2.5f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+        preview.render(PetRenderState(
+            pose = if (cycle < 2.5f) Pose.WALK else Pose.IDLE,
             facing = previewFacing,
             walkPhase = (t * 2.2f) % 1f,
             look = look,
@@ -163,26 +193,31 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
     private fun randomize() {
         val r = Random(System.nanoTime())
+        randomLook(r)
+        preview.emit(PType.SPARKLE, 6)
+        refreshAll()
+    }
+
+    private fun randomLook(r: Random) {
         look = Look(
             fur = Fur.entries[r.nextInt(Fur.entries.size)], ears = Ears.entries[r.nextInt(Ears.entries.size)],
             eyes = EyeColor.entries[r.nextInt(EyeColor.entries.size)], pattern = Pattern.entries[r.nextInt(Pattern.entries.size)],
             accessory = Accessory.entries[r.nextInt(Accessory.entries.size)], accColor = AccColor.entries[r.nextInt(AccColor.entries.size)],
         )
         if (isNew) personality = Personality.values()[r.nextInt(Personality.values().size)]
-        preview.emit(BunnyView.PType.SPARKLE, 6)
-        refreshAll()
     }
 
     private fun validate() {
-        val name = Adoption.cleanName(nameEdit.text.toString()) ?: Identity.DEFAULT_NAME
-        // Une commande : le service (s'il tourne) remplace le lapin sans redémarrer, sinon le repository est écrit
-        PetCommands.adopt(applicationContext, Adoption(
+        val name = Adoption.cleanName(nameEdit.text.toString()) ?: if (asCompanion) COMPANION_NAMES.random() else Identity.DEFAULT_NAME
+        val a = Adoption(
             name = name,
             look = look,
             personality = personality,
             favoriteToy = Toy.entries[Random.nextInt(Toy.entries.size)],
             isNew = isNew,
-        ))
+        )
+        // Une commande : le service (s'il tourne) applique sans redémarrer, sinon le repository est écrit
+        if (asCompanion) PetCommands.adoptCompanion(applicationContext, a) else PetCommands.adopt(applicationContext, a)
         setResult(RESULT_OK)
         finish()
     }

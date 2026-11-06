@@ -29,7 +29,7 @@ import android.widget.TextView
 class MainActivity : Activity(), Choreographer.FrameCallback {
 
     private val d by lazy { resources.displayMetrics.density }
-    private lateinit var preview: BunnyView
+    private lateinit var preview: PetView
     private lateinit var overlayBtn: TextView
     private lateinit var notifBtn: TextView
     private lateinit var usageBtn: TextView
@@ -37,11 +37,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private lateinit var a11yHelp: TextView
     private lateinit var mainBtn: TextView
     private lateinit var nameEdit: EditText
+    /** Liste des animaux (résident + compagnons), reconstruite à chaque retour sur l'écran. */
+    private lateinit var petList: LinearLayout
+    private lateinit var companionBtn: TextView
     private var lastNs = 0L
     private var previewT = 0f
     /** Ce qu'affiche l'aperçu (il n'a pas de [Pet] : son état est fabriqué ici). */
     private var previewLook = Look()
-    private var previewExpr = BunnyView.Expr.NORMAL
+    private var previewExpr = Expr.NORMAL
     private var previewFacing = 1f
     /** Le lapin vient d'être lancé : on passera en arrière-plan après la réponse à la demande de permission. */
     private var backgroundAfterPermission = false
@@ -76,11 +79,11 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             setTextColor(Color.parseColor("#7A6B75")); gravity = Gravity.CENTER
         })
 
-        preview = BunnyView(this)
+        preview = PetView(this)
         preview.setOnClickListener {
-            preview.emit(BunnyView.PType.HEART, 3)
-            previewExpr = BunnyView.Expr.HAPPY
-            preview.postDelayed({ previewExpr = BunnyView.Expr.NORMAL }, 1200)
+            preview.emit(PType.HEART, 3)
+            previewExpr = Expr.HAPPY
+            preview.postDelayed({ previewExpr = Expr.NORMAL }, 1200)
         }
         root.addView(preview, LinearLayout.LayoutParams((170 * d).toInt(), (170 * d).toInt()).apply {
             topMargin = (8 * d).toInt()
@@ -100,6 +103,17 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_NEW, false))
         }, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = (8 * d).toInt() })
         root.addView(nameRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (12 * d).toInt() })
+
+        // Animaux : le résident et ses compagnons (lecture seule par le repository, actions par commandes)
+        section(root, "Tes animaux")
+        petList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(petList, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        companionBtn = smallButton("💞 Adopter un compagnon") {
+            startActivity(Intent(this, AdoptActivity::class.java).putExtra(AdoptActivity.EXTRA_COMPANION, true))
+        }
+        root.addView(companionBtn, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+            topMargin = (4 * d).toInt(); bottomMargin = (12 * d).toInt()
+        })
 
         // Niveau de bêtises
         section(root, "Bêtises")
@@ -227,6 +241,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         val pet = Pets.repository(this).loadResident()
         previewLook = pet?.look ?: Look()
         nameEdit.setText(pet?.identity?.name ?: Identity.DEFAULT_NAME)
+        refreshPets()
         refresh()
         Choreographer.getInstance().postFrameCallback(this)
     }
@@ -253,8 +268,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         // petite marche sur place dans l'aperçu
         val cycle = previewT % 8f
         if (cycle < 0.02f) previewFacing = -previewFacing
-        preview.render(BunnyRenderState(
-            pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+        preview.render(PetRenderState(
+            pose = if (cycle < 3f) Pose.WALK else Pose.IDLE,
             expr = previewExpr,
             facing = previewFacing,
             walkPhase = (previewT * 2.2f) % 1f,
@@ -266,11 +281,11 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private fun refresh() {
         val overlay = Settings.canDrawOverlays(this)
         val notif = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        val usage = ForegroundAppWatcher.hasPermission(this)
+        val usage = UsageStatsForegroundSource.hasPermission(this)
         setPerm(overlayBtn, overlay, "Afficher par-dessus les autres apps", "obligatoire")
         setPerm(notifBtn, notif, "Notifications", "recommandé")
         setPerm(usageBtn, usage, "Accès aux données d'utilisation", "pour qu'il te suive d'app en app")
-        val a11y = Platforms.isEnabled(this)
+        val a11y = ScreenSensorService.isEnabled(this)
         setPerm(a11yBtn, a11y, "Sauter sur les icônes (accessibilité)", "optionnel")
         a11yHelp.visibility = if (a11y) View.GONE else View.VISIBLE
 
@@ -321,6 +336,48 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
                 startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             }
             .setNegativeButton("Non merci", null)
+            .show()
+    }
+
+    /** Une ligne par animal : nom, rôle, jauges ; « Retirer » pour un compagnon. */
+    private fun refreshPets() {
+        val repo = Pets.repository(this)
+        val resident = repo.loadResident()
+        val companions = repo.companions()
+        petList.removeAllViews()
+        val all = listOfNotNull(resident) + companions
+        all.forEachIndexed { i, r ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                val p = (10 * d).toInt(); setPadding(p, p / 2, p / 2, p / 2)
+                background = GradientDrawable().apply { cornerRadius = 12 * d; setColor(Color.WHITE) }
+            }
+            val st = r.stats
+            val sleeping = if (i >= Tuning.MAX_PETS_SHOWN) "  💤 dort hors écran" else ""
+            row.addView(TextView(this).apply {
+                text = "${r.identity.name}  " + (if (r === resident) "🏠 résident" else "💞 compagnon") + sleeping + "\n" +
+                    PetNotifier.statusLine(st.satiety, st.happiness, st.energy, st.cleanliness) + "  🩺${st.health.toInt()}"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f); setTextColor(Color.parseColor("#3A2E39"))
+            }, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            if (r !== resident) row.addView(smallButton("Retirer") { confirmRemove(r.identity.id, r.identity.name) })
+            petList.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
+        }
+        val full = all.size >= Tuning.MAX_PETS
+        companionBtn.isEnabled = resident?.adopted == true && !full
+        companionBtn.alpha = if (companionBtn.isEnabled) 1f else 0.5f
+        if (full) companionBtn.text = "💞 Maison pleine (${Tuning.MAX_PETS} animaux)" else companionBtn.text = "💞 Adopter un compagnon"
+    }
+
+    private fun confirmRemove(id: PetId, name: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Dire au revoir à $name ?")
+            .setMessage("$name quittera ton téléphone (ses jauges et son apparence seront effacées).")
+            .setPositiveButton("Au revoir") { _, _ ->
+                PetCommands.removeCompanion(this, id)
+                // la commande est asynchrone si le service tourne : la liste suit au prochain affichage
+                petList.postDelayed({ refreshPets() }, 300)
+            }
+            .setNegativeButton("Non", null)
             .show()
     }
 
