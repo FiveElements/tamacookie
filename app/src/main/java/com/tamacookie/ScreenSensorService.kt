@@ -18,77 +18,11 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
-import kotlin.math.abs
 
 /**
- * Plateformes détectées à l'écran (icônes, boutons…) sur lesquelles Cookie peut sauter.
- * Partagé dans le même processus entre le service d'accessibilité et BunnyService.
- */
-object Platforms {
-    data class P(val rect: Rect, val label: String?)
-
-    @Volatile var list: List<P> = emptyList()
-        private set
-    @Volatile var version = 0
-        private set
-    @Volatile var connected = false
-    /** Écran allumé ? (mis à jour par ScreenSensorService ; vrai par défaut). */
-    @Volatile var screenOn = true
-
-    // Signaux pour les bêtises (jamais le contenu tapé : seulement "il tape")
-    @Volatile var ime: Rect? = null
-    @Volatile var clickRect: Rect? = null
-    @Volatile var clickVersion = 0
-    @Volatile var typingVersion = 0
-    @Volatile var scrollVersion = 0
-    @Volatile var foregroundPkg: String? = null
-
-    /**
-     * Identifiant de la "vue" courante : l'application, et pour l'écran d'accueil
-     * la page affichée (ex. "com.sec.android.app.launcher#p2").
-     */
-    @Volatile var viewKey: String? = null
-    // Défilement horizontal du bureau (événements TYPE_VIEW_SCROLLED du launcher, ~10/s)
-    @Volatile var scrollX0 = 0
-    @Volatile var scrollX1 = 0
-    @Volatile var scrollT0 = 0L
-    @Volatile var scrollT1 = 0L
-    /** Largeur de défilement d'une page du bureau (apprise), 0 = inconnue. */
-    @Volatile var pageW = 0f
-
-    fun pushScroll(x: Int, t: Long) {
-        scrollX0 = scrollX1; scrollT0 = scrollT1
-        scrollX1 = x; scrollT1 = t
-    }
-
-    /** Nombre de pages du bureau (0 = inconnu). */
-    @Volatile var pageCount = 0
-    /** Package du bureau (launcher) quand il a été vu avec des pages. */
-    @Volatile var launcherPkg: String? = null
-
-    /** Voir [ScreenScan.parsePage]. */
-    fun parsePage(desc: CharSequence?): Pair<Int, Int>? = ScreenScan.parsePage(desc)
-
-    /** Voir [ScreenScan.detectionBand]. */
-    fun detectionBand(height: Int, density: Float): Pair<Float, Float> = ScreenScan.detectionBand(height, density)
-
-    fun publish(l: List<P>) {
-        if (l == list) return
-        list = l
-        version++
-    }
-
-    fun clear() { publish(emptyList()) }
-
-    fun isEnabled(ctx: Context): Boolean {
-        val enabled = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
-        val me = ComponentName(ctx, ScreenSensorService::class.java)
-        return enabled.split(':').any { ComponentName.unflattenFromString(it) == me }
-    }
-}
-
-/**
- * Service d'accessibilité. Ce qu'il lit, et seulement cela :
+ * Service d'accessibilité : adaptateur d'entrée du port [ScreenSensor]. Il **publie** dans le
+ * [ScreenSensorHub] du processus ([AppGraph]) ; la logique (plateformes, pages, défilement) est pure
+ * ([ScreenScan], [ScreenSensorHub]). Ce qu'il lit, et seulement cela :
  *  - la position (rectangle) des éléments visibles, pour que Cookie saute dessus ;
  *  - le nom court (description, sinon libellé) des icônes et boutons NON éditables,
  *    jamais le contenu d'un champ de saisie ni d'un mot de passe ;
@@ -98,6 +32,19 @@ object Platforms {
  */
 class ScreenSensorService : AccessibilityService() {
 
+    companion object {
+        private const val MIN_SCAN_INTERVAL_MS = 600L
+        private const val WINDOW_SETTLE_MS = 1500L
+
+        /** Le service est-il activé dans les réglages d'accessibilité ? */
+        fun isEnabled(ctx: Context): Boolean {
+            val enabled = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false
+            val me = ComponentName(ctx, ScreenSensorService::class.java)
+            return enabled.split(':').any { ComponentName.unflattenFromString(it) == me }
+        }
+    }
+
+    private val hub: ScreenSensorHub by lazy { AppGraph.of(this).screen }
     private val handler = Handler(Looper.getMainLooper())
     private var scanPending = false
     private val scan = Runnable { scanPending = false; runScan() }
@@ -118,13 +65,12 @@ class ScreenSensorService : AccessibilityService() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 Intent.ACTION_SCREEN_OFF -> {
-                    Platforms.screenOn = false
                     handler.removeCallbacks(scan); handler.removeCallbacks(lateScan)
                     scanPending = false
-                    Platforms.clear()
+                    hub.onScreenOff()
                 }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
-                    Platforms.screenOn = true
+                    hub.onScreenOn()
                     scheduleScan(300)
                 }
             }
@@ -132,8 +78,7 @@ class ScreenSensorService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
-        Platforms.connected = true
-        Platforms.screenOn = getSystemService(PowerManager::class.java)?.isInteractive ?: true
+        hub.onConnected(getSystemService(PowerManager::class.java)?.isInteractive ?: true)
         try {
             val f = IntentFilter().apply {
                 addAction(Intent.ACTION_SCREEN_ON)
@@ -150,13 +95,13 @@ class ScreenSensorService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.packageName == packageName) return
-        if (!Platforms.screenOn) return
+        if (!hub.snapshot.screenOn) return
         val evPkg = event.packageName?.toString()
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             // Hors bureau, les changements de contenu (très fréquents) ne déclenchent un scan
             // que juste après un changement de fenêtre (le temps que l'app finisse de s'afficher).
             // Les changements de fenêtre eux-mêmes (TYPE_WINDOW_STATE_CHANGED…) scannent toujours.
-            if (evPkg != Platforms.launcherPkg &&
+            if (evPkg != hub.snapshot.launcherPkg &&
                 SystemClock.uptimeMillis() - lastWindowChangeAt > WINDOW_SETTLE_MS
             ) return
         } else if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
@@ -167,18 +112,12 @@ class ScreenSensorService : AccessibilityService() {
         // Lapin rangé : personne n'utilise les plateformes, on ne scanne pas l'arbre (batterie).
         // Au redémarrage, le prochain événement d'une autre app relance un scan normalement.
         if (!BunnyService.running) return
-        // Défilement des pages du bureau : on le suit en direct
-        if (event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED &&
-            event.packageName?.toString() == Platforms.launcherPkg && event.scrollY == 0 && event.scrollX >= 0 &&
-            (event.scrollDeltaX != 0 || event.scrollX != Platforms.scrollX1)
-        ) {
-            Platforms.pushScroll(event.scrollX, SystemClock.uptimeMillis())
-        }
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
-                // Pendant un défilement, tout bouge : on vide puis on rescanne
-                Platforms.scrollVersion++
-                Platforms.clear(); scheduleScan(350)
+                // Défilement des pages du bureau suivi en direct ; pendant un défilement, tout bouge :
+                // les plateformes sont vidées, puis on rescanne
+                hub.onViewScrolled(evPkg, event.scrollX, event.scrollY, event.scrollDeltaX, SystemClock.uptimeMillis())
+                scheduleScan(350)
                 // L'indicateur de page du bureau se met à jour après l'animation : on relit plus tard
                 handler.removeCallbacks(lateScan)
                 handler.postDelayed(lateScan, 900)
@@ -186,10 +125,10 @@ class ScreenSensorService : AccessibilityService() {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {
                 val r = Rect()
                 event.source?.getBoundsInScreen(r)
-                if (!r.isEmpty) { Platforms.clickRect = r; Platforms.clickVersion++ }
+                hub.onClick(r.toBox())
                 scheduleScan(300)
             }
-            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> Platforms.typingVersion++
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> hub.onTyping()
             else -> scheduleScan(250)
         }
     }
@@ -203,128 +142,61 @@ class ScreenSensorService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
-        Platforms.connected = false
-        Platforms.screenOn = true
         if (receiverRegistered) {
             try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
             receiverRegistered = false
         }
-        Platforms.clear()
         handler.removeCallbacksAndMessages(null)
+        hub.onDisconnected()
         super.onDestroy()
     }
 
     /** Plafonne les scans complets (batterie) : reporte le scan s'il arrive trop tôt. */
     private fun runScan() {
-        if (!Platforms.screenOn || !BunnyService.running) return
+        if (!hub.snapshot.screenOn || !BunnyService.running) return
         val now = SystemClock.uptimeMillis()
         val wait = lastScanAt + MIN_SCAN_INTERVAL_MS - now
         if (wait > 0) { scheduleScan(wait); return }
         lastScanAt = now
-        doScan()
+        val epoch = hub.epoch
+        val bounds = getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
+        val g = ScreenScan.Geometry(bounds.width(), bounds.height(), resources.displayMetrics.density)
+        val result = doScan(hub.snapshot.launcherPkg, g)
+        hub.onScan(result, epoch, SystemClock.uptimeMillis())
     }
 
-    private fun doScan() {
+    /** Lit l'arbre de la fenêtre active (appels IPC) ; [launcherPkg] = bureau déjà reconnu. */
+    private fun doScan(launcherPkg: String?, g: ScreenScan.Geometry): ScanResult {
         // Clavier affiché ?
-        Platforms.ime = try {
+        val ime = try {
             windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
-                ?.let { w -> Rect().also { w.getBoundsInScreen(it) } }
+                ?.let { w -> Rect().also { w.getBoundsInScreen(it) }.toBox() }
         } catch (_: Exception) { null }
 
         val root = try { rootInActiveWindow } catch (_: Exception) { null }
-        if (root == null) { Platforms.clear(); return }
+            ?: return ScanResult(ime, null)
         val pkg = root.packageName?.toString()
         // Notre propre app et le volet de notifications ne changent pas la "vue"
-        if (pkg == packageName || pkg == "com.android.systemui") { Platforms.clear(); return }
-        Platforms.foregroundPkg = pkg
-        var page: Int? = null                // depuis le point "sélectionné" (prioritaire)
-        var pageAny: Pair<Int, Int>? = null  // depuis un indicateur non sélectionné (Pixel)
-        val mayBeHome = pkg == Platforms.launcherPkg || pkg in homePkgs
-
-        val d = resources.displayMetrics.density
-        val wm = getSystemService(WindowManager::class.java)
-        val bounds = wm.currentWindowMetrics.bounds
-        val (minTop, maxTop) = Platforms.detectionBand(bounds.height(), d)
-        val minW = 36 * d; val maxW = 480 * d
-        val minH = 36 * d; val maxH = 260 * d
-
-        val out = ArrayList<Platforms.P>()
-        val stack = ArrayDeque<AccessibilityNodeInfo>()
-        stack.addLast(root)
-        var visited = 0
-        val r = Rect()
-        while (stack.isNotEmpty() && visited < MAX_NODES) {
-            val n = stack.removeLast()
-            visited++
-            if (!n.isVisibleToUser) continue
-            // Indicateur de page du bureau (le point "sélectionné" = page courante)
-            // (Pixel Launcher : "Page 2 of 3" sur l'indicateur lui-même, non sélectionné ;
-            //  le point sélectionné reste prioritaire)
-            if (page == null && !n.isEditable && !n.isPassword) {
-                val cd = n.contentDescription
-                if (cd != null && (n.isSelected || (pageAny == null && mayBeHome))) {
-                    Platforms.parsePage(cd)?.let { (pg, count) ->
-                        if (n.isSelected) {
-                            page = pg
-                            Platforms.pageCount = count
-                            Platforms.launcherPkg = pkg
-                        } else pageAny = pg to count
-                    }
-                }
-            }
-            n.getBoundsInScreen(r)
-            val w = r.width(); val h = r.height()
-            if (w in minW.toInt()..maxW.toInt() && h in minH.toInt()..maxH.toInt()
-                && r.top >= minTop && r.top <= maxTop && r.left >= 0 && r.right <= bounds.width()
-            ) {
-                // Nom court seulement pour les éléments non éditables (jamais le texte saisi)
-                val label = if (!n.isEditable && !n.isPassword)
-                    (n.contentDescription ?: n.text)?.toString()?.take(30) else null
-                if (n.isClickable || !label.isNullOrBlank()) {
-                    // élément retenu : on ne descend pas dans ses enfants
-                    if (out.size < 60 && out.none { Rect.intersects(it.rect, r) && it.rect.top == r.top }) {
-                        out.add(Platforms.P(Rect(r), label))
-                    }
-                    continue
-                }
-            }
-            for (i in 0 until n.childCount) n.getChild(i)?.let { stack.addLast(it) }
-        }
-        if (page == null) pageAny?.let { (pg, count) ->
-            page = pg
-            Platforms.pageCount = count
-            Platforms.launcherPkg = pkg
-        }
-        Platforms.viewKey = if (page != null) "$pkg#p$page" else pkg
-
-        // Bureau au repos : apprendre la largeur d'une page et recaler le défilement
-        val p = page
-        if (p != null && pkg == Platforms.launcherPkg) {
-            val now = SystemClock.uptimeMillis()
-            // Au repos = l'animation s'est terminée (derniers pas de 0-3 px), pas un doigt
-            // immobile au milieu d'un glissé (plus d'événements mais position intermédiaire).
-            val ended = Platforms.scrollT1 == 0L || ScrollMath.ended(Platforms.scrollX0, Platforms.scrollX1)
-            val settled = ended && (Platforms.scrollT1 == 0L || now - Platforms.scrollT1 > 700)
-            if (settled) {
-                if (p > 1 && Platforms.scrollT1 != 0L && Platforms.scrollX1 > 0) {
-                    val w = Platforms.scrollX1.toFloat() / (p - 1)
-                    val sw = bounds.width().toFloat()
-                    if (ScrollMath.plausiblePageWidth(w, sw) &&(Platforms.pageW <= 0f || abs(w - Platforms.pageW) > 4f)) Platforms.pageW = w
-                }
-                val pw = Platforms.pageW
-                val expected = if (pw > 0f) ((p - 1) * pw).toInt() else if (p == 1) 0 else -1
-                if (expected >= 0 && (Platforms.scrollT1 == 0L || abs(Platforms.scrollX1 - expected) > 8)) {
-                    // ex. bouton Accueil qui ramène à la page 1 sans animation
-                    Platforms.pushScroll(expected, now - 1000); Platforms.pushScroll(expected, now - 1000)
-                }
-            }
-        }
-        Platforms.publish(out)
+        if (pkg == null || ScreenScan.ignoredPkg(pkg, packageName)) return ScanResult(ime, null)
+        val mayBeHome = pkg == launcherPkg || pkg in homePkgs
+        val walk = ScreenScan.walk(root, NodeInfoReader(), g, mayBeHome)
+        return ScanResult(ime, pkg, walk.platforms, walk.page, g.width)
     }
 
-    private companion object {
-        const val MIN_SCAN_INTERVAL_MS = 600L
-        const val MAX_NODES = 800
-        const val WINDOW_SETTLE_MS = 1500L
+    /** [ScreenScan.NodeReader] sur `AccessibilityNodeInfo` (minSdk 33 : plus de recyclage à faire). */
+    private class NodeInfoReader : ScreenScan.NodeReader<AccessibilityNodeInfo> {
+        private val r = Rect()
+        override fun isVisible(n: AccessibilityNodeInfo) = n.isVisibleToUser
+        override fun isEditable(n: AccessibilityNodeInfo) = n.isEditable
+        override fun isPassword(n: AccessibilityNodeInfo) = n.isPassword
+        override fun isSelected(n: AccessibilityNodeInfo) = n.isSelected
+        override fun isClickable(n: AccessibilityNodeInfo) = n.isClickable
+        override fun description(n: AccessibilityNodeInfo): CharSequence? = n.contentDescription
+        override fun text(n: AccessibilityNodeInfo): CharSequence? = n.text
+        override fun bounds(n: AccessibilityNodeInfo): Box { n.getBoundsInScreen(r); return r.toBox() }
+        override fun childCount(n: AccessibilityNodeInfo) = n.childCount
+        override fun child(n: AccessibilityNodeInfo, i: Int): AccessibilityNodeInfo? = n.getChild(i)
     }
 }
+
+private fun Rect.toBox() = Box(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())

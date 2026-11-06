@@ -1,6 +1,6 @@
 package com.tamacookie.feature.mischief
 
-import android.graphics.Rect
+import com.tamacookie.Box
 import com.tamacookie.Act
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
@@ -55,7 +55,7 @@ interface MischiefCtx : PetCtx {
 class MischiefState {
     // S'asseoir sur un bouton / une icône / le clavier
     var squatLimit = 20f
-    var squatRect = Rect()
+    var squatRect = Box(0f, 0f, 0f, 0f)
     var squatKbd = false
     var squatVersion = 0
 
@@ -69,9 +69,10 @@ class MischiefState {
     var giggleIn = 5f
 }
 
-/** Ce que l'utilisateur vient de faire (lu dans `Platforms` par le contrôleur). */
+/** Ce que l'utilisateur vient de faire (signaux du port `ScreenSensor`, lus par le contrôleur). */
 class UserEvents {
-    var click = false
+    /** Le bouton qu'il vient de toucher (null = pas de clic). */
+    var click: Box? = null
     var scroll = false
     /** Frappes au clavier accumulées depuis la dernière réaction à la frappe. */
     var typing = 0

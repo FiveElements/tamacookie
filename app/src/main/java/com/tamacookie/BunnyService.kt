@@ -10,7 +10,6 @@ import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -122,10 +121,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Fenêtres créées et domaines câblés : les intents peuvent être traités. */
     private var ready = false
 
-    // --- Plateformes (icônes / boutons) détectées : cache partagé, converti une fois par version ---
-    private var platCacheVersion = -1
-    private var platList: List<Platforms.P> = emptyList()
-    private var platBoxes: List<Box> = emptyList()
+    // --- Adaptateurs du processus ([AppGraph]) ---
+    private val graph: AppGraph by lazy { AppGraph.of(this) }
+    /** Ce que voit le service d'accessibilité (plateformes, pages, signaux). */
+    override val screen: ScreenSensor get() = graph.screen
 
     // --- Visibilité ---
     override var hidden = false
@@ -169,7 +168,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         repo = Pets.repository(this)
         resident = loadResident(BunnyPhysics(d))
         world.add(resident)
-        watcher = ForegroundAppWatcher(this)
+        watcher = ForegroundAppWatcher(this, screen)
         wm = getSystemService(WindowManager::class.java)
         overlayManager = OverlayManager(wm)
         windows = OverlayWindows(this, arena, { prefs }, overlayManager, bubbleAnchor)
@@ -718,7 +717,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private fun decideNext(p: Pet) {
         val b = p.body
         val st = p.stats
-        val boxes = platforms()
+        val boxes = screen.snapshot.platforms.boxes
         val input = BrainInput(
             energy = st.energy, satiety = st.satiety, happiness = st.happiness,
             personality = p.personality, hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
@@ -748,28 +747,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
     }
 
-    /** Icônes détectées, converties une seule fois par version de la liste. */
-    private fun platforms(): List<Box> {
-        val v = Platforms.version
-        if (v != platCacheVersion) {
-            platCacheVersion = v
-            platList = Platforms.list
-            platBoxes = platList.map { it.rect.toBox() }
-        }
-        return platBoxes
-    }
-
-    private fun Rect.toBox() = Box(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
-
     /** Si l'icône sous ses pattes a bougé ou disparu (défilement, changement d'app) : il tombe. */
     private fun checkPlatform(p: Pet) {
         val b = p.body
         val cur = b.platform ?: return
         if (b.act == Act.AIR || b.act == Act.DRAGGED) return
-        val boxes = platforms()
-        if (platCacheVersion == b.platVersionSeen) return
-        b.platVersionSeen = platCacheVersion
-        val same = boxes.firstOrNull {
+        val set = screen.snapshot.platforms
+        if (set.version == b.platVersionSeen) return
+        b.platVersionSeen = set.version
+        val same = set.boxes.firstOrNull {
             abs(it.top - cur.top) < Tuning.PLATFORM_SAME_DP * arena.d && b.fx >= it.left && b.fx <= it.right
         }
         if (same != null) {
@@ -788,23 +774,24 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private fun stepAir(p: Pet, dt: Float) {
         val b = p.body
         b.pose = Pose.AIR
-        val ev = b.phys.stepAir(dt, platforms())
+        val set = screen.snapshot.platforms
+        val ev = b.phys.stepAir(dt, set.boxes)
         if (b.phys.facing != 0f) b.facing = b.phys.facing
         when (ev) {
             AirEvent.ForcedLanded -> p.setAct(b.afterAir, 3f)
             AirEvent.Bounced -> haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
-            is AirEvent.Landed -> onLanded(p, ev)
+            is AirEvent.Landed -> onLanded(p, ev, set)
             AirEvent.Flying, AirEvent.HitWall -> {}
         }
     }
 
     /** Atterrissage sur une icône ou au sol : étourdi si brutal, sinon il reprend l'activité prévue. */
-    private fun onLanded(p: Pet, ev: AirEvent.Landed) {
+    private fun onLanded(p: Pet, ev: AirEvent.Landed, set: PlatformSet) {
         val b = p.body
         if (ev.onPlatform) {
-            b.platform = platBoxes[ev.platform]
-            b.platformLabel = platList.getOrNull(ev.platform)?.label
-            b.platVersionSeen = platCacheVersion
+            b.platform = set.boxes[ev.platform]
+            b.platformLabel = set.items.getOrNull(ev.platform)?.label
+            b.platVersionSeen = set.version
             haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
         }
         if (ev.hard) {

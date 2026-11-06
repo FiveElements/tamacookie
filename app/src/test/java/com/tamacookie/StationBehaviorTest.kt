@@ -13,7 +13,6 @@ import com.tamacookie.feature.station.Occupancy
 import com.tamacookie.feature.station.StationCtx
 import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.station.VetStation
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -47,11 +46,8 @@ class StationBehaviorTest {
     private val pet get() = ctx.pet
 
     @Before fun setUp() {
-        resetPlatforms()
         ctx = FakeStationCtx()
     }
-
-    @After fun tearDown() = resetPlatforms()
 
     /** Comme `StationController.enterStation`, sans les fenêtres. */
     private fun enter(k: StationKind, announce: Boolean = true, p: Pet = pet) {

@@ -28,6 +28,7 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override val clock = FakeClock()
     override val rnd = Random(seed)
     override val pages: PageTracker by lazy { PageTracker(this) }
+    override val screen = FakeScreenSensor()
     override val acts = ActRegistry()
 
     override val pet: Pet = testPet(BunnyPhysics(arena.d), rnd).also {
@@ -81,15 +82,4 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override fun setBunnyAway(away: Boolean, fadeIn: Boolean) { bunnyAway = away }
     override fun placeBunny() {}
     override fun setDockHiding(hiding: Boolean) { dockShowsHiding = hiding }
-}
-
-/** Remet l'état global des capteurs à zéro (il est partagé entre les tests). */
-fun resetPlatforms() {
-    Platforms.clear()                                  // liste vide (version incrémentée)
-    Platforms.connected = false; Platforms.screenOn = true
-    Platforms.ime = null; Platforms.clickRect = null
-    Platforms.clickVersion = 0; Platforms.typingVersion = 0; Platforms.scrollVersion = 0
-    Platforms.foregroundPkg = null; Platforms.viewKey = null
-    Platforms.scrollX0 = 0; Platforms.scrollX1 = 0; Platforms.scrollT0 = 0L; Platforms.scrollT1 = 0L
-    Platforms.pageW = 0f; Platforms.pageCount = 0; Platforms.launcherPkg = null
 }

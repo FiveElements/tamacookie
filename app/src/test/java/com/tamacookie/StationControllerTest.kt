@@ -4,7 +4,6 @@ import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.station.StationPanels
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -47,7 +46,6 @@ class StationControllerTest {
     private val here = "com.app.notes"
 
     @Before fun setUp() {
-        resetPlatforms()
         ctx = FakePetCtx()
         panels = FakeStationPanels()
         val toys = ToyController(ctx)
@@ -57,8 +55,6 @@ class StationControllerTest {
         sc.create()
         ctx.pages.currentView = here
     }
-
-    @After fun tearDown() = resetPlatforms()
 
     /** Installe [k] sur la vue courante (panneau 🏠) et la montre. */
     private fun install(k: StationKind): Station {

@@ -6,7 +6,6 @@ import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
 import com.tamacookie.Pet
-import com.tamacookie.Platforms
 import com.tamacookie.Tuning
 import com.tamacookie.ViewKey
 import com.tamacookie.feature.Travel
@@ -27,7 +26,8 @@ object HideSeekMischief : Mischief {
     /** Possible seulement sur le bureau, avec plusieurs pages (détectées via l'accessibilité). */
     override fun canStart(ctx: MischiefCtx, pet: Pet): Boolean {
         val (pkg, page) = ctx.pages.split(ctx.pages.currentView)
-        return Platforms.connected && page != null && Platforms.pageCount >= 2 && pkg == Platforms.launcherPkg
+        val s = ctx.screen.snapshot
+        return s.connected && page != null && s.pageCount >= 2 && pkg == s.launcherPkg
     }
 
     override fun start(ctx: MischiefCtx, pet: Pet) = startFrom(ctx, pet, fromMenu = false)
@@ -37,14 +37,14 @@ object HideSeekMischief : Mischief {
         if (ctx.world.stationOf(pet) != null || pet.stats.sleeping || pet.isHiding) return false
         if (!canStart(ctx, pet)) {
             if (fromMenu) ctx.say(
-                if (!Platforms.connected) "Active l'accessibilité pour jouer à cache-cache 🫣"
+                if (!ctx.screen.snapshot.connected) "Active l'accessibilité pour jouer à cache-cache 🫣"
                 else "Va sur l'écran d'accueil pour jouer à cache-cache ! 🏠", 3f
             )
             return false
         }
         val a = ctx.arena
         val (pkg, page) = ctx.pages.split(ctx.pages.currentView)
-        val target = (1..Platforms.pageCount).filter { it != page }.random(ctx.rnd)
+        val target = (1..ctx.screen.snapshot.pageCount).filter { it != page }.random(ctx.rnd)
         ctx.state.hidingView = ViewKey.of(pkg, target)
         pet.body.targetX = if (target > page!!) a.screenW + a.bw else -a.bw.toFloat()
         ctx.noteInteraction()

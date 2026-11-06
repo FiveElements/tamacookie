@@ -25,6 +25,8 @@ interface PetCtx {
     val prefs: SharedPreferences
     /** Vues / pages du bureau et défilement (où se trouve chaque chose). */
     val pages: PageTracker
+    /** Ce que voit le service d'accessibilité : plateformes, clavier, pages du bureau, signaux de l'utilisateur. */
+    val screen: ScreenSensor
     /** Quelle fonctionnalité prend en charge l'activité courante d'un animal (stations…). */
     val acts: ActRegistry
 

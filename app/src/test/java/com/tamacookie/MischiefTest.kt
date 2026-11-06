@@ -11,7 +11,6 @@ import com.tamacookie.feature.mischief.Mischiefs
 import com.tamacookie.feature.mischief.ScrollDizzy
 import com.tamacookie.feature.mischief.SquatMischief
 import com.tamacookie.feature.mischief.UserEvents
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -30,13 +29,10 @@ class MischiefTest {
     private val pet get() = ctx.pet
 
     @Before fun setUp() {
-        resetPlatforms()
         ctx = FakePetCtx()
         mis = MischiefController(ctx)
         mis.registerActs(ctx.acts)
     }
-
-    @After fun tearDown() = resetPlatforms()
 
     /** Bêtise factice pour le choix : probabilité fixe, possible ou non, démarre ou non. */
     private class Fake(val c: Float, val ok: Boolean = true, val starts: Boolean = true) : Mischief {
@@ -158,6 +154,51 @@ class MischiefTest {
     }
 
     @Test
+    fun `bouton - il s'installe sur une icone du capteur et tombe quand elle disparait`() {
+        val icon = Box(400f, 1000f, 500f, 1100f)
+        ctx.screen.update { copy(connected = true) }
+        ctx.screen.platforms(icon)
+        val m = fakeMctx()
+        assertTrue(SquatMischief.canStart(m, pet))
+        assertTrue(SquatMischief.start(m, pet))
+        assertEquals(icon, m.state.squatRect)
+        assertEquals(Act.AIR, pet.act)                              // il saute dessus
+        assertEquals(Act.SQUAT, pet.body.afterAir)
+        pet.setAct(Act.SQUAT)
+        SquatMischief.update(m, pet, 0.1f)
+        assertEquals(Act.SQUAT, pet.act)
+        ctx.screen.platforms(Box(420f, 1000f, 520f, 1100f))          // nouvelle liste, toujours sous lui
+        SquatMischief.update(m, pet, 0.1f)
+        assertEquals(Act.SQUAT, pet.act)
+        ctx.screen.platforms(Box(800f, 300f, 900f, 400f))            // l'icône a disparu
+        SquatMischief.update(m, pet, 0.1f)
+        assertEquals(Act.AIR, pet.act)
+    }
+
+    @Test
+    fun `bouton - petit monstre, il s'assoit sur le clavier et tombe quand il se ferme`() {
+        val kb = Box(0f, 1500f, 1080f, 2000f)
+        ctx.screen.update { copy(ime = kb) }
+        val m = object : MischiefCtx, PetCtx by ctx {
+            override val level = 2
+            override var cooldownUntil = 0L
+            override val state = com.tamacookie.feature.mischief.MischiefState()
+        }
+        val ev = UserEvents().apply { typing = UserEvents.TYPING_BURST }
+        var tries = 0
+        while (!SquatMischief.react(m, pet, ev)) { ev.typing = UserEvents.TYPING_BURST; assertTrue(++tries < 100) }
+        assertTrue(m.state.squatKbd)
+        assertEquals(kb.top, m.state.squatRect.top, 0f)
+        assertTrue(m.state.squatRect.left in 270f..810f)
+        pet.setAct(Act.SQUAT)
+        SquatMischief.update(m, pet, 0.1f)
+        assertEquals(Act.SQUAT, pet.act)
+        ctx.screen.update { copy(ime = null) }
+        SquatMischief.update(m, pet, 0.1f)
+        assertEquals(Act.AIR, pet.act)
+    }
+
+    @Test
     fun `bouton - il se lasse et descend`() {
         pet.setAct(Act.SQUAT)
         pet.body.actTime = 61f                                      // au-delà de toute limite
@@ -190,7 +231,7 @@ class MischiefTest {
         mis.checkUserEvents()                                       // première lecture des compteurs
         var steps = 0
         while (pet.act != Act.DIZZY) {
-            Platforms.scrollVersion++
+            ctx.screen.emit(UserSignal.Scroll)
             mis.checkUserEvents()
             assertTrue("jamais étourdi", ++steps < 5_000)
         }
@@ -198,7 +239,7 @@ class MischiefTest {
         // pendant la pause, plus de réaction
         pet.setAct(Act.IDLE)
         val said = ctx.said.size
-        repeat(500) { Platforms.scrollVersion++; mis.checkUserEvents() }
+        repeat(500) { ctx.screen.emit(UserSignal.Scroll); mis.checkUserEvents() }
         assertEquals(said, ctx.said.size)
         assertEquals(Act.IDLE, pet.act)
     }
@@ -206,11 +247,11 @@ class MischiefTest {
     @Test
     fun `frappe - taquin il commente le clavier sans s'y asseoir`() {
         mis.level = 1
-        Platforms.ime = android.graphics.Rect()
+        ctx.screen.update { copy(ime = Box(0f, 1500f, 1080f, 2000f)) }
         mis.checkUserEvents()
         var steps = 0
         while (ctx.said.isEmpty()) {
-            repeat(UserEvents.TYPING_BURST) { Platforms.typingVersion++; mis.checkUserEvents() }
+            repeat(UserEvents.TYPING_BURST) { ctx.screen.emit(UserSignal.Typing); mis.checkUserEvents() }
             assertTrue("il ne dit jamais rien", ++steps < 200)
         }
         assertTrue(ctx.said.single().let { "écris" in it || "tapes" in it || "coucou" in it })

@@ -15,15 +15,15 @@ import com.tamacookie.feature.mischief.UserEvents
  * chaque bêtise est dans son `object` (`feature/mischief/`) ; ses activités passent par [ActRegistry]
  * ([registerActs]).
  *
- * Ne dépend que de [PetCtx] (testable avec `FakePetCtx`) ; agit sur [PetCtx.pet].
+ * Ne dépend que de [PetCtx] (testable avec `FakePetCtx`) ; agit sur [PetCtx.pet]. Les clics / frappes /
+ * défilements arrivent par [PetCtx.screen] ([ScreenSensor.takeSignals]), sans perte.
  */
 class MischiefController(private val ctx: PetCtx, private val all: List<Mischief> = Mischiefs.ALL) {
     /** 0 sage, 1 taquin, 2 petit monstre. */
     var level = 1
     private var cooldownUntil = 0L
-    private var seenClick = -1
-    private var seenTyping = -1
-    private var seenScroll = -1
+    /** Premier passage fait : les signaux reçus avant (lapin pas encore là) sont ignorés. */
+    private var primed = false
     private val events = UserEvents()
     private val state = MischiefState()
 
@@ -60,7 +60,7 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
     fun loadLevel() { level = ctx.prefs.getInt(Prefs.MISCHIEF, 1) }
 
     private fun exemptApp(): Boolean {
-        val pkg = (Platforms.foregroundPkg ?: ctx.foregroundPkg() ?: "").lowercase()
+        val pkg = (ctx.screen.snapshot.foregroundPkg ?: ctx.foregroundPkg() ?: "").lowercase()
         return EXEMPT.any { it in pkg }
     }
 
@@ -81,20 +81,38 @@ class MischiefController(private val ctx: PetCtx, private val all: List<Mischief
         return Mischiefs.seek(all, level, ctx.rnd, { it.canStart(mctx, p) }, { it.start(mctx, p) }) != null
     }
 
-    /** Réagit à ce que fait l'utilisateur (clics, frappe au clavier, défilement). */
+    /**
+     * Réagit à ce que fait l'utilisateur (clics, frappe au clavier, défilement), une fois par image.
+     * Chaque frappe compte ; chaque clic est proposé aux bêtises, dans l'ordre, jusqu'à la première qui
+     * réagit ; le défilement compte une fois par image (il arrive en rafale).
+     */
     fun checkUserEvents() {
-        val cv = Platforms.clickVersion; val tv = Platforms.typingVersion; val sv = Platforms.scrollVersion
-        val newClick = seenClick != -1 && cv != seenClick
-        val newType = seenTyping != -1 && tv != seenTyping
-        val newScroll = seenScroll != -1 && sv != seenScroll
-        seenClick = cv; seenTyping = tv; seenScroll = sv
+        val signals = ctx.screen.takeSignals().let { if (primed) it else emptyList() }
+        primed = true
         if (level == 0 || pet.stats.sleeping || ctx.world.stationOf(pet) != null || ctx.hidden) return
-        if (newType) events.typing++
+        var clicked = false
+        var scrolled = false
+        for (s in signals) when (s) {
+            UserSignal.Typing -> events.typing++
+            UserSignal.Scroll -> scrolled = true
+            is UserSignal.Click -> clicked = true
+        }
         val now = ctx.clock.wallMs()
         if (pet.body.act !in Act.FREE || now < cooldownUntil || exemptApp()) return
-        events.click = newClick; events.scroll = newScroll; events.now = now
+        events.scroll = scrolled; events.now = now
         val p = pet
-        Mischiefs.react(all) { it.react(mctx, p, events) }
+        if (!clicked) {
+            events.click = null
+            Mischiefs.react(all) { it.react(mctx, p, events) }
+            return
+        }
+        for (s in signals) {
+            if (s !is UserSignal.Click) continue
+            events.click = s.box
+            if (Mischiefs.react(all) { it.react(mctx, p, events) } != null) break
+            events.scroll = false                                   // le défilement n'est proposé qu'une fois
+        }
+        events.click = null
     }
 
     // --- Cache-cache (menu, changement de vue, dodo, glisser) ---

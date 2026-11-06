@@ -13,12 +13,12 @@ import android.os.SystemClock
 
 /**
  * Détecte l'application au premier plan.
- *  - Si le service d'accessibilité est connecté, il fournit déjà l'app (Platforms.foregroundPkg) :
+ *  - Si le service d'accessibilité est connecté, il fournit déjà l'app ([ScreenSnapshot.foregroundPkg]) :
  *    on ne touche pas à UsageStats.
  *  - Sinon, via UsageStatsManager (permission "Accès aux données d'utilisation"), au plus
  *    toutes les [MIN_QUERY_INTERVAL_MS], et jamais écran éteint.
  */
-class ForegroundAppWatcher(private val context: Context) {
+class ForegroundAppWatcher(private val context: Context, private val screen: ScreenSensor) {
 
     data class AppInfo(val pkg: String, val label: String, val category: Int, val isHome: Boolean)
 
@@ -43,11 +43,12 @@ class ForegroundAppWatcher(private val context: Context) {
 
     /** Retourne la nouvelle app si elle a changé depuis le dernier appel, sinon null. */
     fun poll(): AppInfo? {
-        if (!Platforms.screenOn || power?.isInteractive == false) return null
+        val s = screen.snapshot
+        if (!s.screenOn || power?.isInteractive == false) return null
 
         // L'accessibilité donne déjà l'app au premier plan : pas de requête UsageStats.
-        if (Platforms.connected) {
-            val pkg = Platforms.foregroundPkg ?: return null
+        if (s.connected) {
+            val pkg = s.foregroundPkg ?: return null
             return changedTo(pkg)
         }
 

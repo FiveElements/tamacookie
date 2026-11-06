@@ -7,11 +7,13 @@ import kotlin.math.abs
  * Chaque objet reste sur la vue où il est posé ; le lapin vit sur une page du bureau :
  * il défile avec elle, peut partir explorer la page voisine, et revient sur la page affichée.
  *
- * Ne dépend que de [PetCtx] (et de l'état global [Platforms]) : testable avec `FakePetCtx`.
+ * Ne dépend que de [PetCtx] (écran : [PetCtx.screen]) : testable avec `FakePetCtx`.
  */
 class PageTracker(private val ctx: PetCtx) {
     private val arena get() = ctx.arena
     private val pet: Pet get() = ctx.pet
+    /** État de l'écran (immuable) : relu à chaque appel. */
+    private val screen: ScreenSnapshot get() = ctx.screen.snapshot
     /** Vue affichée ("pkg" ou "pkg#p2"). */
     var currentView = ""
 
@@ -45,7 +47,7 @@ class PageTracker(private val ctx: PetCtx) {
 
     /** Nouvelle orientation : la largeur des pages du bureau change. */
     fun onScreenResized() {
-        Platforms.pageW = 0f
+        ctx.screen.setPageWidth(0f)
         savedPageW = -1f
         pageWKey = null
         scrollShown = Float.NaN
@@ -69,35 +71,38 @@ class PageTracker(private val ctx: PetCtx) {
         if (savedPageW < 0f) {
             savedPageW = ctx.prefs.getFloat(key, 0f)
             if (!ScrollMath.plausiblePageWidth(savedPageW, arena.screenW)) savedPageW = 0f
-            if (Platforms.pageW <= 0f && savedPageW > 0f) Platforms.pageW = savedPageW
-        } else if (Platforms.pageW > 0f && Platforms.pageW != savedPageW) {
-            savedPageW = Platforms.pageW
+            if (screen.pageW <= 0f && savedPageW > 0f) ctx.screen.setPageWidth(savedPageW)
+        } else {
+            val pw = screen.pageW
+            if (pw <= 0f || pw == savedPageW) return
+            savedPageW = pw
             ctx.prefs.edit().putFloat(key, savedPageW).apply()
         }
     }
 
     /** Position de défilement du bureau estimée maintenant (extrapolée entre deux événements). */
     private fun updateScroll() {
-        val t1 = Platforms.scrollT1
-        if (t1 == 0L) return
-        val est = ScrollMath.estimate(Platforms.scrollX0, Platforms.scrollT0, Platforms.scrollX1, t1, ctx.clock.uptimeMs())
+        val sc = screen.scroll
+        if (sc.t1 == 0L) return
+        val est = ScrollMath.estimate(sc.x0, sc.t0, sc.x1, sc.t1, ctx.clock.uptimeMs())
         scrollShown = if (scrollShown.isNaN() || abs(est - scrollShown) > arena.screenW * 1.5f) est
         else scrollShown + (est - scrollShown) * 0.5f
     }
 
     /** Le bureau défile (ou vient de défiler). */
     fun scrollingRecently(): Boolean {
-        val t1 = Platforms.scrollT1
+        val t1 = screen.scroll.t1
         return t1 != 0L && ctx.clock.uptimeMs() - t1 < Tuning.SCROLL_ACTIVE_MS
     }
 
     fun computeView(): String {
-        val k = Platforms.viewKey ?: return ctx.foregroundPkg() ?: currentView
+        val s = screen
+        val k = s.viewKey ?: return ctx.foregroundPkg() ?: currentView
         val (pkg, page) = split(k)
         // Sur le bureau, la page vient du défilement (instantané) plutôt que de l'indicateur (en retard)
-        val pw = Platforms.pageW
-        if (page != null && pkg == Platforms.launcherPkg && pw > 0f && !scrollShown.isNaN()) {
-            val p = ScrollMath.pageAt(scrollShown, pw, Platforms.pageCount)
+        val pw = s.pageW
+        if (page != null && pkg == s.launcherPkg && pw > 0f && !scrollShown.isNaN()) {
+            val p = ScrollMath.pageAt(scrollShown, pw, s.pageCount)
             if (pkg != lastViewPkg || p != lastViewPage) {
                 lastViewPkg = pkg; lastViewPage = p; lastViewKey = ViewKey.of(pkg, p)
             }
@@ -116,7 +121,7 @@ class PageTracker(private val ctx: PetCtx) {
         val (apkg, apage) = split(anchor)
         if (apage == null) return if (anchor == currentView) 0f else Float.NaN
         if (split(currentView).first != apkg) return Float.NaN
-        val pw = Platforms.pageW
+        val pw = screen.pageW
         if (pw <= 0f || scrollShown.isNaN()) return if (anchor == currentView) 0f else Float.NaN
         return ScrollMath.offset(apage, pw, scrollShown)
     }
@@ -130,12 +135,12 @@ class PageTracker(private val ctx: PetCtx) {
     /** Page du bureau affichée, 0 hors du bureau. */
     fun launcherPage(): Int {
         val (pkg, page) = split(currentView)
-        return if (page != null && pkg == Platforms.launcherPkg) page else 0
+        return if (page != null && pkg == screen.launcherPkg) page else 0
     }
 
     /** Vue où se trouve le lapin (sa page du bureau, sinon la vue affichée). */
     fun bunnyView(): String {
-        val pkg = Platforms.launcherPkg
+        val pkg = screen.launcherPkg
         return if (bunnyPage > 0 && launcherPage() != 0 && pkg != null) ViewKey.of(pkg, bunnyPage) else currentView
     }
 
@@ -165,7 +170,7 @@ class PageTracker(private val ctx: PetCtx) {
             bunnyPage = 0; bunnyShift = 0f; returnAt = 0L
             return
         }
-        val pw = Platforms.pageW
+        val pw = screen.pageW
         if (bunnyPage <= 0 || pet.body.act in Act.NO_PAGE_FOLLOW || pw <= 0f || scrollShown.isNaN()) {
             if (bunnyShift != 0f) pet.body.fx += bunnyShift
             bunnyPage = cp; bunnyShift = 0f
@@ -194,14 +199,15 @@ class PageTracker(private val ctx: PetCtx) {
     /** Il peut partir explorer une page voisine du bureau. */
     fun canPageWander(): Boolean {
         val cp = launcherPage()
-        return cp != 0 && bunnyPage == cp && Platforms.pageCount >= 2 && Platforms.pageW > 0f && !scrollShown.isNaN()
+        val s = screen
+        return cp != 0 && bunnyPage == cp && s.pageCount >= 2 && s.pageW > 0f && !scrollShown.isNaN()
     }
 
     /** Il part explorer une page voisine du bureau. */
     fun startPageWander(): Boolean {
         if (!canPageWander()) return false
         val cp = launcherPage()
-        val n = Platforms.pageCount
+        val n = screen.pageCount
         wanderDir = when { cp <= 1 -> 1; cp >= n -> -1; else -> if (ctx.rnd.nextBoolean()) 1 else -1 }
         pet.body.targetX = if (wanderDir > 0) arena.screenW + arena.bw else -arena.bw.toFloat()
         pet.body.facing = wanderDir.toFloat()
@@ -215,7 +221,7 @@ class PageTracker(private val ctx: PetCtx) {
     fun updatePageOut(pet: Pet, dt: Float) {
         val d = arena.d
         if (ctx.actor.walkToward(pet, pet.body.targetX, Tuning.PAGE_OUT_DP * d, dt, clamp = false)) {
-            val pw = Platforms.pageW
+            val pw = screen.pageW
             if (pw <= 0f || bunnyPage <= 0) { pet.body.fx = pet.body.fx.coerceIn(arena.minX, arena.maxX); pet.setAct(Act.IDLE, 2f); return }
             bunnyPage += wanderDir
             pet.body.fx -= wanderDir * pw
@@ -233,7 +239,7 @@ class PageTracker(private val ctx: PetCtx) {
         val now = ctx.clock.uptimeMs()
         val hasStuff = ctx.world.hasToyOrFood()
         val act = pet.body.act
-        when (BunnyBrain.pageReturn(now, Platforms.scrollT1, act in Act.RUSH_BACK, hasStuff, returnAt,
+        when (BunnyBrain.pageReturn(now, screen.scroll.t1, act in Act.RUSH_BACK, hasStuff, returnAt,
             act in Act.CAN_COME_BACK, pet.stats.sleeping)) {
             BunnyBrain.PageReturn.SCROLLING -> {}
             BunnyBrain.PageReturn.RUSH -> rebaseToActivePage()

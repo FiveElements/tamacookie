@@ -76,7 +76,7 @@ class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     /** Icône / bouton sous ses pattes, null = le sol. */
     var platform: Box? = null
     var platformLabel: String? = null
-    /** Version de [Platforms] déjà vérifiée pour la plateforme courante. */
+    /** Version des plateformes ([PlatformSet.version]) déjà vérifiée pour la plateforme courante. */
     var platVersionSeen = -1
 
     fun setAct(a: Act, duration: Float = 3f) {

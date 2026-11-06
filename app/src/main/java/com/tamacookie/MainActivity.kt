@@ -270,7 +270,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         setPerm(overlayBtn, overlay, "Afficher par-dessus les autres apps", "obligatoire")
         setPerm(notifBtn, notif, "Notifications", "recommandé")
         setPerm(usageBtn, usage, "Accès aux données d'utilisation", "pour qu'il te suive d'app en app")
-        val a11y = Platforms.isEnabled(this)
+        val a11y = ScreenSensorService.isEnabled(this)
         setPerm(a11yBtn, a11y, "Sauter sur les icônes (accessibilité)", "optionnel")
         a11yHelp.visibility = if (a11y) View.GONE else View.VISIBLE
 

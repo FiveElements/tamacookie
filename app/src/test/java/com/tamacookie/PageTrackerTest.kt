@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,21 +13,17 @@ class PageTrackerTest {
     private val pet get() = ctx.pet
 
     @Before fun setUp() {
-        resetPlatforms()
         ctx = FakePetCtx()
         pages = ctx.pages
     }
 
-    @After fun tearDown() = resetPlatforms()
-
     /** Bureau de [count] pages de la largeur de l'écran, au repos sur la page 1. */
     private fun desktop(count: Int = 3) {
-        Platforms.launcherPkg = "launcher"
-        Platforms.pageCount = count
-        Platforms.pageW = ctx.arena.screenW
-        Platforms.viewKey = "launcher#p1"
-        Platforms.scrollX0 = 0; Platforms.scrollX1 = 0
-        Platforms.scrollT0 = ctx.clock.uptime - 100_000; Platforms.scrollT1 = ctx.clock.uptime - 100_000
+        val t = ctx.clock.uptime - 100_000
+        ctx.screen.update {
+            copy(launcherPkg = "launcher", pageCount = count, pageW = ctx.arena.screenW, viewKey = "launcher#p1",
+                scroll = ScrollSamples(0, t, 0, t))
+        }
         assertTrue(pages.refresh())
     }
 
@@ -44,7 +39,7 @@ class PageTrackerTest {
     @Test
     fun `le defilement recent se mesure avec l'horloge injectee`() {
         assertFalse(pages.scrollingRecently())
-        Platforms.scrollT1 = ctx.clock.uptime
+        ctx.screen.update { copy(scroll = ScrollSamples(t1 = ctx.clock.uptime)) }
         ctx.clock.advance(100)
         assertTrue(pages.scrollingRecently())
         ctx.clock.advance(Tuning.SCROLL_ACTIVE_MS)
@@ -117,5 +112,49 @@ class PageTrackerTest {
         assertEquals(Act.TRAVEL_IN, pet.act)
         assertEquals(1, pages.bunnyPage)
         assertTrue(pet.mind.travelComment != null)
+    }
+
+    // --- Alimenté par le port ScreenSensor ---
+
+    @Test
+    fun `largeur de page memorisee - envoyee au capteur, puis la largeur apprise est memorisee`() {
+        val key = Prefs.pageWidth(1080)
+        ctx.prefs.edit().putFloat(key, 1000f).apply()
+        pages.refresh()
+        assertEquals(1000f, ctx.screen.snapshot.pageW, 0f)
+        ctx.screen.setPageWidth(1070f)                               // apprise par le service d'accessibilité
+        pages.refresh()
+        assertEquals(1070f, ctx.prefs.getFloat(key, 0f), 0f)
+    }
+
+    @Test
+    fun `largeur memorisee invraisemblable ignoree, rotation - largeur oubliee`() {
+        ctx.prefs.edit().putFloat(Prefs.pageWidth(1080), 300f).apply()
+        pages.refresh()
+        assertEquals(0f, ctx.screen.snapshot.pageW, 0f)
+        desktop()
+        pages.onScreenResized()
+        assertEquals(0f, ctx.screen.snapshot.pageW, 0f)
+    }
+
+    @Test
+    fun `la page affichee suit le defilement avant l'indicateur`() {
+        desktop()
+        val t = ctx.clock.uptime - 50_000
+        ctx.screen.update { copy(scroll = ScrollSamples(1080, t, 1080, t)) }   // page 2, indicateur encore sur 1
+        var n = 0
+        while (!pages.refresh()) assertTrue(++n < 20)
+        assertEquals("launcher#p2", pages.currentView)
+        assertEquals(2, pages.launcherPage())
+        pages.bunnyPage = 3
+        assertEquals("launcher#p3", pages.bunnyView())               // sa page, sur le bureau du capteur
+    }
+
+    @Test
+    fun `sans accessibilite la vue vient de l'application au premier plan`() {
+        ctx.foreground = "com.example.chat"
+        assertTrue(pages.refresh())
+        assertEquals("com.example.chat", pages.currentView)
+        assertEquals(0, pages.launcherPage())
     }
 }
