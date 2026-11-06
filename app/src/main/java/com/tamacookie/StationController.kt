@@ -104,23 +104,26 @@ class StationController(
         StationKind.values().forEachIndexed { i, k ->
             val s = Station(k, (k.wDp * d).toInt(), (k.hDp * d).toInt())
             s.anchor = prefs.getString(Prefs.stationAnchor(k), null)
-            placeStation(s, savedCx(prefs, k, i), savedCy(prefs, k))
+            placeStation(s, savedCx(prefs, k, i), savedCy(prefs, k, i))
             stations[k] = s
             list.add(s)
         }
         all = list.toTypedArray()
     }
 
+    /** Placement par défaut : quatre par rangée (les quatre premières : la rangée d'origine). */
     private fun savedCx(prefs: SharedPreferences, k: StationKind, i: Int): Float =
-        prefs.getFloat(Prefs.stationFx(k), -1f).let { if (it < 0) arena.screenW * (0.2f + 0.2f * i) else it * arena.screenW }
+        prefs.getFloat(Prefs.stationFx(k), -1f).let { if (it < 0) arena.screenW * (0.2f + 0.2f * (i % 4)) else it * arena.screenW }
 
-    private fun savedCy(prefs: SharedPreferences, k: StationKind): Float =
-        prefs.getFloat(Prefs.stationFy(k), -1f).let { if (it < 0) arena.topY + (arena.groundY - arena.topY) * 0.32f else it * arena.groundY }
+    private fun savedCy(prefs: SharedPreferences, k: StationKind, i: Int): Float =
+        prefs.getFloat(Prefs.stationFy(k), -1f).let {
+            if (it < 0) arena.topY + (arena.groundY - arena.topY) * (0.32f + 0.3f * (i / 4)) else it * arena.groundY
+        }
 
     /** Nouvelle taille d'écran : positions recalculées depuis les fractions sauvegardées. */
     fun reloadPositions() {
         val prefs = ctx.prefs
-        all.forEachIndexed { i, s -> placeStation(s, savedCx(prefs, s.kind, i), savedCy(prefs, s.kind)) }
+        all.forEachIndexed { i, s -> placeStation(s, savedCx(prefs, s.kind, i), savedCy(prefs, s.kind, i)) }
     }
 
     private fun placeStation(s: Station, cx: Float, cy: Float) {
@@ -240,10 +243,11 @@ class StationController(
         redraw(s)
     }
 
-    /** Assoit [p] à sa place dans la station ([StationBehavior.seat]). */
+    /** Assoit [p] à sa place dans la station ([StationBehavior.seatFor] : selon son rang d'arrivée). */
     fun positionInStation(p: Pet, k: StationKind) {
         val s = get(k)
-        val seat = k.behavior.seat
+        val rank = ctx.world.station(k).occupants.indexOfFirst { it.value == p.id.value }.coerceAtLeast(0)
+        val seat = k.behavior.seatFor(rank)
         p.body.fx = s.cx + seat.dxDp * d; p.body.fy = s.bottom - seat.aboveBottomDp * d
         ctx.place(p)
     }

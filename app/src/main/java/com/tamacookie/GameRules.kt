@@ -67,6 +67,20 @@ data class GameRules(
     /** Personne ne l'a trouvé : il abandonne. */
     val notFoundJoyCost: Float = 3f,
 
+    // --- Stations de l'évolution 4a ---
+    /** Endormi dans le lit : énergie regagnée par heure **en plus** de [energyGainAsleepPerH]. */
+    val bedEnergyGainPerH: Float = 25f,
+    /** Un tour de roue : il se fatigue, ça le rend heureux (×[StatMod.PLAY_JOY]), ça creuse un peu. */
+    val wheelEnergyCost: Float = 10f,
+    val wheelJoy: Float = 10f,
+    val wheelSatietyCost: Float = 3f,
+    /** Le jardin : petite joie, quelques brins d'herbe, un peu de terre sur le pelage. */
+    val gardenJoy: Float = 5f,
+    val gardenSatiety: Float = 3f,
+    val gardenCleanlinessCost: Float = 4f,
+    /** La gamelle : il y mange s'il a faim (satiété sous ce seuil), sinon il renifle et ressort. */
+    val bowlHungryBelow: Float = 70f,
+
     // --- Humeur (ordre de priorité dans [PetRules.mood]) ---
     val sickBelow: Float = 35f,
     val hungryBelow: Float = 20f,

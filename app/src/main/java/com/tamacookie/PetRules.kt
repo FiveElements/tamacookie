@@ -34,8 +34,9 @@ data class PetStats(
 /** Ce qui fait évoluer les jauges. [savesNow] : l'hôte sauvegarde aussitôt (sinon à la prochaine sauvegarde périodique). */
 sealed interface PetEvent {
     val savesNow: Boolean get() = when (this) {
-        is Fed, PlayStarted, Bathed, PoopRemoved, Healed, FellAsleep, is Woken, Caged, Released -> true
-        is Elapsed, Petted, is PlayHit, AppVisited, HardLanding, Found, NotFound -> false
+        is Fed, PlayStarted, Bathed, PoopRemoved, Healed, FellAsleep, is Woken, Caged, Released,
+        WheelRun, Grazed -> true
+        is Elapsed, Petted, is PlayHit, AppVisited, HardLanding, Found, NotFound, is Rested -> false
     }
 
     /** Le temps passe ([hours] heures ; plafonné à [GameRules.maxElapsedHours]). */
@@ -62,6 +63,14 @@ sealed interface PetEvent {
     data object Found : PetEvent
     /** Personne ne l'a trouvé à cache-cache. */
     data object NotFound : PetEvent
+
+    // --- Évolution 4a : stations ---
+    /** Il dort dans le lit depuis [hours] heures (en plus du temps qui passe) : énergie en plus. */
+    data class Rested(val hours: Float) : PetEvent
+    /** Un tour de roue (refusé s'il est trop fatigué ou endormi). */
+    data object WheelRun : PetEvent
+    /** Il a grignoté et s'est roulé dans le jardin. */
+    data object Grazed : PetEvent
 }
 
 /** Conséquences d'un événement, à mettre en scène par l'appelant. */
@@ -150,6 +159,23 @@ object PetRules {
             PetEvent.Released -> done(s.copy(caged = false), r)
             PetEvent.Found -> done(s.copy(happiness = s.happiness + r.foundJoy), r)
             PetEvent.NotFound -> done(s.copy(happiness = s.happiness - r.notFoundJoyCost), r)
+            is PetEvent.Rested -> {
+                if (!s.sleeping || event.hours <= 0f) return Result(s)
+                done(s.copy(energy = s.energy + r.bedEnergyGainPerH * minOf(event.hours, r.maxElapsedHours)), r)
+            }
+            PetEvent.WheelRun -> {
+                if (s.energy < r.playMinEnergy || s.sleeping) return refused(s)
+                done(s.copy(
+                    energy = s.energy - r.wheelEnergyCost,
+                    happiness = s.happiness + r.wheelJoy * p.mod(StatMod.PLAY_JOY),
+                    satiety = s.satiety - r.wheelSatietyCost,
+                ), r)
+            }
+            PetEvent.Grazed -> done(s.copy(
+                happiness = s.happiness + r.gardenJoy,
+                satiety = s.satiety + r.gardenSatiety,
+                cleanliness = s.cleanliness - r.gardenCleanlinessCost,
+            ), r)
         }
     }
 

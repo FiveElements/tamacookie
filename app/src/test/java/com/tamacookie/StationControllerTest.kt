@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.feature.station.BedStation
 import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.station.StationPanels
 import com.tamacookie.feature.toy.Food
@@ -186,5 +187,37 @@ class StationControllerTest {
         sc.layout()
         sc.update(0.5f)
         assertEquals(0.5f, s.t, 1e-6f)          // pas affichée : pas animée
+    }
+
+    @Test fun `deux animaux dans le lit, chacun a sa place`() {
+        val s = install(StationKind.BED)
+        val other = ctx.addPet("seconde")
+        pet.stats = pet.stats.copy(energy = 30f)
+        other.stats = other.stats.copy(energy = 30f)
+        sc.enterStation(StationKind.BED)
+        sc.enterStation(StationKind.BED, p = other)
+        assertEquals(StationKind.BED, ctx.world.stationOf(other))
+        assertTrue(pet.stats.sleeping && other.stats.sleeping)
+        assertEquals(s.cx + BedStation.seatFor(0).dxDp, pet.body.fx, 0.01f)
+        assertEquals(s.cx + BedStation.seatFor(1).dxDp, other.body.fx, 0.01f)
+        // un troisième ne rentre pas
+        val third = ctx.addPet("troisieme")
+        sc.enterStation(StationKind.BED, p = third)
+        assertNull(ctx.world.stationOf(third))
+        // le premier sort : la place reste au second
+        sc.leaveStation(pet, hopOut = false)
+        assertFalse(pet.stats.sleeping)
+        assertTrue(s.occupied)
+        assertTrue(sc.touchGoesToPet(s))
+    }
+
+    @Test fun `les nouvelles stations ont leur place par defaut sur une deuxieme rangee`() {
+        val old = sc[StationKind.BATH]
+        val bed = sc[StationKind.BED]
+        val garden = sc[StationKind.GARDEN]
+        assertEquals(old.cx, bed.cx, 0.01f)                  // même colonne que la première…
+        assertTrue(bed.cy > old.cy)                          // … une rangée plus bas
+        assertTrue(garden.cx > bed.cx)
+        assertTrue(garden.cx + garden.w / 2f <= ctx.arena.screenW)
     }
 }

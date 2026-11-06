@@ -26,6 +26,28 @@ class PetRulesTest {
     private fun on(s: PetStats, ev: PetEvent, traits: Traits = Traits(), at: Long = now) = PetRules.apply(s, ev, at, traits)
 
     @Test
+    fun `evolution 4a - lit, roue, jardin`() {
+        val r = GameRules.DEFAULT
+        // le lit : seulement endormi, plafonné comme le temps qui passe, borné
+        assertEquals(40f + r.bedEnergyGainPerH * 2f, on(PetStats(energy = 40f, sleeping = true), PetEvent.Rested(2f)).stats.energy, eps)
+        assertEquals(PetStats(energy = 40f), on(PetStats(energy = 40f), PetEvent.Rested(2f)).stats)
+        assertEquals(100f, on(PetStats(energy = 95f, sleeping = true), PetEvent.Rested(1f)).stats.energy, eps)
+        // la roue : joie modulée par le caractère comme le jeu, refusée trop fatigué
+        val run = on(PetStats(energy = 50f, happiness = 50f, satiety = 50f), PetEvent.WheelRun, Traits(Personality.LAZY))
+        assertEquals(50f - r.wheelEnergyCost, run.stats.energy, eps)
+        assertEquals(50f + r.wheelJoy * Personality.LAZY.mod(StatMod.PLAY_JOY), run.stats.happiness, eps)
+        assertEquals(50f - r.wheelSatietyCost, run.stats.satiety, eps)
+        assertTrue(on(PetStats(energy = r.playMinEnergy - 1f), PetEvent.WheelRun).refused)
+        // le jardin
+        val g = on(PetStats(happiness = 99f, cleanliness = 2f), PetEvent.Grazed).stats
+        assertEquals(100f, g.happiness, eps)
+        assertEquals(0f, g.cleanliness, eps)
+        // sauvegarde immédiate : la roue et le jardin, pas le lit (chaque image)
+        assertTrue(PetEvent.WheelRun.savesNow && PetEvent.Grazed.savesNow)
+        assertFalse(PetEvent.Rested(0.1f).savesNow)
+    }
+
+    @Test
     fun `zero heure ne change rien`() {
         val r = on(PetStats(), Elapsed(0f))
         assertEquals(PetStats(), r.stats)
