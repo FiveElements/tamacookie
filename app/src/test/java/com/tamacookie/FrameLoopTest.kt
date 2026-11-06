@@ -1,8 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,7 +42,7 @@ class FrameLoopTest {
         }
     }
 
-    private class Harness(var state: BunnyRenderState, var invisible: Boolean = false, var fps: Int = Tuning.FPS_IDLE) {
+    private class Harness(var state: PetRenderState, var invisible: Boolean = false, var fps: Int = Tuning.FPS_IDLE) {
         val sched = FakeScheduler()
         val ambient = AmbientAnimator(Random(42))
         var shown = state
@@ -54,7 +51,7 @@ class FrameLoopTest {
         var redraws = 0
         val loop = FrameLoop(sched, uptimeMs = { sched.now }, targetFps = { fps }, canSuspend = { invisible }) { dt ->
             steps++; simulated += dt
-            // ce que fait BunnyView.render
+            // ce que fait PetView.render
             val old = shown
             shown = state
             if (ambient.frame(dt, old, state, 260f, 280f, 2f)) redraws++
@@ -62,7 +59,7 @@ class FrameLoopTest {
     }
 
     @Test fun `le lapin visible qui dort recoit des images, respire, fait des Zzz et se redessine`() {
-        val h = Harness(BunnyRenderState(pose = Pose.SLEEP, expr = Expr.SLEEPY), fps = Tuning.FPS_SLEEP)
+        val h = Harness(PetRenderState(pose = Pose.SLEEP, expr = Expr.SLEEPY), fps = Tuning.FPS_SLEEP)
         h.loop.start()
         h.sched.run(h.loop, 500)                      // il vient de s'endormir
         val t0 = h.ambient.t; val steps0 = h.steps; val redraws0 = h.redraws
@@ -81,7 +78,7 @@ class FrameLoopTest {
     @Test fun `les poses immobiles restent animees`() {
         for (pose in listOf(Pose.IDLE, Pose.SIT, Pose.SLEEP, Pose.EAT, Pose.DRAGGED)) {
             for (fps in listOf(Tuning.FPS_IDLE, Tuning.FPS_SLEEP)) {
-                val h = Harness(BunnyRenderState(pose = pose), fps = fps)
+                val h = Harness(PetRenderState(pose = pose), fps = fps)
                 h.loop.start()
                 h.sched.run(h.loop, 3_000)
                 assertFalse("$pose", h.loop.suspended)
@@ -95,7 +92,7 @@ class FrameLoopTest {
         assertEquals(0L, FrameLoop.frameDelayMs(Tuning.FPS_MOVING))
         assertEquals(17L, FrameLoop.frameDelayMs(Tuning.FPS_IDLE))
         assertEquals(67L, FrameLoop.frameDelayMs(Tuning.FPS_SLEEP))
-        val h = Harness(BunnyRenderState(pose = Pose.WALK), fps = Tuning.FPS_MOVING)
+        val h = Harness(PetRenderState(pose = Pose.WALK), fps = Tuning.FPS_MOVING)
         h.loop.start()
         h.sched.run(h.loop, 1_000)
         assertTrue("${h.steps}", h.steps in 55..65)
@@ -103,7 +100,7 @@ class FrameLoopTest {
     }
 
     @Test fun `invisible et rien a animer, la boucle se suspend mais la simulation avance, puis reprend`() {
-        val h = Harness(BunnyRenderState(pose = Pose.SLEEP), invisible = true, fps = Tuning.FPS_SLEEP)
+        val h = Harness(PetRenderState(pose = Pose.SLEEP), invisible = true, fps = Tuning.FPS_SLEEP)
         h.loop.start()
         h.sched.run(h.loop, 100)
         assertTrue(h.loop.suspended)

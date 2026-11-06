@@ -1,8 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel
@@ -190,7 +187,7 @@ class ToyController(private val ctx: PetCtx) {
             ctx.on(pet, PetEvent.Fed(b.eatingFood))
             ctx.emit(pet, PType.HEART, 3)
             pet.express(Expr.HAPPY, 2f)
-            ctx.speech.sayOneOf(Lines.ATE)
+            ctx.speech.sayOneOf(pet.species.lines.ATE)
             pet.setAct(Act.IDLE, 3f)
         }
     }
@@ -226,6 +223,7 @@ class ToyController(private val ctx: PetCtx) {
     // =====================================================================
     fun startPlay(toy: Toy, from: Station? = null) {
         val rnd = ctx.rnd
+        if (!pet.species.accepts(toy)) return
         if (refuses(pet, "Chut… il dort", noteFirst = false)) return
         if (ctx.on(pet, PetEvent.PlayStarted).refused) { ctx.say(ctx.speech.pickFrom(TOO_TIRED)); return }
         props.filter { it.toy != null }.forEach { removeProp(it) }
@@ -256,7 +254,7 @@ class ToyController(private val ctx: PetCtx) {
         val p = ctx.world.currentToy()
         pet.mind.playTime += dt
         if (p == null) { pet.setAct(Act.IDLE); return }
-        val limit = if (pet.personality == Personality.PLAYFUL) 50f else 35f
+        val limit = pet.species.behavior(pet.personality).playSeconds
         if (pet.mind.playTime > limit || pet.stats.energy < ctx.rules.playStopEnergyBelow) { endPlay(p); return }
         p.toy!!.spec.play(tctx, pet, p, dt)
     }

@@ -1,10 +1,9 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.persist.PetRecord
+import com.tamacookie.species.Species
 import kotlin.random.Random
 
 /** Identifiant stable d'un animal : UUID créé à l'adoption (ou à la migration), clé de la persistance et des échanges. */
@@ -22,13 +21,12 @@ data class Identity(
     val name: String = DEFAULT_NAME,
     /** Date de naissance (heure murale, ms). */
     val bornAt: Long = 0L,
-    /** Espèce (le lapin est la seule pour l'instant ; plugin `Species` à l'étape 7). */
-    val species: String = RABBIT,
+    /** Identifiant d'espèce ([Species.id], sauvegardé) ; résolu par [Species.of]. */
+    val species: String = Species.DEFAULT.id,
     val origin: Origin = Origin.Resident,
 ) {
     companion object {
         const val DEFAULT_NAME = "Cookie"
-        const val RABBIT = "rabbit"
         /** Longueur maximale d'un nom (écran d'adoption, renommage, échange). */
         const val MAX_NAME = 16
     }
@@ -40,7 +38,7 @@ data class Identity(
 /**
  * Corps : position (dans [phys]), activité courante, posture et orientation.
  * Les pieds sont en ([fx], [fy]), dans les coordonnées de sa page (voir [PageTracker.bunnyShift]).
- * Le rendu en est tiré à chaque image ([BunnyRenderState.of]) : la vue ne lit ni n'écrit le corps.
+ * Le rendu en est tiré à chaque image ([PetRenderState.of]) : la vue ne lit ni n'écrit le corps.
  */
 class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     var fx: Float
@@ -89,9 +87,12 @@ class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     }
 }
 
-/** Esprit : cerveau (décisions), son aléatoire, expression forcée et petits minuteurs de comportement. */
-class Mind(val rnd: Random) {
-    val brain = BunnyBrain(rnd)
+/**
+ * Esprit : cerveau (décisions, selon l'espèce), son aléatoire (propre à chaque animal), expression forcée et
+ * petits minuteurs de comportement.
+ */
+class Mind(val rnd: Random, species: Species = Species.DEFAULT) {
+    val brain = BunnyBrain(rnd, species)
 
     var exprOverride: Expr? = null
     var exprTimer = 0f
@@ -139,6 +140,8 @@ class Pet(
     var identity: Identity = identity
         private set
     val id: PetId = identity.id
+    /** Son espèce (plugin) : dessin, gabarit, influence du caractère, répliques. */
+    val species: Species = Species.of(identity.species)
     val name: String get() = identity.name
     val personality: Personality get() = traits.personality
     val favoriteToy: Toy get() = traits.favoriteToy
@@ -167,6 +170,6 @@ class Pet(
     companion object {
         /** Un animal chargé (sans rattrapage hors-ligne : à l'appelant d'appliquer [PetEvent.Elapsed]). */
         fun fromRecord(r: PetRecord, phys: BunnyPhysics, rnd: Random): Pet =
-            Pet(r.identity, r.traits, r.look, r.stats, Body(phys), Mind(rnd), r.adopted)
+            Pet(r.identity, r.traits, r.look, r.stats, Body(phys), Mind(rnd, Species.of(r.identity.species)), r.adopted)
     }
 }

@@ -2,9 +2,9 @@ package com.tamacookie.feature.mischief
 
 import com.tamacookie.PetEvent
 import com.tamacookie.Act
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
+import com.tamacookie.Expr
+import com.tamacookie.PType
+import com.tamacookie.Pose
 import com.tamacookie.Pet
 import com.tamacookie.Box
 import java.util.EnumSet

@@ -1,28 +1,29 @@
-package com.tamacookie
+package com.tamacookie.species.rabbit
+
+import com.tamacookie.Mood
+import com.tamacookie.species.SpeciesLines
 
 /**
- * Répliques du lapin dites par le service (bavardage, accueil, voyage, toucher…).
- *
- * Kotlin pur (testable en JVM). Chaque liste est un tirage possible pour [Speech.pick].
+ * Répliques du lapin dites par la boucle et le toucher (bavardage, accueil, voyage, toucher…) :
+ * [SpeciesLines] de [Rabbit]. Les répliques des fonctionnalités (stations, jouets, bêtises, pages) sont
+ * dans leur fonctionnalité. Kotlin pur ; chaque liste est un tirage possible pour `Speech.pickFrom`.
  * Les textes restent en français, en dur, jusqu'à leur extraction dans `strings.xml` (étape 8).
- * Les répliques propres aux contrôleurs (stations, jouets, bêtises, pages) les rejoindront
- * avec leur fonctionnalité (étape 3).
  */
-object Lines {
+object RabbitLines : SpeciesLines {
 
     // --- Accueil, réveil, apparition ---
-    fun greeting(name: String, hungry: Boolean, hour: Int): String = when {
+    override fun greeting(name: String, hungry: Boolean, hour: Int): String = when {
         hungry -> "Coucou… j'ai faim 🥺"
         hour < 11 -> "Bonjour ! ☀️ C'est moi, $name !"
         hour < 18 -> "Coucou ! C'est $name 🐰"
         else -> "Bonsoir ! 🌙 $name est là"
     }
-    fun newLook(name: String) = arrayOf("Je m'appelle $name ! ✨", "Tu aimes mon nouveau look ? ✨")
-    val WELCOME_BACK = arrayOf("Te revoilà ! 💕", "Coucou toi !", "Tu m'as manqué !")
-    val SHOWN = arrayOf("Coucou, me revoilà !", "Je suis là ! 🐰", "Hop !")
+    override fun newLook(name: String) = arrayOf("Je m'appelle $name ! ✨", "Tu aimes mon nouveau look ? ✨")
+    override val WELCOME_BACK = arrayOf("Te revoilà ! 💕", "Coucou toi !", "Tu m'as manqué !")
+    override val SHOWN = arrayOf("Coucou, me revoilà !", "Je suis là ! 🐰", "Hop !")
 
     // --- Bavardage selon l'humeur ---
-    fun chatter(mood: Mood): Array<String> = when (mood) {
+    override fun chatter(mood: Mood): Array<String> = when (mood) {
         Mood.HUNGRY -> arrayOf("J'ai faim… 🥕", "Mon ventre gargouille…", "Une petite carotte ?")
         Mood.SLEEPY -> arrayOf("*bâille*", "Je suis fatigué…", "Une sieste me ferait du bien")
         Mood.DIRTY -> arrayOf("Je suis tout sale…", "Un bain ? 🫧", "Ça sent pas très bon ici…")
@@ -33,38 +34,38 @@ object Lines {
     }
 
     // --- Vie quotidienne ---
-    val POOPED = arrayOf("Oups… 💩", "C'est pas moi !", "Hihi… pardon")
-    val WOKE_UP = arrayOf("Bien dormi ! ☀️", "*s'étire* Bonjour !", "Quelle bonne sieste !")
-    val ATE = arrayOf("Miam ! 🥕", "Trop bon !", "Merci ! *rot*", "Délicieux !")
-    val GOING_TO_SLEEP = arrayOf("Bonne nuit… 💤", "*bâille* Je fais une petite sieste", "Zzz…")
+    override val POOPED = arrayOf("Oups… 💩", "C'est pas moi !", "Hihi… pardon")
+    override val WOKE_UP = arrayOf("Bien dormi ! ☀️", "*s'étire* Bonjour !", "Quelle bonne sieste !")
+    override val ATE = arrayOf("Miam ! 🥕", "Trop bon !", "Merci ! *rot*", "Délicieux !")
+    override val GOING_TO_SLEEP = arrayOf("Bonne nuit… 💤", "*bâille* Je fais une petite sieste", "Zzz…")
 
     // --- Plateformes et chutes ---
-    val PLATFORM_LOST = arrayOf("Oups !", "Whoaaa !", "Ça bouge !")
-    val HARD_LANDING_PLATFORM = arrayOf("Ouille ! Ça tourne…", "Aïe aïe aïe…")
-    val HARD_LANDING_GROUND = arrayOf("Ouille ! Ça tourne…", "Aïe aïe aïe…", "Doucement !")
-    fun onPlatform(label: String) =
+    override val PLATFORM_LOST = arrayOf("Oups !", "Whoaaa !", "Ça bouge !")
+    override val HARD_LANDING_PLATFORM = arrayOf("Ouille ! Ça tourne…", "Aïe aïe aïe…")
+    override val HARD_LANDING_GROUND = arrayOf("Ouille ! Ça tourne…", "Aïe aïe aïe…", "Doucement !")
+    override fun onPlatform(label: String) =
         arrayOf("Je suis sur $label !", "Coucou depuis $label 👋", "La vue est belle d'ici !", "Hop, sur $label !")
 
     // --- Toucher, glisser, lancer ---
-    const val FOUND_WHILE_DRAGGED = "Trouvé !! 🎉"
-    val DRAGGED = arrayOf("Waaah !", "Hé ! Pose-moi !", "Je voleeee !", "Hiii !")
-    val THROWN = arrayOf("Wiiiiii !", "Je vole !!", "Aaaaah !")
-    val WOKEN_BY_TAP = arrayOf("Hmpf… je dormais !", "Encore 5 minutes…", "Grrr… 😾")
-    val TICKLED = arrayOf("Ça chatouille !! 🤭", "Arrête, hihi !")
-    val PETTED = arrayOf("Hihi ! 💕", "Encore !", "J'adore les câlins", "Mmmh…", "Tu es gentil·le !", "*ronronne* (oui, les lapins aussi)")
+    override val FOUND_WHILE_DRAGGED = "Trouvé !! 🎉"
+    override val DRAGGED = arrayOf("Waaah !", "Hé ! Pose-moi !", "Je voleeee !", "Hiii !")
+    override val THROWN = arrayOf("Wiiiiii !", "Je vole !!", "Aaaaah !")
+    override val WOKEN_BY_TAP = arrayOf("Hmpf… je dormais !", "Encore 5 minutes…", "Grrr… 😾")
+    override val TICKLED = arrayOf("Ça chatouille !! 🤭", "Arrête, hihi !")
+    override val PETTED = arrayOf("Hihi ! 💕", "Encore !", "J'adore les câlins", "Mmmh…", "Tu es gentil·le !", "*ronronne* (oui, les lapins aussi)")
 
     // --- Menu ---
-    const val GETTING_UP = "*bâille* D'accord, je me lève…"
-    val NOT_TIRED = arrayOf("Je ne suis pas fatigué !", "Dodo ? Déjà ?!")
+    override val GETTING_UP = "*bâille* D'accord, je me lève…"
+    override val NOT_TIRED = arrayOf("Je ne suis pas fatigué !", "Dodo ? Déjà ?!")
 
     // --- Voyage d'application en application ---
-    val FOLLOWING = arrayOf("J'arrive !", "Attends-moi !", "Hop, on change d'app !", "Je te suis ! 🐾")
+    override val FOLLOWING = arrayOf("J'arrive !", "Attends-moi !", "Hop, on change d'app !", "Je te suis ! 🐾")
 
     /**
      * Commentaires possibles à l'arrivée dans une app.
      * [category] : `ApplicationInfo.CATEGORY_*` (constantes de compilation, utilisables en JVM).
      */
-    fun appComments(label: String, pkg: String, category: Int, isHome: Boolean): Array<String> {
+    override fun appComments(label: String, pkg: String, category: Int, isHome: Boolean): Array<String> {
         val p = pkg.lowercase()
         return when {
             isHome -> arrayOf("De retour à la maison 🏠", "Ah, l'écran d'accueil !", "On fait quoi maintenant ?")

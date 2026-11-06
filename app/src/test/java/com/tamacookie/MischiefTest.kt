@@ -1,7 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.Travel
 import com.tamacookie.feature.mischief.HideSeekMischief
 import com.tamacookie.feature.mischief.KnockMischief

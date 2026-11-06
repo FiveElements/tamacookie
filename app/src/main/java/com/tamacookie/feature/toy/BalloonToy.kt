@@ -3,7 +3,7 @@ package com.tamacookie.feature.toy
 import android.graphics.Canvas
 import com.tamacookie.Act
 import com.tamacookie.BunnyPhysics
-import com.tamacookie.BunnyView.Pose
+import com.tamacookie.Pose
 import com.tamacookie.Palette
 import com.tamacookie.Pet
 import com.tamacookie.Prop

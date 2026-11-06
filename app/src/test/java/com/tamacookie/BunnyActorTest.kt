@@ -1,6 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Pose
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

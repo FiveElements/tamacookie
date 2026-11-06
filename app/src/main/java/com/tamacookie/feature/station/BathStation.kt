@@ -3,9 +3,9 @@ package com.tamacookie.feature.station
 import android.graphics.Canvas
 import android.graphics.Color
 import com.tamacookie.PetEvent
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
+import com.tamacookie.Expr
+import com.tamacookie.PType
+import com.tamacookie.Pose
 import com.tamacookie.Palette
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx

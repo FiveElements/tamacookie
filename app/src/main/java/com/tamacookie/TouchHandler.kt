@@ -8,8 +8,6 @@ import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.menu.MenuCtx
 import com.tamacookie.feature.menu.MenuEntries
 import kotlin.math.abs
@@ -60,7 +58,7 @@ class TouchHandler(
     //  Toucher, glisser, lancer
     // =====================================================================
     @SuppressLint("ClickableViewAccessibility")
-    fun attach(bunny: BunnyView) {
+    fun attach(bunny: PetView) {
         val slop = ViewConfiguration.get(context).scaledTouchSlop * 1.5f
         val gd = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDown(e: MotionEvent) = true
@@ -132,7 +130,7 @@ class TouchHandler(
         if (pet.body.act == Act.PEEK) {
             mischief.endHiding()
             ctx.on(pet, PetEvent.Found)
-            ctx.say(Lines.FOUND_WHILE_DRAGGED, 1.5f)
+            ctx.say(pet.species.lines.FOUND_WHILE_DRAGGED, 1.5f)
         } else if (pet.isHiding) mischief.endHiding()
         closeMenu()
         pet.body.platform = null
@@ -142,14 +140,14 @@ class TouchHandler(
         ctx.world.dropHeldToy()
         ctx.noteInteraction()
         pet.setAct(Act.DRAGGED)
-        ctx.speech.sayOneOf(Lines.DRAGGED, 1.8f)
+        ctx.speech.sayOneOf(pet.species.lines.DRAGGED, 1.8f)
         ctx.haptic(pet, HapticFeedbackConstants.KEYBOARD_TAP)
     }
 
     private fun release(vxPx: Float, vyPx: Float) {
         val phys = pet.body.phys
         phys.release(vxPx, vyPx)
-        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * arena.d) ctx.speech.sayOneOf(Lines.THROWN, 1.6f)
+        if (hypot(phys.vx, phys.vy) > Tuning.THROW_SHOUT_DP * arena.d) ctx.speech.sayOneOf(pet.species.lines.THROWN, 1.6f)
         pet.body.afterAir = Act.IDLE
         pet.setAct(Act.AIR)
     }
@@ -163,7 +161,7 @@ class TouchHandler(
         if (pet.body.act == Act.SLEEP || pet.stats.sleeping) {
             ctx.on(pet, PetEvent.Woken(grumpy = true))
             pet.express(Expr.ANGRY, 2.5f)
-            ctx.speech.sayOneOf(Lines.WOKEN_BY_TAP)
+            ctx.speech.sayOneOf(pet.species.lines.WOKEN_BY_TAP)
             pet.setActOrAfterAir(Act.IDLE, 3f)
             return
         }
@@ -172,7 +170,7 @@ class TouchHandler(
         if (tapTimes.size >= Tuning.TICKLE_TAPS) {
             tapTimes.clear()
             pet.express(Expr.HAPPY, 1.5f)
-            ctx.speech.sayOneOf(Lines.TICKLED)
+            ctx.speech.sayOneOf(pet.species.lines.TICKLED)
             val fx = pet.body.fx; val screenW = arena.screenW
             pet.body.targetX = if (fx > screenW / 2) fx - screenW * 0.35f else fx + screenW * 0.35f
             pet.setActOrAfterAir(Act.WALK)
@@ -181,7 +179,7 @@ class TouchHandler(
         ctx.on(pet, PetEvent.Petted)
         ctx.emit(pet, PType.HEART, 2 + ctx.rnd.nextInt(3))
         pet.express(Expr.HAPPY, 1.6f)
-        if (ctx.rnd.nextFloat() < 0.45f) ctx.speech.sayOneOf(Lines.PETTED, 2f)
+        if (ctx.rnd.nextFloat() < 0.45f) ctx.speech.sayOneOf(pet.species.lines.PETTED, 2f)
         val act = pet.body.act
         if (act == Act.IDLE || act == Act.WALK || act == Act.SIT) {
             if (ctx.rnd.nextFloat() < 0.35f) ctx.actor.jump(pet, -560 * arena.d, 0f, then = Act.IDLE) else pet.setAct(Act.IDLE, 2.5f)

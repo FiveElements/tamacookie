@@ -1,7 +1,6 @@
 package com.tamacookie
 
 import com.tamacookie.persist.PetRecord
-import com.tamacookie.BunnyView.Expr
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

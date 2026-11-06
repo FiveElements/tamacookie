@@ -1,22 +1,20 @@
 package com.tamacookie
 
 /**
- * Constantes de réglage du lapin et de ses objets.
+ * Constantes de réglage communes à toutes les espèces et aux objets (gabarit et vitesses d'une espèce :
+ * `SpeciesSpec`).
  * Suffixes : DP = à multiplier par la densité de l'écran, S = secondes, MS = millisecondes.
  * Aucune dépendance Android : utilisable dans les tests JVM.
  */
 object Tuning {
-    // --- Lapin (fenêtre et limites) ---
-    const val BUNNY_W_DP = 130f
-    const val BUNNY_H_DP = 140f
-    const val FEET_PAD_DP = 6f
+    // --- Animal (limites ; gabarit et vitesses : `SpeciesSpec` de son espèce) ---
     /** Marge latérale : il ne marche pas plus près du bord que ça. */
     const val SIDE_MARGIN_DP = 34f
     const val GROUND_MARGIN_DP = 2f
     /** Hauteur (sous le haut de l'écran) d'où il tombe en arrivant. */
     const val SPAWN_DROP_DP = 150f
 
-    // --- Physique du lapin ---
+    // --- Physique de l.animal ---
     const val GRAVITY_DP = 2600f
     /** Vitesse de chute au-delà de laquelle l'atterrissage est "brutal" (étourdi). */
     const val HARD_LANDING_DP = 2300f
@@ -38,7 +36,7 @@ object Tuning {
     const val FACE_VX_DP = 60f
     const val JUMP_APEX_MIN_DP = 70f
     const val JUMP_APEX_RAND_DP = 50f
-    /** Vitesse maximale d'un lancer (lapin). */
+    /** Vitesse maximale d'un lancer (animal). */
     const val THROW_MAX_DP = 3500f
     const val THROW_SHOUT_DP = 2400f
 
@@ -49,16 +47,6 @@ object Tuning {
     const val TOY_THROW_MAX_DP = 4000f
     /** Âge (s) au-delà duquel la nourriture non mangée disparaît. */
     const val FOOD_LIFETIME_S = 90f
-
-    // --- Vitesses de marche (dp/s) ---
-    const val WALK_SLOW_DP = 45f
-    const val WALK_NORMAL_DP = 75f
-    const val WALK_HAPPY_DP = 95f
-    const val LAZY_SPEED_FACTOR = 0.7f
-    const val TRAVEL_OUT_DP = 260f
-    const val TRAVEL_IN_DP = 200f
-    const val PAGE_OUT_DP = 150f
-    const val HIDE_RUN_DP = 300f
 
     // --- Panneaux (largeur souhaitée, réduite sur écran étroit) ---
     const val MENU_W_DP = 320f
@@ -77,7 +65,7 @@ object Tuning {
     const val FPS_SLEEP = 12
     /** Plafond du pas de temps à 30-60 i/s. */
     const val DT_CAP_S = 0.05f
-    /** Vérification légère quand la boucle est suspendue (lapin invisible). */
+    /** Vérification légère quand la boucle est suspendue (animal invisible). */
     const val SUSPENDED_TICK_MS = 300L
     /** Pas de simulation pendant la suspension. */
     const val SUSPENDED_STEP_S = 0.1f

@@ -1,8 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel

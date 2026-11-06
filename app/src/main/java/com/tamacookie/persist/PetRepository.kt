@@ -1,5 +1,6 @@
 package com.tamacookie.persist
 
+import com.tamacookie.species.Species
 import android.content.SharedPreferences
 import com.tamacookie.Accessory
 import com.tamacookie.AccColor
@@ -193,7 +194,7 @@ internal object PetFields {
                 id = id,
                 name = prefs.getString(p + NAME, null) ?: Identity.DEFAULT_NAME,
                 bornAt = bornAt,
-                species = prefs.getString(p + SPECIES, null) ?: Identity.RABBIT,
+                species = prefs.getString(p + SPECIES, null) ?: Species.DEFAULT.id,
             ),
             traits = Traits(
                 personality = enumOr(prefs.getString(p + PERSONALITY, null), Personality.CUDDLY),

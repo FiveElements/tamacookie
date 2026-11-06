@@ -2,9 +2,9 @@ package com.tamacookie.feature.mischief
 
 import com.tamacookie.PetEvent
 import com.tamacookie.Act
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
+import com.tamacookie.Expr
+import com.tamacookie.PType
+import com.tamacookie.Pose
 import com.tamacookie.Pet
 import com.tamacookie.Tuning
 import com.tamacookie.ViewKey
@@ -132,7 +132,7 @@ object HideSeekMischief : Mischief {
         val s = ctx.state
         when (pet.body.act) {
             Act.HIDE_RUN -> {
-                if (ctx.actor.walkToward(pet, pet.body.targetX, Tuning.HIDE_RUN_DP * ctx.arena.d, dt, clamp = false)) {
+                if (ctx.actor.walkToward(pet, pet.body.targetX, pet.species.spec.hideRunDp * ctx.arena.d, dt, clamp = false)) {
                     s.hideStarted = ctx.clock.wallMs()
                     pet.setAct(Act.HIDDEN)
                     ctx.setDockHiding(true)

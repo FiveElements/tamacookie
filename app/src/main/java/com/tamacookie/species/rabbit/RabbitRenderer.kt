@@ -1,40 +1,36 @@
-package com.tamacookie
+package com.tamacookie.species.rabbit
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.view.View
+import com.tamacookie.AccColor
+import com.tamacookie.Accessory
+import com.tamacookie.AmbientAnimator
+import com.tamacookie.Ears
+import com.tamacookie.Expr
+import com.tamacookie.Look
+import com.tamacookie.Options
+import com.tamacookie.Palette
+import com.tamacookie.Pattern
+import com.tamacookie.PetRenderState
+import com.tamacookie.PetRenderer
+import com.tamacookie.Pose
 import com.tamacookie.feature.toy.Food
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.sin
-import kotlin.random.Random
 
 /**
- * Dessin de Cookie, entièrement en Canvas (aucune image). La vue n'affiche qu'un [BunnyRenderState]
- * immuable ([render]) : elle n'écrit ni ne lit l'état du jeu. L'animation ambiante (clignement,
- * oreilles, particules) est calculée par son [AmbientAnimator] (aléatoire injectable).
+ * Dessin du lapin, entièrement en Canvas (aucune image) : renderer de l'espèce [Rabbit], appelé par la
+ * vue générique `PetView` (qui garde l'animation ambiante et les particules). [d] = densité (px par dp).
  */
-@SuppressLint("ViewConstructor")
-class BunnyView(
-    context: Context,
-    private val ambient: AmbientAnimator = AmbientAnimator(Random(System.nanoTime())),
-) : View(context) {
-
-    enum class Pose { IDLE, WALK, AIR, SLEEP, EAT, DRAGGED, SIT }
-    enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY }
-    enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE }
-
-    /** Dernier état affiché. */
-    var state = BunnyRenderState()
-        private set
+class RabbitRenderer(private val d: Float) : PetRenderer {
+    /** État et animation de l'image en cours de dessin (posés par [draw]). */
+    private var state = PetRenderState()
+    private lateinit var ambient: AmbientAnimator
     private val pose get() = state.pose
     private val expr get() = state.expr
     private val facing get() = state.facing
@@ -44,8 +40,6 @@ class BunnyView(
     private val dirty get() = state.dirty
     private val look get() = state.look
     private val t get() = ambient.t
-
-    private val d = resources.displayMetrics.density
 
     // --- Peintures ---
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -68,10 +62,6 @@ class BunnyView(
     private val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.SHADOW }
     private val carrot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.CARROT }
     private val leaf = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LEAF }
-    private val pPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER; isFakeBoldText = true
-    }
     private val rect = RectF()
     private val path = Path()
     private val clip = Path()
@@ -109,27 +99,16 @@ class BunnyView(
 
     init { applyLook(state.look) }
 
-    /**
-     * Affiche [s] et avance l'animation ambiante de [dt] secondes. Ne redessine que si l'image change
-     * (état différent, clignement, oreille, particules, ou dessin qui dépend du temps).
-     */
-    fun render(s: BunnyRenderState, dt: Float) {
-        val old = state
-        state = s
+    override fun onState(old: PetRenderState, s: PetRenderState) {
         if (s.look != old.look) applyLook(s.look)
         if (s.food != paintedFood) { paintedFood = s.food; carrot.color = Color.parseColor(s.food.color) }
-        if (ambient.frame(dt, old, s, width.toFloat(), height.toFloat(), d)) invalidate()
-    }
-
-    /** Ajoute des particules au-dessus de la tête (cœurs, notes…), [facing] = sens du regard. */
-    fun emit(type: PType, count: Int = 1, facing: Float = state.facing) {
-        ambient.emit(type, count, width.toFloat(), height.toFloat(), d, facing)
-        invalidate()
     }
 
     private fun unit() = AmbientAnimator.UNIT
 
-    override fun onDraw(c: Canvas) {
+    override fun draw(c: Canvas, s: PetRenderState, ambient: AmbientAnimator, width: Int, height: Int) {
+        state = s
+        this.ambient = ambient
         val cx = width / 2f
         val fy = height - 6f * d
         val s = d * unit()
@@ -175,9 +154,8 @@ class BunnyView(
 
         if (pose == Pose.SLEEP) drawSleeping(c) else drawBunny(c)
         c.restore()
-
-        drawParticles(c)
     }
+
 
     // ------------------------------------------------------------------
     //  Lapin debout
@@ -494,56 +472,6 @@ class BunnyView(
         drawAccessory(c, 14f, -24f, 16f, standing = false)
     }
 
-    // ------------------------------------------------------------------
-    //  Particules
-    // ------------------------------------------------------------------
-    private fun drawParticles(c: Canvas) {
-        for (p in ambient.particles) {
-            val a = (p.life / p.maxLife).coerceIn(0f, 1f)
-            val alpha = (min(1f, a * 2.5f) * 255).toInt()
-            when (p.type) {
-                PType.HEART -> { pPaint.color = Palette.HEART; pPaint.alpha = alpha; heart(c, p.x, p.y, p.size) }
-                PType.ZZZ -> text(c, "z", p.x, p.y, p.size * (1.4f - a * 0.5f), Palette.ZZZ, alpha)
-                PType.NOTE -> text(c, if (p.rot > 3f) "♪" else "♫", p.x, p.y, p.size, Palette.NOTE, alpha)
-                PType.SPARKLE -> { pPaint.color = Palette.SPARKLE; pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * (0.6f + a)) }
-                PType.DROP -> { pPaint.color = Palette.DROP; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
-                PType.CRUMB -> { pPaint.color = Palette.CARROT; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }
-                PType.STAR -> {
-                    val ang = p.rot + t * 6f
-                    text(c, "★", p.x + cos(ang) * 24f * d, p.y + sin(ang) * 7f * d, 11f * d, Palette.STAR, alpha)
-                }
-                PType.BUBBLE -> {
-                    pPaint.color = Palette.DIRT_BUBBLE; pPaint.alpha = alpha / 2
-                    c.drawCircle(p.x, p.y, p.size, pPaint)
-                }
-            }
-        }
-    }
-
-    private fun text(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, alpha: Int) {
-        textPaint.textSize = size
-        textPaint.color = color
-        textPaint.alpha = alpha
-        c.drawText(s, x, y, textPaint)
-    }
-
-    private fun heart(c: Canvas, x: Float, y: Float, s: Float) {
-        path.reset()
-        path.moveTo(x, y + s * 0.35f)
-        path.cubicTo(x - s * 1.1f, y - s * 0.35f, x - s * 0.45f, y - s * 1.05f, x, y - s * 0.45f)
-        path.cubicTo(x + s * 0.45f, y - s * 1.05f, x + s * 1.1f, y - s * 0.35f, x, y + s * 0.35f)
-        path.close()
-        c.drawPath(path, pPaint)
-    }
-
-    private fun sparkle(c: Canvas, x: Float, y: Float, s: Float) {
-        path.reset()
-        path.moveTo(x, y - s); path.lineTo(x + s * 0.25f, y - s * 0.25f); path.lineTo(x + s, y)
-        path.lineTo(x + s * 0.25f, y + s * 0.25f); path.lineTo(x, y + s); path.lineTo(x - s * 0.25f, y + s * 0.25f)
-        path.lineTo(x - s, y); path.lineTo(x - s * 0.25f, y - s * 0.25f); path.close()
-        c.drawPath(path, pPaint)
-    }
-
     private fun oval(c: Canvas, x: Float, y: Float, rx: Float, ry: Float, p: Paint) {
         rect.set(x - rx, y - ry, x + rx, y + ry); c.drawOval(rect, p)
     }
@@ -551,13 +479,10 @@ class BunnyView(
     private fun circle(c: Canvas, x: Float, y: Float, r: Float, p: Paint) = c.drawCircle(x, y, r, p)
 
     /** Vrai si le point (coordonnées de la vue) touche approximativement le lapin. */
-    fun hitTest(x: Float, y: Float): Boolean {
+    override fun hitTest(x: Float, y: Float, width: Int, height: Int): Boolean {
         val cx = width / 2f
         val fy = height - 6f * d
         val s = d * unit()
         return abs(x - cx) < 38f * s && y > fy - 100f * s && y < fy + 6f * s
     }
-
-    @Suppress("unused")
-    private fun clamp01(v: Float) = max(0f, min(1f, v))
 }

@@ -2,8 +2,6 @@ package com.tamacookie
 
 import android.content.SharedPreferences
 import android.view.HapticFeedbackConstants
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.station.StationBehavior
@@ -209,7 +207,7 @@ class StationController(
     fun updateHover() {
         val hx = pet.body.fx; val hy = pet.body.fy - 45 * d
         var found: StationKind? = null
-        for (s in all) if (shown(s) && ctx.world.station(s.kind).canEnter(pet.id) && s.contains(hx, hy, 12 * d)) { found = s.kind; break }
+        for (s in all) if (shown(s) && pet.species.accepts(s.kind) && ctx.world.station(s.kind).canEnter(pet.id) && s.contains(hx, hy, 12 * d)) { found = s.kind; break }
         if (found != hoverStation) {
             hoverStation?.let { setHighlight(get(it), false) }
             hoverStation = found
@@ -257,7 +255,7 @@ class StationController(
 
     fun enterStation(k: StationKind, announce: Boolean = true, p: Pet = pet) {
         val occ = ctx.world.station(k)
-        if (!occ.canEnter(p.id)) return
+        if (!p.species.accepts(k) || !occ.canEnter(p.id)) return
         // Une seule station à la fois (ne devrait pas arriver : le glisser le fait sortir avant)
         ctx.world.stationOf(p)?.let { prev ->
             ctx.world.station(prev).leave(p.id); setOccupied(get(prev))
@@ -431,7 +429,8 @@ class StationController(
         val st = pet.stats
         val rnd = ctx.rnd
         val keep = ctx.lastInteraction            // ce n'est pas l'utilisateur qui s'est occupé de lui
-        val glutton = pet.personality == Personality.GLUTTON && rnd.nextFloat() < 0.6f
+        val greed = pet.species.behavior(pet.personality).chestGreedChance
+        val glutton = greed > 0f && rnd.nextFloat() < greed
         val r = ctx.rules
         if (st.satiety < r.chestFoodSatietyBelow || glutton || st.energy < r.chestFoodEnergyBelow) {
             val f = when {

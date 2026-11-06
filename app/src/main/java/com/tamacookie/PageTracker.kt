@@ -220,7 +220,7 @@ class PageTracker(private val ctx: PetCtx) {
     /** Act.PAGE_OUT : il marche jusqu'au bord… et passe sur la page voisine du bureau. */
     fun updatePageOut(pet: Pet, dt: Float) {
         val d = arena.d
-        if (ctx.actor.walkToward(pet, pet.body.targetX, Tuning.PAGE_OUT_DP * d, dt, clamp = false)) {
+        if (ctx.actor.walkToward(pet, pet.body.targetX, pet.species.spec.pageOutDp * d, dt, clamp = false)) {
             val pw = screen.pageW
             if (pw <= 0f || bunnyPage <= 0) { pet.body.fx = pet.body.fx.coerceIn(arena.minX, arena.maxX); pet.setAct(Act.IDLE, 2f); return }
             bunnyPage += wanderDir

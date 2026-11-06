@@ -1,5 +1,6 @@
 package com.tamacookie.persist
 
+import com.tamacookie.species.Species
 import com.tamacookie.Accessory
 import com.tamacookie.AccColor
 import com.tamacookie.Ears
@@ -80,8 +81,8 @@ data class PetSnapshot(
         const val VERSION = 1
         /** Taille maximale acceptée (octets UTF-8) : un animal encodé fait ~400 octets. */
         const val MAX_BYTES = 2048
-        /** Espèces connues (le lapin seulement, jusqu'au plugin `Species` de l'étape 7). */
-        val SPECIES_KNOWN = setOf(Identity.RABBIT)
+        /** Espèces connues (registre [Species.ALL]) : une autre est rejetée. */
+        val SPECIES_KNOWN: Set<String> get() = Species.ALL.mapTo(HashSet()) { it.id }
 
         private const val ID = "id"
         private const val SPECIES = "species"

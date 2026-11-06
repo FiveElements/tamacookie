@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.species.rabbit.RabbitLines
 import android.content.pm.ApplicationInfo
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -22,48 +23,48 @@ class SpeechTest {
 
     @Test fun sayOneOf_tireDansLaListe() {
         val sp = speech()
-        repeat(50) { sp.sayOneOf(Lines.PETTED, 2f) }
-        assertTrue(said.all { (t, s) -> t in Lines.PETTED && s == 2f })
+        repeat(50) { sp.sayOneOf(RabbitLines.PETTED, 2f) }
+        assertTrue(said.all { (t, s) -> t in RabbitLines.PETTED && s == 2f })
     }
 
     @Test fun pick_memeTirageQueLAncienPick() {
         // Même graine, même suite : pickFrom(tableau) et pick(vararg) consomment le Random à l'identique
         val a = Speech(Random(42)) { _, _ -> }
         val b = Speech(Random(42)) { _, _ -> }
-        repeat(20) { assertEquals(a.pick(*Lines.ATE), b.pickFrom(Lines.ATE)) }
+        repeat(20) { assertEquals(a.pick(*RabbitLines.ATE), b.pickFrom(RabbitLines.ATE)) }
     }
 
     @Test fun chatter_couvreToutesLesHumeurs() {
         val sp = speech()
         for (m in Mood.values()) {
-            val lines = Lines.chatter(m)
+            val lines = RabbitLines.chatter(m)
             assertTrue(lines.isNotEmpty())
             assertTrue(sp.chatterLine(m) in lines)
         }
-        assertTrue("J'ai faim… 🥕" in Lines.chatter(Mood.HUNGRY))
+        assertTrue("J'ai faim… 🥕" in RabbitLines.chatter(Mood.HUNGRY))
     }
 
     // --- Lines ---
 
     @Test fun greeting_selonFaimEtHeure() {
-        assertEquals("Coucou… j'ai faim 🥺", Lines.greeting("Cookie", hungry = true, hour = 9))
-        assertEquals("Bonjour ! ☀️ C'est moi, Cookie !", Lines.greeting("Cookie", hungry = false, hour = 10))
-        assertEquals("Coucou ! C'est Cookie 🐰", Lines.greeting("Cookie", hungry = false, hour = 11))
-        assertEquals("Coucou ! C'est Cookie 🐰", Lines.greeting("Cookie", hungry = false, hour = 17))
-        assertEquals("Bonsoir ! 🌙 Cookie est là", Lines.greeting("Cookie", hungry = false, hour = 18))
+        assertEquals("Coucou… j'ai faim 🥺", RabbitLines.greeting("Cookie", hungry = true, hour = 9))
+        assertEquals("Bonjour ! ☀️ C'est moi, Cookie !", RabbitLines.greeting("Cookie", hungry = false, hour = 10))
+        assertEquals("Coucou ! C'est Cookie 🐰", RabbitLines.greeting("Cookie", hungry = false, hour = 11))
+        assertEquals("Coucou ! C'est Cookie 🐰", RabbitLines.greeting("Cookie", hungry = false, hour = 17))
+        assertEquals("Bonsoir ! 🌙 Cookie est là", RabbitLines.greeting("Cookie", hungry = false, hour = 18))
     }
 
     @Test fun appComments_prioriteAccueilPuisPaquetPuisCategorie() {
-        val home = Lines.appComments("Accueil", "com.android.camera", ApplicationInfo.CATEGORY_GAME, isHome = true)
+        val home = RabbitLines.appComments("Accueil", "com.android.camera", ApplicationInfo.CATEGORY_GAME, isHome = true)
         assertTrue("De retour à la maison 🏠" in home)
-        val cam = Lines.appComments("Photo", "com.Vendor.CAMERA2", ApplicationInfo.CATEGORY_GAME, isHome = false)
+        val cam = RabbitLines.appComments("Photo", "com.Vendor.CAMERA2", ApplicationInfo.CATEGORY_GAME, isHome = false)
         assertTrue("Prends-moi en photo ! 📸" in cam)
-        assertTrue("Tic tac 🕰️" in Lines.appComments("Horloge", "x.alarm", -1, false))
-        assertTrue("Tu m'achètes une carotte ?" in Lines.appComments("Play", "com.android.vending", -1, false))
+        assertTrue("Tic tac 🕰️" in RabbitLines.appComments("Horloge", "x.alarm", -1, false))
+        assertTrue("Tu m'achètes une carotte ?" in RabbitLines.appComments("Play", "com.android.vending", -1, false))
     }
 
     @Test fun appComments_categoriesAndroid() {
-        fun c(cat: Int) = Lines.appComments("App", "com.example", cat, false)
+        fun c(cat: Int) = RabbitLines.appComments("App", "com.example", cat, false)
         assertTrue("Vas-y, bats le record !" in c(ApplicationInfo.CATEGORY_GAME))
         assertTrue("On danse ? ♫" in c(ApplicationInfo.CATEGORY_AUDIO))
         assertTrue("Chut, ça commence !" in c(ApplicationInfo.CATEGORY_VIDEO))
@@ -76,7 +77,7 @@ class SpeechTest {
     }
 
     @Test fun onPlatform_inclutLeLibelle() {
-        assertTrue("Hop, sur Chrome !" in Lines.onPlatform("Chrome"))
+        assertTrue("Hop, sur Chrome !" in RabbitLines.onPlatform("Chrome"))
     }
 
     // --- PetNotifier (textes purs) ---

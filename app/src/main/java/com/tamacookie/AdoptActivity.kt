@@ -32,7 +32,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     companion object { const val EXTRA_NEW = "new" }
 
     private val d by lazy { resources.displayMetrics.density }
-    private lateinit var preview: BunnyView
+    private lateinit var preview: PetView
     private lateinit var nameEdit: EditText
     private var look = Look()
     private var personality = Personality.CUDDLY
@@ -76,8 +76,8 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             gravity = Gravity.CENTER
         })
 
-        preview = BunnyView(this)
-        preview.setOnClickListener { preview.emit(BunnyView.PType.HEART, 3) }
+        preview = PetView(this)
+        preview.setOnClickListener { preview.emit(PType.HEART, 3) }
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
         nameEdit = EditText(this).apply {
@@ -148,8 +148,8 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         val cycle = t % 7f
         if (cycle < 0.02f) previewFacing = -previewFacing
         // L'aperçu affiche l'apparence en cours de choix ([Look] est immuable)
-        preview.render(BunnyRenderState(
-            pose = if (cycle < 2.5f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+        preview.render(PetRenderState(
+            pose = if (cycle < 2.5f) Pose.WALK else Pose.IDLE,
             facing = previewFacing,
             walkPhase = (t * 2.2f) % 1f,
             look = look,
@@ -169,7 +169,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             accessory = Accessory.entries[r.nextInt(Accessory.entries.size)], accColor = AccColor.entries[r.nextInt(AccColor.entries.size)],
         )
         if (isNew) personality = Personality.values()[r.nextInt(Personality.values().size)]
-        preview.emit(BunnyView.PType.SPARKLE, 6)
+        preview.emit(PType.SPARKLE, 6)
         refreshAll()
     }
 

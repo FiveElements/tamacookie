@@ -29,7 +29,7 @@ import android.widget.TextView
 class MainActivity : Activity(), Choreographer.FrameCallback {
 
     private val d by lazy { resources.displayMetrics.density }
-    private lateinit var preview: BunnyView
+    private lateinit var preview: PetView
     private lateinit var overlayBtn: TextView
     private lateinit var notifBtn: TextView
     private lateinit var usageBtn: TextView
@@ -41,7 +41,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private var previewT = 0f
     /** Ce qu'affiche l'aperçu (il n'a pas de [Pet] : son état est fabriqué ici). */
     private var previewLook = Look()
-    private var previewExpr = BunnyView.Expr.NORMAL
+    private var previewExpr = Expr.NORMAL
     private var previewFacing = 1f
     /** Le lapin vient d'être lancé : on passera en arrière-plan après la réponse à la demande de permission. */
     private var backgroundAfterPermission = false
@@ -76,11 +76,11 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
             setTextColor(Color.parseColor("#7A6B75")); gravity = Gravity.CENTER
         })
 
-        preview = BunnyView(this)
+        preview = PetView(this)
         preview.setOnClickListener {
-            preview.emit(BunnyView.PType.HEART, 3)
-            previewExpr = BunnyView.Expr.HAPPY
-            preview.postDelayed({ previewExpr = BunnyView.Expr.NORMAL }, 1200)
+            preview.emit(PType.HEART, 3)
+            previewExpr = Expr.HAPPY
+            preview.postDelayed({ previewExpr = Expr.NORMAL }, 1200)
         }
         root.addView(preview, LinearLayout.LayoutParams((170 * d).toInt(), (170 * d).toInt()).apply {
             topMargin = (8 * d).toInt()
@@ -253,8 +253,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         // petite marche sur place dans l'aperçu
         val cycle = previewT % 8f
         if (cycle < 0.02f) previewFacing = -previewFacing
-        preview.render(BunnyRenderState(
-            pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+        preview.render(PetRenderState(
+            pose = if (cycle < 3f) Pose.WALK else Pose.IDLE,
             expr = previewExpr,
             facing = previewFacing,
             walkPhase = (previewT * 2.2f) % 1f,

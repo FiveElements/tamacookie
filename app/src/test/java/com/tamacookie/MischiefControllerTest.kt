@@ -1,7 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.station.StationKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

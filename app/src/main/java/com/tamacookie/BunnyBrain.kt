@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.species.Species
 import java.util.EnumSet
 import kotlin.math.abs
 import kotlin.random.Random
@@ -87,9 +88,10 @@ sealed class Decision {
 }
 
 /**
- * Décisions du lapin, sans Android : [Random] injecté, heure et état passés en paramètre.
+ * Décisions d'un animal, sans Android : [Random] injecté, heure et état passés en paramètre ; l'influence du
+ * caractère vient de son espèce ([Species.behavior]). Nom historique (il sert à toutes les espèces).
  */
-class BunnyBrain(private val rnd: Random) {
+class BunnyBrain(private val rnd: Random, private val species: Species = Species.DEFAULT) {
 
     /**
      * Choisit l'activité suivante. [seekAttention] est appelé (après la vérification du sommeil) :
@@ -102,7 +104,7 @@ class BunnyBrain(private val rnd: Random) {
             return Decision.GoToChest
         }
         if (!s.elsewhere && s.platform == null &&
-            rnd.nextFloat() < (if (s.personality == Personality.CURIOUS) 0.12f else 0.06f) && s.canPageWander
+            rnd.nextFloat() < species.behavior(s.personality).pageWanderChance && s.canPageWander
         ) return Decision.PageWander
 
         val d = s.density
@@ -115,7 +117,7 @@ class BunnyBrain(private val rnd: Random) {
             if (r < 0.75f) return Decision.TurnAround(2f + rnd.nextFloat() * 3f)
             return Decision.Idle(3f + rnd.nextFloat() * 5f)
         }
-        val platChance = if (s.personality == Personality.CURIOUS) 0.6f else 0.35f
+        val platChance = species.behavior(s.personality).platformChance
         if (!s.elsewhere && r < platChance && s.energy > 25f) pickPlatform(s)?.let { return it }
         return when {
             r < 0.55f -> Decision.Walk((s.x + (rnd.nextFloat() * 2f - 1f) * s.screenW * 0.45f).coerceIn(s.minX, s.maxX))
@@ -127,10 +129,10 @@ class BunnyBrain(private val rnd: Random) {
 
     /** Envie de dormir : énergie basse, nuit, ou paresse. */
     fun wantsSleep(s: BrainInput): Boolean {
-        val lazy = s.personality == Personality.LAZY
-        return s.energy < (if (lazy) 30f else 12f) ||
-            (isNight(s.hour) && s.energy < (if (lazy) 75f else 55f) && rnd.nextFloat() < 0.5f) ||
-            (lazy && s.energy < 60f && rnd.nextFloat() < 0.12f)
+        val m = species.behavior(s.personality)
+        return s.energy < m.sleepEnergyBelow ||
+            (isNight(s.hour) && s.energy < m.nightSleepEnergyBelow && rnd.nextFloat() < 0.5f) ||
+            (m.napEnergyBelow > 0f && s.energy < m.napEnergyBelow && rnd.nextFloat() < m.napChance)
     }
 
     /** Une icône à portée (ni trop près ni trop loin, dans l'écran, pas celle où il est déjà). */
@@ -192,9 +194,9 @@ class BunnyBrain(private val rnd: Random) {
         fun isNight(hour: Int) = hour >= 22 || hour < 7
 
         /** Temps sans interaction avant qu'il cherche l'attention, selon le niveau de bêtises et le caractère. */
-        fun attentionThresholdMs(mischief: Int, personality: Personality): Long {
+        fun attentionThresholdMs(mischief: Int, personality: Personality, species: Species = Species.DEFAULT): Long {
             val minutes = when (mischief) { 0 -> 12f; 1 -> 6f; else -> 3f } *
-                (if (personality == Personality.CUDDLY) 0.6f else 1f)
+                species.behavior(personality).attentionFactor
             return (minutes * 60_000).toLong()
         }
 

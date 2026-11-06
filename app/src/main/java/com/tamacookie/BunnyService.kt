@@ -22,15 +22,13 @@ import android.view.Choreographer
 import android.view.HapticFeedbackConstants
 import android.view.WindowInsets
 import android.view.WindowManager
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel
 import com.tamacookie.persist.Adoption
 import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
 import com.tamacookie.persist.Pets
+import com.tamacookie.species.Species
 import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -94,10 +92,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override val overlay: OverlayHost get() = overlayManager
     private lateinit var windows: OverlayWindows
     /** Fenêtre de chaque animal (vue + paramètres). */
-    private class PetWindow(val id: WindowId, val view: BunnyView, val lp: WindowManager.LayoutParams)
+    private class PetWindow(val id: WindowId, val view: PetView, val lp: WindowManager.LayoutParams)
     private val petWindows = HashMap<PetId, PetWindow>()
     /** Vue du résident (gestes, aperçu des effets). */
-    private val bunny: BunnyView get() = petWindows.getValue(resident.id).view
+    private val bunny: PetView get() = petWindows.getValue(resident.id).view
 
     // --- Domaines ---
     override lateinit var pages: PageTracker
@@ -162,9 +160,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         val d = resources.displayMetrics.density
         arena.d = d
-        arena.bw = (Tuning.BUNNY_W_DP * d).toInt()
-        arena.bh = (Tuning.BUNNY_H_DP * d).toInt()
-        arena.feetPad = Tuning.FEET_PAD_DP * d
+        val spec = Species.DEFAULT.spec
+        arena.bw = (spec.windowWDp * d).toInt()
+        arena.bh = (spec.windowHDp * d).toInt()
+        arena.feetPad = spec.feetPadDp * d
         repo = Pets.repository(this)
         resident = loadResident(BunnyPhysics(d))
         world.add(resident)
@@ -248,7 +247,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private fun showNewLook() {
         applyView()
         emit(resident, PType.SPARKLE, 6)
-        speech.sayOneOf(Lines.newLook(resident.name))
+        speech.sayOneOf(pet.species.lines.newLook(resident.name))
         requestFrames()
     }
 
@@ -391,15 +390,15 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         handler.postDelayed(appPoll, 1500)
         tickStats(force = true)
         if (!hidden) startLoop()
-        if (greet && !resident.stats.sleeping) speech.sayOneOf(Lines.WELCOME_BACK)
+        if (greet && !resident.stats.sleeping) speech.sayOneOf(pet.species.lines.WELCOME_BACK)
     }
 
     // =====================================================================
     //  Fenêtres
     // =====================================================================
     private fun createWindows() {
-        val v = BunnyView(this)
-        v.render(BunnyRenderState.of(resident), 0f)
+        val v = PetView(this)
+        v.render(PetRenderState.of(resident), 0f)
         petWindows[resident.id] = PetWindow(WindowId.Pet(resident.id), v, windows.params(arena.bw, arena.bh, touchable = true))
         attachPet(resident)
         touch.attach(v)
@@ -443,7 +442,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         applyView()   // gère aussi le lapin en cage sur une autre vue
         stations.reopenVetPanelIfNeeded()
         startLoop()
-        speech.sayOneOf(Lines.SHOWN)
+        speech.sayOneOf(pet.species.lines.SHOWN)
         updateNotification(force = true)
     }
 
@@ -499,7 +498,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         override fun headTop(pet: PetId): Float {
             val p = world.pets[pet] ?: return 0f
-            return p.body.fy - (if (p.act == Act.SLEEP) 70 else 112) * arena.d
+            val spec = p.species.spec
+            return p.body.fy - (if (p.act == Act.SLEEP) spec.headTopSleepingDp else spec.headTopDp) * arena.d
         }
     }
 
@@ -599,7 +599,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         stations.checkChestBump(dt)
 
         // Rendu : chaque animal affiché reçoit son état de l'image
-        for (pet in world.pets.values) petWindows[pet.id]?.view?.render(BunnyRenderState.of(pet), dt)
+        for (pet in world.pets.values) petWindows[pet.id]?.view?.render(PetRenderState.of(pet), dt)
         placeBunny()
         windows.updateBubbles(dt)
         // Au plus un updateViewLayout par fenêtre et par image
@@ -623,7 +623,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 toys.spawnPoop((p.body.fx - p.body.facing * 40 * arena.d).coerceIn(arena.minX, arena.maxX))
             }
         }
-        if (newPoops > 0 && p.act != Act.SLEEP) speech.sayOneOf(Lines.POOPED)
+        if (newPoops > 0 && p.act != Act.SLEEP) speech.sayOneOf(pet.species.lines.POOPED)
         if (now - lastSaveWall > Tuning.SAVE_EVERY_MS) { save(p); lastSaveWall = now }
     }
 
@@ -648,11 +648,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 if (b.actTime > b.actDuration) decideNext(p)
             }
             Act.WALK -> {
+                val spec = p.species.spec
                 val speed = when {
-                    st.isSick || st.energy < rules.walkSlowEnergyBelow -> Tuning.WALK_SLOW_DP * d
-                    st.happiness > rules.walkHappyAbove -> Tuning.WALK_HAPPY_DP * d
-                    else -> Tuning.WALK_NORMAL_DP * d
-                } * (if (p.personality == Personality.LAZY) Tuning.LAZY_SPEED_FACTOR else 1f)
+                    st.isSick || st.energy < rules.walkSlowEnergyBelow -> spec.walkSlowDp * d
+                    st.happiness > rules.walkHappyAbove -> spec.walkHappyDp * d
+                    else -> spec.walkNormalDp * d
+                } * p.species.behavior(p.personality).walkSpeedFactor
                 if (actor.walkToward(p, b.targetX, speed, dt)) p.setAct(Act.IDLE, 2f + rnd.nextFloat() * 4f)
             }
             Act.AIR -> stepAir(p, dt)
@@ -662,12 +663,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 b.fy = actor.surfaceY(p)
                 if (!st.sleeping) {
                     p.express(Expr.HAPPY, 2f)
-                    speech.sayOneOf(Lines.WOKE_UP)
+                    speech.sayOneOf(pet.species.lines.WOKE_UP)
                     p.setAct(Act.IDLE, 3f)
                 }
             }
             Act.TRAVEL_OUT -> {
-                if (actor.walkToward(p, b.targetX, Tuning.TRAVEL_OUT_DP * d, dt, clamp = false)) {
+                if (actor.walkToward(p, b.targetX, p.species.spec.travelOutDp * d, dt, clamp = false)) {
                     // Il "passe" dans l'application suivante : réapparaît de l'autre côté
                     b.fx = if (b.targetX < 0) arena.screenW + arena.bw else -arena.bw.toFloat()
                     b.targetX = arena.screenW * (0.2f + rnd.nextFloat() * 0.6f)
@@ -676,7 +677,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 }
             }
             Act.TRAVEL_IN -> {
-                if (actor.walkToward(p, b.targetX, Tuning.TRAVEL_IN_DP * d, dt, clamp = false)) {
+                if (actor.walkToward(p, b.targetX, p.species.spec.travelInDp * d, dt, clamp = false)) {
                     m.travelComment?.let { say(it, 4.5f) }
                     m.travelComment = null
                     when (m.travelThen) {
@@ -767,7 +768,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         b.phys.stop()
         b.afterAir = if (b.act == Act.SLEEP) Act.SLEEP else Act.IDLE
         p.express(Expr.SURPRISED, 1f)
-        if (b.act != Act.SLEEP) speech.sayOneOf(Lines.PLATFORM_LOST, 1.5f)
+        if (b.act != Act.SLEEP) speech.sayOneOf(pet.species.lines.PLATFORM_LOST, 1.5f)
         p.setAct(Act.AIR)
     }
 
@@ -795,9 +796,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             haptic(p, HapticFeedbackConstants.KEYBOARD_TAP)
         }
         if (ev.hard) {
-            if (ev.onPlatform) speech.sayOneOf(Lines.HARD_LANDING_PLATFORM)
+            if (ev.onPlatform) speech.sayOneOf(pet.species.lines.HARD_LANDING_PLATFORM)
             else {
-                speech.sayOneOf(Lines.HARD_LANDING_GROUND)
+                speech.sayOneOf(pet.species.lines.HARD_LANDING_GROUND)
                 on(p, PetEvent.HardLanding)
             }
             p.setAct(Act.DIZZY)
@@ -808,7 +809,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         p.setAct(next, if (next == Act.IDLE) idle else 3f)
         val lbl = b.platformLabel
         if (ev.onPlatform && !lbl.isNullOrBlank() && next == Act.IDLE && rnd.nextFloat() < 0.35f) {
-            speech.sayOneOf(Lines.onPlatform(lbl), 2.2f)
+            speech.sayOneOf(pet.species.lines.onPlatform(lbl), 2.2f)
         }
     }
 
@@ -819,7 +820,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             pet.body.fx = pet.body.fx.coerceIn(arena.minX, arena.maxX)
         }
         on(pet, PetEvent.FellAsleep)
-        speech.sayOneOf(Lines.GOING_TO_SLEEP)
+        speech.sayOneOf(pet.species.lines.GOING_TO_SLEEP)
         val k = world.stationOf(pet)
         if (k != null && k.behavior.holdsPet) return   // il dort dans sa cage
         if (k != null) stations.leaveStation(pet, hopOut = false)
@@ -890,7 +891,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         p.mind.travelThen = then
         // Il court vers le bord le plus proche et "saute" dans la nouvelle app
         p.body.targetX = if (p.body.fx < arena.screenW / 2) -arena.bw.toFloat() else arena.screenW + arena.bw
-        speech.sayOneOf(Lines.FOLLOWING, 1.5f)
+        speech.sayOneOf(pet.species.lines.FOLLOWING, 1.5f)
         p.setAct(Act.TRAVEL_OUT)
         requestFrames()
     }

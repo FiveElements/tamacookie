@@ -1,7 +1,5 @@
 package com.tamacookie
 
-import com.tamacookie.BunnyView.Expr
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.toy.BalloonToy
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.FrisbeeToy

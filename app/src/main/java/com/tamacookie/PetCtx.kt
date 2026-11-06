@@ -1,7 +1,6 @@
 package com.tamacookie
 
 import android.content.SharedPreferences
-import com.tamacookie.BunnyView.PType
 import com.tamacookie.feature.ActRegistry
 import kotlin.random.Random
 
