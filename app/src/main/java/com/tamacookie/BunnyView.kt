@@ -118,8 +118,7 @@ class BunnyView(
         state = s
         if (s.look != old.look) applyLook(s.look)
         if (s.food != paintedFood) { paintedFood = s.food; carrot.color = Color.parseColor(s.food.color) }
-        val moving = ambient.update(dt, s, width.toFloat(), height.toFloat(), d)
-        if (moving || s != old) invalidate()
+        if (ambient.frame(dt, old, s, width.toFloat(), height.toFloat(), d)) invalidate()
     }
 
     /** Ajoute des particules au-dessus de la tête (cœurs, notes…), [facing] = sens du regard. */

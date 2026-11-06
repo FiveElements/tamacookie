@@ -24,6 +24,11 @@ Code, commentaires, commits et UI sont **en français**.
   tests. `PetRepository.save()` ignore un animal qui n'est plus enregistré (remplacé par une adoption).
 - Les activités ne lisent l'animal que par le repository et n'écrivent que par `PetCommands` (le service est
   l'autorité quand il tourne).
+- **APK à installer : toujours `./gradlew clean assembleDebug`.** La compilation incrémentale de Kotlin a déjà
+  laissé une classe périmée (`TouchHandler$menuCtx$1`, délégation `PetCtx by ctx` compilée avant l'ajout de
+  `PetCtx.rules`) : `AbstractMethodError` au toucher de « Dodo ». Le fil principal reste alors bloqué dans le
+  gestionnaire de plantage et **toutes les fenêtres overlay sont figées** (même symptôme qu'une boucle arrêtée).
+  Les tests JVM ne le voient pas (ils recompilent).
 - Ignorer `.claude/worktrees/` (copies de travail) dans les recherches.
 - Le repo est indexé par **graft** : `graft ask "<question>" --source`, `graft grep`, `graft skeleton <fichier>`,
   `graft callers <symbole> --depth all` avant tout déplacement/renommage.
@@ -361,6 +366,15 @@ Principes :
     shared_prefs/pets.xml`) ; adoption et renommage service lancé / arrêté ; l'écran principal juste après
     l'adoption (la commande est asynchrone : nom affiché éventuellement en retard d'un `onResume`) ; un retour à
     une version antérieure perdrait l'animal (anciennes clés effacées).
+
+- **Après l'étape 5 — lapin endormi figé (tablette, build 2fb081d)** : non reproduit. Sur émulateur Android 16
+  (API 36, accessibilité active), des builds **propres** de 2fb081d et de 5d552af animent le sommeil (respiration,
+  Zzz), y compris boucle suspendue (forcée) ; la tablette n'a enregistré ni plantage ni ANR (`dumpsys activity
+  exit-info`). Seule cause trouvée d'un écran figé après « Dodo » : un APK incrémental périmé (voir Pièges). La
+  boucle est sortie du service dans **`FrameLoop`** (pur : cadence, dt borné, suspension, reprise ; port
+  `FrameScheduler` = Choreographer + Handler) et `AmbientAnimator.frame` décide du redessin ; `FrameLoopTest`
+  simule les images (faux Choreographer à horloge virtuelle) : un animal visible qui dort reçoit ≈ 12 i/s, chaque
+  image redessine, le temps avance, des Zzz apparaissent ; idem IDLE / SIT / EAT / tenu.
 
 #### Schéma de persistance v1
 

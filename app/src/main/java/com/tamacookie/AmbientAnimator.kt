@@ -73,6 +73,13 @@ class AmbientAnimator(private val rnd: Random) {
         return active || blink > 0f || earTwitch > 0f || particles.isNotEmpty() || movesWithTime(s)
     }
 
+    /**
+     * Une image de la vue : avance de [dt] pour l'état [s] (le précédent était [old]) et renvoie s'il faut
+     * redessiner (état différent ou animation ambiante).
+     */
+    fun frame(dt: Float, old: BunnyRenderState, s: BunnyRenderState, w: Float, h: Float, d: Float): Boolean =
+        update(dt, s, w, h, d) || s != old
+
     /** Ajoute [count] particules au-dessus de la tête (vue [w] × [h], densité [d], regard [facing]). */
     fun emit(type: PType, count: Int, w: Float, h: Float, d: Float, facing: Float) {
         repeat(count) {

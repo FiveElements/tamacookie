@@ -34,8 +34,6 @@ import com.tamacookie.persist.PetRepository
 import com.tamacookie.persist.Pets
 import java.util.Calendar
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.random.Random
@@ -137,13 +135,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         private set
 
     // --- Boucle ---
-    private var looping = false
-    /** Boucle suspendue (lapin invisible) : simple vérification périodique via [suspendedTick]. */
-    private var suspended = false
-    private var lastSuspendedTick = 0L
     /** Écran allumé ET déverrouillé. */
     private var awake = true
-    private var lastFrameNs = 0L
     private var lastTickWall = 0L
     private var lastSaveWall = 0L
     private var notifTimer = 0f
@@ -494,7 +487,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     override fun placeBunny() {
         // Boucle suspendue : il est hors de l'écran, inutile de déplacer la fenêtre (fait à la reprise)
-        if (suspended) return
+        if (loop.suspended) return
         val w = petWindows[resident.id] ?: return
         overlay.move(w.id, petX(resident), petY(resident))
     }
@@ -544,30 +537,14 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     //  Boucle d'animation (fréquence adaptée à l'activité, suspendue s'il est invisible)
     // =====================================================================
     private fun startLoop() {
-        if (looping || hidden || !awake) return
-        looping = true
-        suspended = false
-        lastFrameNs = 0L
-        handler.removeCallbacks(suspendedTick)
-        Choreographer.getInstance().postFrameCallback(this)
+        if (hidden || !awake) return
+        loop.start()
     }
 
-    private fun stopLoop() {
-        looping = false
-        suspended = false
-        Choreographer.getInstance().removeFrameCallback(this)
-        handler.removeCallbacks(suspendedTick)
-    }
+    private fun stopLoop() = loop.stop()
 
     /** Quelque chose de visible va se passer : reprend la boucle si elle était suspendue. */
-    override fun requestFrames() {
-        if (!looping || !suspended) return
-        suspended = false
-        handler.removeCallbacks(suspendedTick)
-        lastFrameNs = 0L
-        placeBunny()
-        Choreographer.getInstance().postFrameCallback(this)
-    }
+    override fun requestFrames() { loop.resume() }
 
     private fun targetFps(): Int {
         val act = resident.act
@@ -586,51 +563,26 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             !world.hasToyOrFood() && !toys.anyMoving() && !stations.animating()
     }
 
-    override fun doFrame(frameTimeNanos: Long) {
-        if (!looping || suspended) return
-        val fps = targetFps()
-        val cap = max(Tuning.DT_CAP_S, 2f / fps)
-        val dt = if (lastFrameNs == 0L) 0.016f else ((frameTimeNanos - lastFrameNs) / 1e9f).coerceIn(0f, cap)
-        lastFrameNs = frameTimeNanos
-        try {
-            update(dt)
-        } catch (e: Exception) {
-            Log.e(TAG, "frame error", e)
-        }
-        if (!looping || suspended) return
-        if (canSuspend()) {
-            suspended = true
-            lastSuspendedTick = clock.uptimeMs()
-            handler.postDelayed(suspendedTick, Tuning.SUSPENDED_TICK_MS)
-            return
-        }
-        // Moins de 60 i/s : on saute des vsync au lieu de calculer chaque image
-        val delay = 1000L / targetFps() - 16L
-        if (delay > 0) Choreographer.getInstance().postFrameCallbackDelayed(this, delay)
-        else Choreographer.getInstance().postFrameCallback(this)
-    }
+    override fun doFrame(frameTimeNanos: Long) = loop.onFrame(frameTimeNanos)
 
     /** Boucle suspendue : la simulation avance par petits pas, et la boucle reprend dès qu'il redevient visible. */
-    private val suspendedTick = object : Runnable {
-        override fun run() {
-            if (!looping || !suspended) return
-            val now = clock.uptimeMs()
-            var left = ((now - lastSuspendedTick) / 1000f).coerceAtMost(1f)
-            lastSuspendedTick = now
-            try {
-                while (left > 0f && suspended) {
-                    val step = min(left, Tuning.SUSPENDED_STEP_S)
-                    update(step)
-                    left -= step
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "suspended tick error", e)
-            }
-            if (!looping || !suspended) return
-            if (!canSuspend()) requestFrames()
-            else handler.postDelayed(this, Tuning.SUSPENDED_TICK_MS)
+    private val suspendedTick: Runnable = Runnable { loop.onTick() }
+
+    /** Images (Choreographer) et vérifications de la boucle suspendue (Handler). */
+    private val frameScheduler: FrameScheduler = object : FrameScheduler {
+        override fun postFrame(delayMs: Long) {
+            if (delayMs > 0) Choreographer.getInstance().postFrameCallbackDelayed(this@BunnyService, delayMs)
+            else Choreographer.getInstance().postFrameCallback(this@BunnyService)
         }
+        override fun cancelFrames() = Choreographer.getInstance().removeFrameCallback(this@BunnyService)
+        override fun postTick(delayMs: Long) { handler.postDelayed(suspendedTick, delayMs) }
+        override fun cancelTicks() = handler.removeCallbacks(suspendedTick)
     }
+
+    private val loop: FrameLoop = FrameLoop(
+        frameScheduler, uptimeMs = { clock.uptimeMs() }, targetFps = ::targetFps, canSuspend = ::canSuspend,
+        onError = { what, e -> Log.e(TAG, what, e) }, onResume = { placeBunny() },
+    ) { dt -> update(dt) }
 
     private fun update(dt: Float) {
         val p = resident
