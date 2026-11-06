@@ -24,6 +24,9 @@ object Prefs {
     /** Thèmes de saison (Noël, Halloween, printemps) : activés par défaut ([SEASONAL_DEFAULT]). */
     const val SEASONAL = "seasonal"
     const val SEASONAL_DEFAULT = true
+    /** Bien-être numérique (pause proposée après un long moment dans la même app) : coupé par défaut. */
+    const val WELLBEING = "wellbeing"
+    const val WELLBEING_DEFAULT = false
 
     /** Largeur apprise d'une page du bureau, par largeur d'écran (portrait / paysage). */
     fun pageWidth(screenW: Int) = "pageW2_$screenW"

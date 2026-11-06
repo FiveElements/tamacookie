@@ -178,6 +178,33 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
         paintSeason()
 
+        // Bien-être numérique (évolution 4c) : il propose une pause, ne bloque jamais rien
+        section(root, "Bien-être")
+        val wellChip = TextView(this).apply {
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f); setTextColor(Color.parseColor("#3A2E39"))
+            val p = (10 * d).toInt(); setPadding(p, p, p, p)
+        }
+        fun paintWellbeing() {
+            val on = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT)
+            wellChip.text = if (on) "☕ Pauses proposées : activées" else "Pauses proposées : désactivées"
+            wellChip.background = chipBg(on)
+        }
+        wellChip.setOnClickListener {
+            val on = prefs.getBoolean(Prefs.WELLBEING, Prefs.WELLBEING_DEFAULT)
+            prefs.edit().putBoolean(Prefs.WELLBEING, !on).apply()
+            BunnyService.send(this@MainActivity, BunnyService.ACTION_RELOAD)
+            paintWellbeing()
+        }
+        root.addView(wellChip, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        root.addView(TextView(this).apply {
+            text = "Après ${GameRules.DEFAULT.breakSuggestAfterMin} min dans la même app, il bâille et propose une pause ; " +
+                "après ${GameRules.DEFAULT.breakSulkAfterMin} min, il boude jusqu'à ce que tu changes d'app ou le caresses"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f); setTextColor(Color.parseColor("#7A6B75"))
+            setPadding((4 * d).toInt(), (4 * d).toInt(), 0, 0)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        paintWellbeing()
+
 
         section(root, "Autorisations")
         overlayBtn = permButton(root) {
