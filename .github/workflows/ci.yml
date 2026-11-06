@@ -83,10 +83,8 @@ jobs:
           python3 .github/scripts/coverage_badge.py coverage/report.xml "$RUNNER_TEMP/coverage.svg"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch --orphan badges
-          git rm -rq --cached . || true
-          git clean -fdxq -e coverage
-          cp "$RUNNER_TEMP/coverage.svg" coverage.svg
-          git add coverage.svg
-          git commit -qm "Badge de couverture ($GITHUB_SHA)"
-          git push --force origin HEAD:badges
+          # Commit orphelin construit sans toucher à la copie de travail (pas de checkout).
+          blob=$(git hash-object -w "$RUNNER_TEMP/coverage.svg")
+          tree=$(printf '100644 blob %s\tcoverage.svg\n' "$blob" | git mktree)
+          commit=$(git commit-tree "$tree" -m "Badge de couverture ($GITHUB_SHA)")
+          git push --force origin "$commit:refs/heads/badges"
