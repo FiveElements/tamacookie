@@ -190,6 +190,15 @@ class PetState(private val context: Context) {
         favoriteToy = runCatching { Toy.valueOf(p.getString("favoriteToy", "")!!) }.getOrDefault(Toy.BALL)
     }
 
+    /**
+     * Recharge seulement le nom, l'apparence et le caractère (après l'écran d'adoption ou un renommage),
+     * sans écraser les jauges en mémoire (sommeil, crottes…) non encore sauvegardées.
+     */
+    fun reloadAppearance() {
+        loadLook()
+        name = prefs().getString("name", name) ?: name
+    }
+
     /** Charge l'état et rattrape le temps écoulé depuis la dernière sauvegarde. */
     fun load(): PetState {
         val p = prefs()
@@ -211,8 +220,8 @@ class PetState(private val context: Context) {
 
     /** Nouveau lapin : jauges remises à zéro (l'apparence est sauvegardée à part). */
     fun reset() {
-        val enabled = prefs().getBoolean("enabled", false)
-        prefs().edit().clear().putBoolean("enabled", enabled).apply()
+        val enabled = prefs().getBoolean(Prefs.ENABLED, false)
+        prefs().edit().clear().putBoolean(Prefs.ENABLED, enabled).apply()
         satiety = 80f; happiness = 80f; energy = 90f; cleanliness = 90f; health = 100f
         sleeping = false; poops = 0; poopAccumulator = 0f; visitedApps = 0; caged = false
         bornAt = System.currentTimeMillis()
@@ -220,5 +229,5 @@ class PetState(private val context: Context) {
         saveLook()
     }
 
-    private fun prefs() = context.getSharedPreferences("pet", Context.MODE_PRIVATE)
+    private fun prefs() = context.getSharedPreferences(Prefs.FILE, Context.MODE_PRIVATE)
 }

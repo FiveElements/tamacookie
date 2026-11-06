@@ -2,5 +2,5 @@
 <resources>
     <string name="app_name">TamaCookie</string>
     <string name="a11y_summary">Permet à Cookie de sauter sur les icônes et les boutons</string>
-    <string name="a11y_description">TamaCookie utilise uniquement la position des éléments affichés (icônes, boutons) pour que le lapin puisse sauter dessus, et remarque quand tu touches un bouton, fais défiler ou tapes au clavier (sans jamais lire le texte) pour qu\'il puisse réagir et faire des bêtises. Aucun contenu n\'est enregistré ni envoyé.</string>
+    <string name="a11y_description">TamaCookie lit la position des éléments affichés (icônes, boutons) pour que le lapin puisse sauter dessus, ainsi que le nom court des icônes et boutons (par ex. « Chrome ») et le numéro de page du bureau. Il remarque aussi quand tu touches un bouton, fais défiler ou tapes au clavier, sans jamais lire le texte que tu saisis ni le contenu des champs de saisie ou des mots de passe. Tout reste sur le téléphone, en mémoire : rien n\'est enregistré ni envoyé.</string>
 </resources>

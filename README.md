@@ -8,6 +8,7 @@
 [![Android 13+](https://img.shields.io/badge/Android-13%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com/about/versions/13)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Dependabot](https://img.shields.io/badge/Dependabot-auto--merge-025E8C?logo=dependabot)](.github/dependabot.yml)
+[![Licence LGPL-3.0](https://img.shields.io/github/license/FiveElements/tamacookie?label=licence&color=blue)](LICENSE)
 
 Un petit lapin façon tamagotchi qui **vit par-dessus tes écrans Android** : il se promène sur le bureau,
 saute sur les icônes, te suit d'application en application… et vient t'embêter quand tu l'oublies.
@@ -66,7 +67,9 @@ Le projet n'utilise que le framework Android et la bibliothèque standard Kotlin
 |---|---|---|
 | [`ci.yml`](.github/workflows/ci.yml) | push sur `main`, pull requests | tests unitaires, lint, APK debug (artefact) |
 | [`release.yml`](.github/workflows/release.yml) | tag `v*` ou lancement manuel | tests, APK release signé, publication GitHub Release |
-| [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) | PR Dependabot | fusion automatique dès que la CI est verte |
+| [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) | PR Dependabot | fusion automatique dès que la CI est verte, **uniquement pour les mises à jour patch et minor** (les majeures restent manuelles) |
+
+Les actions GitHub sont épinglées par SHA de commit (le tag est indiqué en commentaire) ; Dependabot les met à jour.
 
 **Publier une version** :
 
@@ -76,6 +79,16 @@ git tag v1.1.0 && git push origin v1.1.0
 
 ou *Actions → Release → Run workflow* avec le numéro de version.
 
-**Signature** : l'APK de release est signé avec la clé fournie par les secrets du dépôt
-`TAMACOOKIE_KEYSTORE_BASE64`, `TAMACOOKIE_KEYSTORE_PASSWORD`, `TAMACOOKIE_KEY_ALIAS` et `TAMACOOKIE_KEY_PASSWORD`
-(sinon, avec une clé de debug et un avertissement).
+La version doit être de la forme `X.Y.Z` (ex. `1.2.0`), sinon le workflow échoue.
+
+**Signature** : la release **exige** les 4 secrets du dépôt
+`TAMACOOKIE_KEYSTORE_BASE64`, `TAMACOOKIE_KEYSTORE_PASSWORD`, `TAMACOOKIE_KEY_ALIAS` et `TAMACOOKIE_KEY_PASSWORD`.
+Sans clé de signature, le workflow échoue (aucune release signée avec une clé de debug n'est publiée).
+
+## 📄 Licence
+
+TamaCookie est un logiciel libre distribué sous licence
+**GNU Lesser General Public License v3.0 ou ultérieure** (LGPL-3.0-or-later) :
+voir [`LICENSE`](LICENSE), qui complète la [GNU GPL v3](COPYING).
+
+Copyright © 2026 FiveElements

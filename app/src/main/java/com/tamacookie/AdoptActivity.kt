@@ -40,6 +40,8 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Anti-tapjacking : aucune surimpression d'une autre app par-dessus cet écran
+        window.setHideOverlayWindows(true)
         window.statusBarColor = Color.parseColor("#FFF4E6")
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
@@ -127,6 +129,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
             LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         root.addView(btnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (22 * d).toInt() })
 
+        scroll.filterTouchesWhenObscured = true
         setContentView(scroll)
         refreshAll()
     }
