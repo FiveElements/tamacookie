@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
@@ -22,7 +23,15 @@ import android.view.accessibility.AccessibilityWindowInfo
 /**
  * Service d'accessibilité : adaptateur d'entrée du port [ScreenSensor]. Il **publie** dans le
  * [ScreenSensorHub] du processus ([AppGraph]) ; la logique (plateformes, pages, défilement) est pure
- * ([ScreenScan], [ScreenSensorHub]). Ce qu'il lit, et seulement cela :
+ * ([ScreenScan], [ScreenSensorHub]).
+ *
+ * Fils : les événements arrivent sur le fil principal, qui décide quand scanner (délais, au plus un scan
+ * toutes les [MIN_SCAN_INTERVAL_MS]). Le **parcours de l'arbre** (un appel IPC par nœud, jusqu'à
+ * [ScreenScan.MAX_NODES]) tourne sur un [HandlerThread] dédié, qui renvoie un [ScanResult] immuable au fil
+ * principal (`post`) ; un seul scan à la fois. Le fil est arrêté dans [onDestroy] (`onInterrupt` ne
+ * signale qu'une interruption du retour à l'utilisateur : le service reste connecté).
+ *
+ * Ce qu'il lit, et seulement cela :
  *  - la position (rectangle) des éléments visibles, pour que Cookie saute dessus ;
  *  - le nom court (description, sinon libellé) des icônes et boutons NON éditables,
  *    jamais le contenu d'un champ de saisie ni d'un mot de passe ;
@@ -53,6 +62,13 @@ class ScreenSensorService : AccessibilityService() {
     private var lastScanAt = 0L
     private var lastWindowChangeAt = 0L
     private var receiverRegistered = false
+    /** Fil du parcours de l'arbre (créé au premier scan, arrêté dans [onDestroy]). */
+    private var scanThread: HandlerThread? = null
+    private var scanHandler: Handler? = null
+    /** Un scan tourne sur [scanThread] ; [rescan] : un autre a été demandé entre-temps. */
+    private var scanInFlight = false
+    private var rescan = false
+    private var destroyed = false
     private val homePkgs: Set<String> by lazy {
         try {
             val i = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
@@ -146,26 +162,57 @@ class ScreenSensorService : AccessibilityService() {
             try { unregisterReceiver(screenReceiver) } catch (_: Exception) {}
             receiverRegistered = false
         }
+        destroyed = true
         handler.removeCallbacksAndMessages(null)
+        scanThread?.quit()             // les scans en attente sont abandonnés ; celui en cours ne publiera pas
+        scanThread = null; scanHandler = null
         hub.onDisconnected()
         super.onDestroy()
     }
 
-    /** Plafonne les scans complets (batterie) : reporte le scan s'il arrive trop tôt. */
+    /**
+     * Plafonne les scans complets (batterie) : reporte le scan s'il arrive trop tôt, ou s'il y en a déjà un
+     * en cours. Fil principal : capture ce dont le scan a besoin, le lance sur [scanThread], publie le
+     * résultat dans le [hub] à son retour.
+     */
     private fun runScan() {
-        if (!hub.snapshot.screenOn || !BunnyService.running) return
+        if (destroyed || !hub.snapshot.screenOn || !BunnyService.running) return
+        if (scanInFlight) { rescan = true; return }
         val now = SystemClock.uptimeMillis()
         val wait = lastScanAt + MIN_SCAN_INTERVAL_MS - now
         if (wait > 0) { scheduleScan(wait); return }
         lastScanAt = now
         val epoch = hub.epoch
+        val launcherPkg = hub.snapshot.launcherPkg
         val bounds = getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
         val g = ScreenScan.Geometry(bounds.width(), bounds.height(), resources.displayMetrics.density)
-        val result = doScan(hub.snapshot.launcherPkg, g)
-        hub.onScan(result, epoch, SystemClock.uptimeMillis())
+        scanInFlight = true
+        worker().post {
+            val result = try { doScan(launcherPkg, g) } catch (e: Exception) {
+                Log.w("TamaCookie", "scan", e); null
+            }
+            handler.post { onScanDone(result, epoch) }
+        }
     }
 
-    /** Lit l'arbre de la fenêtre active (appels IPC) ; [launcherPkg] = bureau déjà reconnu. */
+    /** Fil principal : résultat d'un scan (null = échec). */
+    private fun onScanDone(result: ScanResult?, epoch: Int) {
+        scanInFlight = false
+        if (destroyed) return
+        if (result != null) hub.onScan(result, epoch, SystemClock.uptimeMillis())
+        if (rescan) { rescan = false; scheduleScan(0) }
+    }
+
+    private fun worker(): Handler = scanHandler ?: run {
+        val t = HandlerThread("TamaCookie-scan").also { it.start() }
+        scanThread = t
+        Handler(t.looper).also { scanHandler = it }
+    }
+
+    /**
+     * **Fil du scan** : lit l'arbre de la fenêtre active (appels IPC) ; [launcherPkg] = bureau déjà reconnu.
+     * Ne touche à aucun état partagé (tout est passé en paramètre ou renvoyé dans le [ScanResult]).
+     */
     private fun doScan(launcherPkg: String?, g: ScreenScan.Geometry): ScanResult {
         // Clavier affiché ?
         val ime = try {
