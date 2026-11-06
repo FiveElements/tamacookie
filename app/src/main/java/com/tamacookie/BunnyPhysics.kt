@@ -134,7 +134,9 @@ class BunnyPhysics(val density: Float = 1f) {
                     x >= p.left + margin && x <= p.right - margin
                 ) {
                     y = p.top
-                    val hard = vy > Tuning.HARD_LANDING_DP * d
+                    // Impact brutal au sol plus tôt dans ce vol (rebond) : signalé ici, et oublié pour le vol suivant
+                    val hard = vy > Tuning.HARD_LANDING_DP * d || hardLanding
+                    hardLanding = false
                     vx = 0f; vy = 0f; airVy = 0f
                     return AirEvent.Landed(i, hard)
                 }
