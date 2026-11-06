@@ -77,4 +77,53 @@ class MenuEntryTest {
         assertEquals(listOf(MenuEntries.SLEEP), MenuEntries.ALL.filter { it.dynamic })
         for (e in MenuEntries.ALL.filter { !it.dynamic }) assertEquals("${e.emoji}\n${e.label}", e.text(FakePetCtx().pet.stats))
     }
+
+    // ------------------------------------------------------------------ Évolution 4a
+
+    @Test
+    fun `nouvelles entrees a la fin - chanter, brosser`() {
+        assertEquals(listOf("Chanter", "Brosser"), MenuEntries.ALL.drop(4).map { it.label })
+        assertEquals(0, MenuEntries.ALL.size % MenuEntries.PER_ROW)          // rangées complètes
+    }
+
+    @Test
+    fun `chanter - des notes et une danse, une berceuse s'il dort`() {
+        val c = FakeMenuCtx()
+        MenuEntries.SING.run(c, c.pet)
+        assertEquals(4, c.base.emitted.count { it == PType.NOTE })
+        assertEquals(Act.DANCE, c.pet.act)
+        assertEquals(0f, c.pet.mind.danceTime, 0f)
+        assertEquals(Expr.HAPPY, c.pet.mind.exprOverride)
+        assertEquals(1, c.base.said.size)
+        // endormi : il ne se réveille pas
+        val s = FakeMenuCtx()
+        s.pet.stats = s.pet.stats.copy(sleeping = true)
+        s.pet.setAct(Act.SLEEP)
+        MenuEntries.SING.run(s, s.pet)
+        assertTrue(s.pet.stats.sleeping)
+        assertEquals(Act.SLEEP, s.pet.act)
+        assertTrue(s.base.said.single().contains("Dodo") || s.base.said.single().contains("rêves"))
+        // occupé (une partie) : il chante sans s'arrêter de jouer
+        val p = FakeMenuCtx()
+        p.pet.setAct(Act.PLAY)
+        MenuEntries.SING.run(p, p.pet)
+        assertEquals(Act.PLAY, p.pet.act)
+    }
+
+    @Test
+    fun `brosser - plus propre et content, sauvegarde, pas pendant son sommeil`() {
+        val c = FakeMenuCtx()
+        c.pet.stats = c.pet.stats.copy(cleanliness = 50f, happiness = 50f)
+        MenuEntries.BRUSH.run(c, c.pet)
+        val r = GameRules.DEFAULT
+        assertEquals(50f + r.brushCleanliness, c.pet.stats.cleanliness, 0.01f)
+        assertTrue(c.pet.stats.happiness > 50f)
+        assertEquals(listOf(c.pet.id), c.base.saved)
+        assertEquals(3, c.base.emitted.count { it == PType.SPARKLE })
+        val s = FakeMenuCtx()
+        s.pet.stats = s.pet.stats.copy(sleeping = true, cleanliness = 50f)
+        MenuEntries.BRUSH.run(s, s.pet)
+        assertEquals(50f, s.pet.stats.cleanliness, 0f)
+        assertTrue(s.base.said.single().contains("dort"))
+    }
 }

@@ -80,6 +80,9 @@ data class GameRules(
     val gardenCleanlinessCost: Float = 4f,
     /** La gamelle : il y mange s'il a faim (satiété sous ce seuil), sinon il renifle et ressort. */
     val bowlHungryBelow: Float = 70f,
+    /** Brossé (menu 🪥) : propreté, et un peu de joie (×[StatMod.PET_JOY], comme une caresse). */
+    val brushCleanliness: Float = 8f,
+    val brushJoy: Float = 3f,
 
     // --- Humeur (ordre de priorité dans [PetRules.mood]) ---
     val sickBelow: Float = 35f,

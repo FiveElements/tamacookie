@@ -35,7 +35,7 @@ data class PetStats(
 sealed interface PetEvent {
     val savesNow: Boolean get() = when (this) {
         is Fed, PlayStarted, Bathed, PoopRemoved, Healed, FellAsleep, is Woken, Caged, Released,
-        WheelRun, Grazed -> true
+        WheelRun, Grazed, Brushed -> true
         is Elapsed, Petted, is PlayHit, AppVisited, HardLanding, Found, NotFound, is Rested -> false
     }
 
@@ -71,6 +71,8 @@ sealed interface PetEvent {
     data object WheelRun : PetEvent
     /** Il a grignoté et s'est roulé dans le jardin. */
     data object Grazed : PetEvent
+    /** Brossé (menu) : un peu plus propre, content. */
+    data object Brushed : PetEvent
 }
 
 /** Conséquences d'un événement, à mettre en scène par l'appelant. */
@@ -175,6 +177,10 @@ object PetRules {
                 happiness = s.happiness + r.gardenJoy,
                 satiety = s.satiety + r.gardenSatiety,
                 cleanliness = s.cleanliness - r.gardenCleanlinessCost,
+            ), r)
+            PetEvent.Brushed -> done(s.copy(
+                cleanliness = s.cleanliness + r.brushCleanliness,
+                happiness = s.happiness + r.brushJoy * p.mod(StatMod.PET_JOY),
             ), r)
         }
     }
