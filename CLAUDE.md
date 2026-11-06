@@ -14,7 +14,9 @@ Code, commentaires, commits et UI sont **en français**.
 ./gradlew :core:jacocoTestReport createDebugUnitTestCoverageReport   # couverture JaCoCo des deux modules :
 #   core/build/reports/jacoco/test/ (html/, jacocoTestReport.xml) et app/build/reports/coverage/test/debug/ (index.html, report.xml)
 #   total : python .github/scripts/coverage_badge.py core/…/jacocoTestReport.xml app/…/report.xml sortie.svg
-./gradlew lintDebug           # ⚠️ plante avec JDK 25 (UastFacade) : lancer Gradle avec un JDK 17/21
+./gradlew lintDebug           # démon Gradle forcé en JDK 21 (gradle/gradle-daemon-jvm.properties) : lint plante avec le
+#   JDK 25 (UastFacade). JAVA_HOME peut être un JDK 25 si un JDK 21 est trouvé : JDK21_HOME (variable d'environnement)
+#   ou org.gradle.java.installations.paths dans ~/.gradle/gradle.properties (Gradle ne détecte pas le JDK Microsoft)
 ./gradlew detekt              # analyse statique des deux modules (bloquant en CI) : rapports dans <module>/build/reports/detekt/
 ./gradlew detektBaseline      # régénère config/detekt/baseline-<module>.xml — voir « Baseline detekt » ci-dessous
 ```
@@ -1113,6 +1115,55 @@ Principes :
     `A11yActionIdsTest` (app, +2). **498 → 518 tests** (489 dans `:core`, 29 dans `:app`).
   - **Non couvert par les tests JVM** (vues Android, TalkBack) : voir « Accessibilité » en fin de fichier, liste
     d'essais sur tablette.
+
+- **Corrections après l'étape 8 — service, stations, batterie, build** — 5 commits (un par point ; ce fichier) :
+  - **Relance après une mise à jour** : `BootReceiver` écoute aussi `ACTION_MY_PACKAGE_REPLACED` (`adb install -r`,
+    Play Store : le processus est tué, le service ne revenait pas). Même garde (`Prefs.ENABLED`, surimpression), même
+    `try/catch`. Ce broadcast est, avec `BOOT_COMPLETED`, exempté (Android 12+) de l'interdiction de démarrer un
+    service au premier plan depuis l'arrière-plan ; notre type `specialUse` n'est pas visé par les limites
+    d'Android 15 sur `BOOT_COMPLETED` (`dataSync`, `camera`, `mediaPlayback`…). Décision pure : **`AutoRestart`**
+    (cœur, actions recopiées de `Intent`, vérifiées par `AndroidConstantsTest`).
+  - **Stations par-dessus nos écrans** (l'écran principal en fenêtre pop-up Samsung sur le bureau : roue et lit
+    sur le champ du nom). Cause : `ForegroundAppWatcher` ignore notre paquet, la vue courante restait le bureau.
+    **Choix : les rappels de cycle de vie des activités, pas le paquet au premier plan** — le paquet ne dit rien
+    d'une pop-up ou d'un écran partagé (et dépend de l'accessibilité / d'UsageStats), et une commande par intent
+    (comme `ACTION_RELOAD`) laisserait le service ignorer un écran ouvert **avant** son démarrage. `TamaApp`
+    enregistre des `ActivityLifecycleCallbacks` (toutes les activités, présentes et à venir) qui tiennent
+    **`OwnAppScreens`** (cœur, dans `AppGraph.ownApp`, même processus que le service) : visible de `onStart` à
+    `onStop` (pas `onResume` / `onPause` : une pop-up ou un écran partagé sont visibles sans focus), jetons comptés
+    un par un (l'adoption démarre avant que l'écran principal s'arrête). Le service recopie l'état dans
+    `StationController.ownAppVisible` à chaque `layoutAnchored` et demande une image à chaque bascule (une rotation,
+    arrêt puis redémarrage dans le même message, ne fait rien clignoter). `layout()` retire alors les stations
+    **vides** (placement, ancrage, préférences intacts ; retour en fondu) ; une station **occupée** reste avec son
+    occupant (bain, lit, cage : il n'est ni sorti ni déplacé — l'animal lui-même reste affiché, ce n'était pas
+    demandé). Une station retirée ne se surligne pas sous l'animal glissé. **Non retirés** : objets (jouets,
+    nourriture : en jeu, liés à l'animal ; crottes : petites, à ramasser), dock 🏠, bulles.
+  - **Batterie** : `StationBehavior.animated` ne demande des images qu'à une station affichée **et occupée**
+    (`StationController.animates`). La roue ne tourne que si quelqu'un court dedans (`WheelStationDrawer` lit déjà
+    `v.occupied`) ; la mousse et les bulles du bain n'ont de sens qu'avec lui dedans. Vide, la station est dessinée
+    immobile (`t` figé, plus de redessin) et `animating()` ne bloque plus `BunnyService.canSuspend` : animal caché ou
+    sur une autre page + baignoire / roue vide affichée = boucle suspendue. Occupée : inchangé. `canSuspend` est
+    dans le service (Android) : `FrameLoopTest` ne s'y prête pas, le test porte sur `animating()`.
+  - **Build : démon Gradle en JDK 21** : `gradle/gradle-daemon-jvm.properties` (`toolchainVersion=21`), **écrit à la
+    main** — `./gradlew updateDaemonJvm --jvm-version=21` échoue sans résolveur de toolchains (« Toolchain download
+    repositories have not been configured ») : il faudrait le plugin foojay dans `settings.gradle.kts` (dépendance
+    de build et URL de téléchargement vers l'API foojay), non ajouté. Sans URL, rien n'est téléchargé : un JDK 21
+    **local** est exigé. Gradle ne détecte pas le JDK Microsoft installé (`C:\Program Files\Microsoft\…`) :
+    `gradle.properties` ajoute `org.gradle.java.installations.fromEnv=JDK21_HOME,JAVA_HOME_21_X64` (le second est
+    posé par `actions/setup-java` en CI). Vérifié hors ligne : `JAVA_HOME` = JDK 25 + `JDK21_HOME` → démon en
+    JDK 21, `test detekt lintDebug` verts. CI (`ci.yml`, `release.yml`) : `setup-java` 17 → **21**. **Cible
+    inchangée** : classes de l'app et du cœur en version 61 (Java 17 : `jvmTarget`, `source/targetCompatibility`) ;
+    le cœur compile en plus avec **`-Xjdk-release=17`** — compilé contre l'API du JDK 21, un appel comme
+    `list.removeFirst()` se lierait à la méthode du JDK 21, absente d'Android 13/14 (l'APK embarque le cœur) ;
+    l'app compile contre `android.jar` (AGP), rien à faire.
+  - Tests : `AutoRestartTest` (+3), `AndroidConstantsTest` (+1), `StationControllerTest` (+6, dont la baignoire
+    réécrite : occupée pour s'animer). **518 → 528 tests**.
+  - **À vérifier sur tablette** : `adb install -r` d'un APK (`./gradlew clean assembleDebug`) service lancé → le lapin
+    revient seul (et ne revient pas s'il était rangé ou sans surimpression) ; écran principal en pop-up sur le bureau,
+    en plein écran et en écran partagé → stations vides absentes, occupées (lapin au bain, au lit, en cage)
+    présentes, toutes de retour à leur place en quittant l'app (et en passant à l'adoption puis en revenant :
+    pas de clignotement ; rotation de l'écran principal) ; baignoire / roue vides immobiles, roue qui tourne et bain
+    qui mousse avec le lapin dedans, boucle suspendue avec lapin caché et baignoire vide affichée (batterie).
 
 #### Schéma de persistance v1
 
