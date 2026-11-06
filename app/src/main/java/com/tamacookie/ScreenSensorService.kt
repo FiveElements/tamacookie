@@ -66,36 +66,11 @@ object Platforms {
     /** Package du bureau (launcher) quand il a été vu avec des pages. */
     @Volatile var launcherPkg: String? = null
 
-    /**
-     * Numéro de page extrait d'une "page 2 sur 3" / "page 2 of 3" / "Pagina 2 van 3" /
-     * "Strona 2 z 3"… (groupes 1 et 2), ou d'un simple "2 / 3" (groupes 3 et 4).
-     * Utiliser [parsePage] plutôt que les groupes directement.
-     */
-    val PAGE_RE = Regex(
-        "(?iu)(?:page|écran|ecran|seite|página|pagina|pagine|strona|stránka|stranka|sida|side|sivu|oldal|" +
-            "страница|экран)\\s*(\\d+)\\s*(?:sur|of|/|de|do|von|di|van|z|ze|av|af|из|-)\\s*(\\d+)" +
-            "|^\\s*(\\d+)\\s*/\\s*(\\d+)\\s*$"
-    )
+    /** Voir [ScreenScan.parsePage]. */
+    fun parsePage(desc: CharSequence?): Pair<Int, Int>? = ScreenScan.parsePage(desc)
 
-    /** (page courante, nombre de pages) d'une description d'indicateur de page, sinon null. */
-    fun parsePage(desc: CharSequence?): Pair<Int, Int>? {
-        if (desc.isNullOrEmpty()) return null
-        val m = PAGE_RE.find(desc) ?: return null
-        val g = m.groupValues
-        val page = (g[1].ifEmpty { g[3] }).toIntOrNull() ?: return null
-        val count = (g[2].ifEmpty { g[4] }).toIntOrNull() ?: return null
-        return if (page in 1..count && count <= 50) page to count else null
-    }
-
-    /**
-     * Bande verticale [minTop, maxTop] (px) où l'on cherche des plateformes : proportionnelle
-     * à la hauteur pour rester non vide en paysage sur téléphone.
-     */
-    fun detectionBand(height: Int, density: Float): Pair<Float, Float> {
-        val minTop = maxOf(120 * density, 0.22f * height)          // place pour la tête et le saut
-        val maxTop = height - maxOf(90 * density, 0.12f * height)  // pas collé au sol
-        return minTop to maxTop
-    }
+    /** Voir [ScreenScan.detectionBand]. */
+    fun detectionBand(height: Int, density: Float): Pair<Float, Float> = ScreenScan.detectionBand(height, density)
 
     fun publish(l: List<P>) {
         if (l == list) return

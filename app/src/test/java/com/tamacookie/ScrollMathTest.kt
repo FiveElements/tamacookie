@@ -85,4 +85,63 @@ class ScrollMathTest {
         assertTrue(ScrollMath.ended(2449, 2450))
         assertFalse(ScrollMath.ended(249, 599))
     }
+
+    @Test
+    fun `fin d'animation - seuil de 3 px dans les deux sens`() {
+        assertTrue(ScrollMath.ended(2450, 2450))
+        assertTrue(ScrollMath.ended(2453, 2450))
+        assertTrue(ScrollMath.ended(2447, 2450))
+        assertFalse(ScrollMath.ended(2454, 2450))
+        assertFalse(ScrollMath.ended(2446, 2450))
+    }
+
+    @Test
+    fun `page affichee - nombre de pages inconnu ou bord exact`() {
+        // pageCount 0 (inconnu) : on reste sur la page 1 sans planter
+        assertEquals(1, ScrollMath.pageAt(5000f, 2450f, 0))
+        // au-delà de la moitié, on passe à la page suivante
+        assertEquals(2, ScrollMath.pageAt(1226f, 2450f, 4))
+        assertEquals(3, ScrollMath.pageAt(4900f, 2450f, 4))
+    }
+
+    @Test
+    fun `decalage - page affichee a gauche ou a droite`() {
+        // Objet sur la page 1 vu depuis la page 3 : deux pages à gauche
+        assertEquals(-4900f, ScrollMath.offset(1, 2450f, 4900f), 0.01f)
+        // Au repos sur sa page : aucun décalage
+        assertEquals(0f, ScrollMath.offset(1, 2450f, 0f), 0.01f)
+        assertEquals(0f, ScrollMath.offset(4, 1000f, 3000f), 0.01f)
+    }
+
+    @Test
+    fun `largeur de page plausible - bornes`() {
+        assertTrue(ScrollMath.plausiblePageWidth(1690f, 2800f))          // ~60 %
+        assertTrue(ScrollMath.plausiblePageWidth(2850f, 2800f))          // ~102 %
+        assertFalse(ScrollMath.plausiblePageWidth(1670f, 2800f))
+        assertFalse(ScrollMath.plausiblePageWidth(2860f, 2800f))
+        assertFalse(ScrollMath.plausiblePageWidth(-1f, 2800f))
+    }
+
+    @Test
+    fun `estimation - evenement a venir ou intervalle limite`() {
+        // now avant t1 : pas d'anticipation négative
+        assertEquals(1491f, ScrollMath.estimate(1091, 1000, 1491, 1100, 1050), 0.01f)
+        // intervalle de 30 ms : encore pris en compte (10 px/ms, 10 ms -> +100)
+        assertEquals(400f, ScrollMath.estimate(0, 0, 300, 30, 40), 0.01f)
+        // intervalle de 251 ms : trop espacé
+        assertEquals(300f, ScrollMath.estimate(0, 0, 300, 251, 300), 0.01f)
+    }
+
+    @Test
+    fun `cle de vue - cas limites`() {
+        // numéro de page illisible : pas de page
+        assertEquals("pkg" to null, ViewKey.split("pkg#pX"))
+        // seul le dernier "#p" compte
+        assertEquals("a#p1" to 2, ViewKey.split("a#p1#p2"))
+        assertEquals("" to 3, ViewKey.split("#p3"))
+        // aller-retour
+        val (pkg, page) = ViewKey.split(ViewKey.of(launcher, 5))
+        assertEquals(launcher, pkg)
+        assertEquals(5, page)
+    }
 }
