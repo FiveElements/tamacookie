@@ -29,6 +29,7 @@ import com.tamacookie.persist.PetRecord
 import com.tamacookie.persist.PetRepository
 import com.tamacookie.persist.Pets
 import com.tamacookie.social.SocialSystem
+import com.tamacookie.tile.PetTileService
 import com.tamacookie.widget.PetWidget
 import com.tamacookie.widget.UpdateThrottle
 import com.tamacookie.species.Species
@@ -67,6 +68,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         private const val CALLED = "Je suis là ! 👋"
 
         @Volatile var running = false
+            private set
+        /** Le service tourne **et** l'animal est affiché (pas « Caché ») : l'état de la tuile. */
+        @Volatile var visible = false
             private set
 
         /**
@@ -268,6 +272,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         running = true
         ready = true
+        visible = !hidden
+        PetTileService.refresh(this)
         PetWidget.updateAll(this)
 
         for (p in shown) world.asPet(p) { toys.restorePoops(p) }
@@ -481,6 +487,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     override fun onDestroy() {
         running = false
+        visible = false
         val wasReady = ready
         ready = false
         handler.removeCallbacksAndMessages(null)
@@ -492,6 +499,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             removeAllWindows()
             PetWidget.updateAll(this)   // « Rangé »
         }
+        PetTileService.refresh(this)
         super.onDestroy()
     }
 
@@ -593,10 +601,12 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     override fun hide() {
         if (hidden) return
         hidden = true
+        visible = false
         wellbeing.reset()
         removeAllWindows()
         stopLoop()
         updateNotification(force = true)
+        PetTileService.refresh(this)
     }
 
     private fun show() {
@@ -613,6 +623,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         startLoop()
         speech.sayOneOf(resident.species.lines.SHOWN)
         updateNotification(force = true)
+        visible = true
+        PetTileService.refresh(this)
     }
 
     override fun isAway(pet: Pet): Boolean = pet.id in awayPets

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icône de la tuile Réglages rapides : tête de lapin (monochrome, teintée par le système) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M8,11.5 C6.8,8 6.6,3.4 8.2,2.6 C9.8,2.2 10.4,7 10,11 Z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M16,11.5 C17.2,8 17.4,3.4 15.8,2.6 C14.2,2.2 13.6,7 14,11 Z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M12,9.5 C16.4,9.5 19.5,12.4 19.5,15.8 C19.5,19.4 16.2,21.5 12,21.5 C7.8,21.5 4.5,19.4 4.5,15.8 C4.5,12.4 7.6,9.5 12,9.5 Z" />
+</vector>

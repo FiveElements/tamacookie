@@ -89,6 +89,18 @@
                 android:resource="@xml/pet_widget_info" />
         </receiver>
 
+        <!-- Tuile Réglages rapides : montrer / cacher (évolution 4c) -->
+        <service
+            android:name=".tile.PetTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

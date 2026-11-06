@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.tile.TileTexts
 import com.tamacookie.widget.UpdateThrottle
 import com.tamacookie.widget.WidgetTexts
 import org.junit.Assert.assertEquals
@@ -58,4 +59,14 @@ class HomeShortcutsTest {
         assertEquals(0L, t.request(121_000))         // une minute après : tout de suite
     }
 
+    @Test
+    fun `tuile - active si affiche, sinon cachee ou rangee`() {
+        assertEquals(TileTexts.State(true, "Sur l'écran", "Cacher"), TileTexts.state(running = true, visible = true))
+        assertEquals(TileTexts.State(false, "Caché", "Montrer"), TileTexts.state(running = true, visible = false))
+        assertFalse(TileTexts.state(running = false, visible = true).active)
+        assertEquals("Rangé", TileTexts.state(running = false, visible = false).subtitle)
+        assertEquals("Cookie", TileTexts.label(null, "Cookie"))
+        assertEquals("Cookie", TileTexts.label(" ", "Cookie"))
+        assertEquals("Noisette", TileTexts.label("Noisette", "Cookie"))
+    }
 }

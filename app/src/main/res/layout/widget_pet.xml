@@ -61,7 +61,7 @@
                 android:id="@+id/widget_g0_value"
                 android:layout_width="30dp"
                 android:layout_height="wrap_content"
-                android:gravity="end"
+                android:paddingHorizontal="4dp"
                 android:textColor="#FF7A6B75"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -92,7 +92,7 @@
                 android:id="@+id/widget_g1_value"
                 android:layout_width="30dp"
                 android:layout_height="wrap_content"
-                android:gravity="end"
+                android:paddingHorizontal="4dp"
                 android:textColor="#FF7A6B75"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -123,7 +123,7 @@
                 android:id="@+id/widget_g2_value"
                 android:layout_width="30dp"
                 android:layout_height="wrap_content"
-                android:gravity="end"
+                android:paddingHorizontal="4dp"
                 android:textColor="#FF7A6B75"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -154,7 +154,7 @@
                 android:id="@+id/widget_g3_value"
                 android:layout_width="30dp"
                 android:layout_height="wrap_content"
-                android:gravity="end"
+                android:paddingHorizontal="4dp"
                 android:textColor="#FF7A6B75"
                 android:textSize="11sp" />
         </LinearLayout>
@@ -176,11 +176,11 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:orientation="horizontal">
+
         <TextView
             android:id="@+id/widget_feed"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_button_bg"
             android:gravity="center"
@@ -188,11 +188,17 @@
             android:text="@string/widget_feed"
             android:textColor="#FFFFFFFF"
             android:textSize="13sp" />
+
+        <!-- Espace entre les boutons (View seule n'est pas permise dans un RemoteViews) -->
+        <FrameLayout
+            android:id="@+id/widget_gap"
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
         <TextView
             android:id="@+id/widget_call"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
             android:layout_weight="1"
             android:background="@drawable/widget_button_bg"
             android:gravity="center"
