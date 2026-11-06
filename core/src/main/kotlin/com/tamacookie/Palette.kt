@@ -117,4 +117,59 @@ object Palette {
     // --- Jauges ---
     const val BAR_BG = 0xFFEFE7E1.toInt()
     const val BAR_LOW = 0xFFE5484D.toInt()
+
+    // --- Interface de l'app : écrans, panneaux, widget (étape 8d) ---
+    // Chaque paire texte / fond utilisée est vérifiée par ContrastTest (≥ 4,5:1, WCAG AA texte normal).
+    /** Fond crème des écrans et du widget. */
+    const val UI_BG = 0xFFFFF4E6.toInt()
+    /** Fond des panneaux flottants, du dock. */
+    const val UI_PANEL = 0xFFFFFDF9.toInt()
+    /** Texte secondaire (descriptions, astuces, valeurs). */
+    const val UI_MUTED = 0xFF7A6B75.toInt()
+    /** Petits boutons de l'écran principal. */
+    const val UI_CHIP = 0xFFFBE3D6.toInt()
+    /** Choix sélectionné (fond) et son contour (non textuel). */
+    const val UI_SELECTED = 0xFFFFE0E8.toInt()
+    const val UI_SELECTED_STROKE = 0xFFF07893.toInt()
+    /** Contour d'un choix non sélectionné. */
+    const val UI_STROKE = 0xFFE3D6CC.toInt()
+    /** Boutons des panneaux (menu, coffre, véto). */
+    const val UI_BUTTON = 0xFFFBEFE6.toInt()
+    /** Autorisation accordée / manquante. */
+    const val UI_OK = 0xFFE3F4E8.toInt()
+    const val UI_WARN = 0xFFFFE3E3.toInt()
+    /**
+     * Bouton d'action (texte blanc : « Faire apparaître », « Adopter ! », boutons du widget). Était `#F07893`,
+     * 2,7:1 avec le blanc : assombri en framboise (4,8:1) — même teinte, plus foncée.
+     */
+    const val UI_ACTION = 0xFFC2456A.toInt()
+    /**
+     * Bouton principal sans la permission de surimpression (il ouvre les réglages : il reste actif). Était
+     * `#BDB3B8` avec un texte blanc (2,0:1) : fond plus clair et texte [INK] (8,6:1).
+     */
+    const val UI_ACTION_OFF = 0xFFD9D1D5.toInt()
+    /** Bouton principal quand l'animal est affiché (« Ranger »), texte blanc. */
+    const val UI_ACTION_STOP = 0xFF7A6B75.toInt()
+    const val WHITE = 0xFFFFFFFF.toInt()
+}
+
+/** Contraste entre deux couleurs (WCAG 2.x, Kotlin pur) : de 1 (identiques) à 21 (noir sur blanc). */
+object Contrast {
+    /** Luminance relative d'une couleur opaque `0xAARRGGBB` (l'alpha est ignoré). */
+    fun luminance(argb: Int): Double {
+        fun channel(shift: Int): Double {
+            val c = ((argb shr shift) and 0xFF) / 255.0
+            return if (c <= 0.03928) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+    }
+
+    fun ratio(a: Int, b: Int): Double {
+        val la = luminance(a)
+        val lb = luminance(b)
+        return (maxOf(la, lb) + 0.05) / (minOf(la, lb) + 0.05)
+    }
+
+    /** Seuil WCAG AA pour un texte de taille normale. */
+    const val AA = 4.5
 }

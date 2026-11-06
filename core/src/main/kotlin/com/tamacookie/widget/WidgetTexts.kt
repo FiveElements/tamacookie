@@ -1,5 +1,6 @@
 package com.tamacookie.widget
 
+import com.tamacookie.A11yTexts
 import com.tamacookie.Mood
 import com.tamacookie.NotifierTexts
 import com.tamacookie.PetStats
@@ -12,7 +13,10 @@ import com.tamacookie.species.Species
  */
 object WidgetTexts {
     /** Une jauge du widget : emoji, nom (lu par l'accessibilité), valeur 0..100. */
-    data class Gauge(val emoji: String, val label: String, val value: Int)
+    data class Gauge(val emoji: String, val label: String, val value: Int) {
+        /** Lu par le lecteur d'écran : « Satiété 80 % » (étape 8d). */
+        val description: String get() = A11yTexts.gauge(label, value.toFloat())
+    }
 
     data class Content(
         /** « 😊 Cookie ». */
@@ -41,10 +45,10 @@ object WidgetTexts {
 
     /** Les quatre jauges de la notification, dans le même ordre, arrondies et bornées à 0..100. */
     fun gauges(s: PetStats): List<Gauge> = listOf(
-        Gauge("🥕", "Satiété", pct(s.satiety)),
-        Gauge("💖", "Bonheur", pct(s.happiness)),
-        Gauge("⚡", "Énergie", pct(s.energy)),
-        Gauge("🛁", "Propreté", pct(s.cleanliness)),
+        Gauge("🥕", A11yTexts.SATIETY, pct(s.satiety)),
+        Gauge("💖", A11yTexts.HAPPINESS, pct(s.happiness)),
+        Gauge("⚡", A11yTexts.ENERGY, pct(s.energy)),
+        Gauge("🛁", A11yTexts.CLEANLINESS, pct(s.cleanliness)),
     )
 
     private fun pct(v: Float): Int = v.toInt().coerceIn(0, 100)

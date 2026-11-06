@@ -28,6 +28,14 @@ class AmbientAnimator(private val rnd: Random) {
         private set
     val particles = ArrayList<Particle>()
 
+    /**
+     * Animations réduites ([ReducedMotion], étape 8d) : ni frémissement d'oreille, ni particules purement
+     * décoratives (miettes, étoiles du vertige, bulles de saleté, flocons et pétales de saison) ; une seule
+     * particule par demande du jeu ([emit] : cœurs, notes, étincelles). Restent le clignement, les Zzz du sommeil
+     * et les larmes (elles disent son état). Faux : exactement les mêmes tirages qu'avant.
+     */
+    var reducedMotion = false
+
     /** Les yeux sont fermés (clignement). */
     val blinking: Boolean get() = blink > 0f
 
@@ -44,22 +52,25 @@ class AmbientAnimator(private val rnd: Random) {
             blinkIn -= dt
             if (blinkIn <= 0f) { blink = 0.14f; blinkIn = 2f + rnd.nextFloat() * 4f }
         }
-        // petit mouvement d'oreille
+        // petit mouvement d'oreille (décoratif : aucun en animations réduites)
         if (earTwitch > 0f) earTwitch -= dt
-        else {
+        else if (!reducedMotion) {
             earTwitchIn -= dt
             if (earTwitchIn <= 0f) { earTwitch = 0.35f; earTwitchIn = 3f + rnd.nextFloat() * 6f }
         }
         // particules selon la pose et l'humeur
         if (s.pose == Pose.SLEEP && rnd.nextFloat() < dt * 0.9f) emit(PType.ZZZ, 1, w, h, d, s.facing)
-        if (s.pose == Pose.EAT && rnd.nextFloat() < dt * 4f) emit(PType.CRUMB, 1, w, h, d, s.facing)
+        val deco = !reducedMotion
+        if (deco && s.pose == Pose.EAT && rnd.nextFloat() < dt * 4f) emit(PType.CRUMB, 1, w, h, d, s.facing)
         if (s.expr == Expr.SAD && rnd.nextFloat() < dt * 0.4f) emit(PType.DROP, 1, w, h, d, s.facing)
         if (s.expr == Expr.SICK && rnd.nextFloat() < dt * 0.3f) emit(PType.DROP, 1, w, h, d, s.facing)
-        if (s.expr == Expr.DIZZY && rnd.nextFloat() < dt * 5f) emit(PType.STAR, 1, w, h, d, s.facing)
-        if (s.veryDirty && rnd.nextFloat() < dt * 0.6f) emit(PType.BUBBLE, 1, w, h, d, s.facing)
+        if (deco && s.expr == Expr.DIZZY && rnd.nextFloat() < dt * 5f) emit(PType.STAR, 1, w, h, d, s.facing)
+        if (deco && s.veryDirty && rnd.nextFloat() < dt * 0.6f) emit(PType.BUBBLE, 1, w, h, d, s.facing)
         // saison (évolution 4b) : après les autres, et aucun tirage hors saison (mêmes tirages qu'avant)
         val seasonal = s.season.particle
-        if (seasonal != null && rnd.nextFloat() < dt * SEASON_PARTICLES_PER_S) emit(seasonal, 1, w, h, d, s.facing)
+        if (deco && seasonal != null && rnd.nextFloat() < dt * SEASON_PARTICLES_PER_S) {
+            emit(seasonal, 1, w, h, d, s.facing)
+        }
 
         val it = particles.iterator()
         while (it.hasNext()) {
@@ -83,7 +94,7 @@ class AmbientAnimator(private val rnd: Random) {
 
     /** Ajoute [count] particules au-dessus de la tête (vue [w] × [h], densité [d], regard [facing]). */
     fun emit(type: PType, count: Int, w: Float, h: Float, d: Float, facing: Float) {
-        repeat(count) {
+        repeat(if (reducedMotion) count.coerceAtMost(1) else count) {
             val cx = w / 2f
             val headY = h - 6f * d - 60f * d * UNIT
             val p = when (type) {
