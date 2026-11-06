@@ -18,6 +18,21 @@ import java.util.EnumSet
  * [Tuning.HIDE_GIVE_UP_MS]. Lancé quand il est ignoré, ou depuis le menu ([startFrom]).
  */
 object HideSeekMischief : Mischief {
+    /** La partie commence. */
+    val START = arrayOf(
+        "Cache-cache ! Compte jusqu'à 10… 🙈", "Tu ne me trouveras jamais ! 🫣", "Attrape-moi si tu peux !",
+    )
+    /** Trouvé (tap sur sa tête qui dépasse). */
+    val FOUND = arrayOf("Trouvé !! 🎉", "Oh non, tu m'as trouvé ! 😆", "Tu es trop fort ! On rejoue ?")
+    /** Personne ne l'a trouvé : il abandonne. */
+    val GAVE_UP = arrayOf("Tu ne m'as pas trouvé… 😢 Je reviens !", "Personne ne me cherche ? 🥺")
+    /** Caché, il pouffe. */
+    val GIGGLE = arrayOf("hihi…", "🤭", "chut…")
+    /** Cache-cache demandé sans le service d'accessibilité. */
+    const val NEEDS_ACCESSIBILITY = "Active l'accessibilité pour jouer à cache-cache 🫣"
+    /** Cache-cache demandé hors de l'écran d'accueil. */
+    const val NEEDS_HOME = "Va sur l'écran d'accueil pour jouer à cache-cache ! 🏠"
+
     override val acts: Set<Act> = EnumSet.of(Act.HIDE_RUN, Act.HIDDEN, Act.PEEK)
     /** Il ne suit pas l'utilisateur dans une autre application, et n'en dit rien. */
     override val travel = Travel.IGNORES
@@ -43,20 +58,19 @@ object HideSeekMischief : Mischief {
     fun startFrom(ctx: MischiefCtx, pet: Pet, fromMenu: Boolean): Boolean {
         if (ctx.world.stationOf(pet) != null || pet.stats.sleeping || pet.isHiding) return false
         if (!canStart(ctx, pet)) {
-            if (fromMenu) ctx.say(
-                if (!ctx.screen.snapshot.connected) "Active l'accessibilité pour jouer à cache-cache 🫣"
-                else "Va sur l'écran d'accueil pour jouer à cache-cache ! 🏠", 3f
-            )
+            if (fromMenu) ctx.say(if (!ctx.screen.snapshot.connected) NEEDS_ACCESSIBILITY else NEEDS_HOME, 3f)
             return false
         }
         val a = ctx.arena
+        // `canStart` garantit une page du bureau (sans aléatoire : cette garde ne change aucun tirage)
         val (pkg, page) = ctx.pages.split(ctx.pages.currentView)
+        if (page == null) return false
         val target = (1..ctx.screen.snapshot.pageCount).filter { it != page }.random(ctx.rnd)
         ctx.state.hidingView = ViewKey.of(pkg, target)
-        pet.body.targetX = if (target > page!!) a.screenW + a.bw else -a.bw.toFloat()
+        pet.body.targetX = if (target > page) a.screenW + a.bw else -a.bw.toFloat()
         ctx.noteInteraction()
         ctx.closeMenu()
-        ctx.say(ctx.pick("Cache-cache ! Compte jusqu'à 10… 🙈", "Tu ne me trouveras jamais ! 🫣", "Attrape-moi si tu peux !"), 2.5f)
+        ctx.say(ctx.pick(*START), 2.5f)
         pet.setAct(Act.HIDE_RUN)
         return true
     }
@@ -108,7 +122,7 @@ object HideSeekMischief : Mischief {
         ctx.on(pet, PetEvent.Found)
         ctx.emit(pet, PType.HEART, 5)
         pet.express(Expr.HAPPY, 2.5f)
-        ctx.say(ctx.pick("Trouvé !! 🎉", "Oh non, tu m'as trouvé ! 😆", "Tu es trop fort ! On rejoue ?"), 2.5f)
+        ctx.say(ctx.pick(*FOUND), 2.5f)
         val fx = pet.body.fx
         ctx.actor.jumpTo(pet, (fx.coerceIn(a.minX, a.maxX) + (if (fx < a.screenW / 2) 120 else -120) * a.d).coerceIn(a.minX, a.maxX),
             a.groundY, Act.IDLE)
@@ -131,7 +145,7 @@ object HideSeekMischief : Mischief {
             pet.setAct(Act.IDLE, 2f)
         }
         pet.express(Expr.SAD, 2f)
-        ctx.say(ctx.pick("Tu ne m'as pas trouvé… 😢 Je reviens !", "Personne ne me cherche ? 🥺"), 3f)
+        ctx.say(ctx.pick(*GAVE_UP), 3f)
     }
 
     /** Act.HIDE_RUN / HIDDEN / PEEK */
@@ -155,7 +169,7 @@ object HideSeekMischief : Mischief {
                 s.giggleIn -= dt
                 if (s.giggleIn <= 0f) {
                     s.giggleIn = 5f + ctx.rnd.nextFloat() * 5f
-                    if (ctx.rnd.nextFloat() < 0.5f) ctx.say(ctx.pick("hihi…", "🤭", "chut…"), 1.2f)
+                    if (ctx.rnd.nextFloat() < 0.5f) ctx.say(ctx.pick(*GIGGLE), 1.2f)
                 }
                 if (ctx.clock.wallMs() - s.hideStarted > Tuning.HIDE_GIVE_UP_MS) giveUp(ctx, pet)
             }

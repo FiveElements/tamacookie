@@ -104,7 +104,6 @@
     <string name="adopt_save">Enregistrer ✨</string>
     <string name="adopt_as_companion">…ou l\'adopter comme compagnon 💞</string>
     <string name="adopt_replace_hint">« Adopter ! » remplace %1$s ; un compagnon vit avec lui.</string>
-    <string name="adopt_your_pet">ton lapin</string>
     <!-- Noms proposés à un compagnon (le premier libre ; au hasard si le champ est vidé) -->
     <string-array name="adopt_companion_names">
         <item>Noisette</item>

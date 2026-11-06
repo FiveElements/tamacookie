@@ -50,7 +50,7 @@ class ToyController(private val ctx: PetCtx) {
     }
     private val eating = object : ActHandler {
         override val travel = Travel.BUSY
-        override fun update(pet: Pet, dt: Float) = updateEat(pet, dt)
+        override fun update(pet: Pet, dt: Float) = updateEat(pet)
     }
 
     /** Jouer, aller manger, manger : la boucle et le toucher délèguent à ce contrôleur. */
@@ -166,7 +166,8 @@ class ToyController(private val ctx: PetCtx) {
     /** Act.GOTO_FOOD : il attend que la nourriture tombe puis court la manger. */
     private fun updateGoToFood(pet: Pet, dt: Float) {
         val c = props.firstOrNull { it.food != null }
-        if (c == null) { pet.setAct(Act.IDLE); return }
+        val food = c?.food
+        if (c == null || food == null) { pet.setAct(Act.IDLE); return }
         if (!c.onGround) {
             pet.body.pose = Pose.IDLE
             pet.body.facing = sign(c.x - pet.body.fx).takeIf { it != 0f } ?: pet.body.facing
@@ -177,14 +178,14 @@ class ToyController(private val ctx: PetCtx) {
             ctx.director.loseFood(pet, c, ctx.director.foodWinner(c))
             pet.setAct(Act.IDLE, 2f)
         } else if (ctx.actor.walkToward(pet, c.x, 130 * d, dt, stopDist = 26 * d)) {
-            pet.body.eatingFood = c.food!!
+            pet.body.eatingFood = food
             removeProp(c)
             pet.setAct(Act.EAT, 3f)
         }
     }
 
     /** Act.EAT : il croque pendant 3 s (avancement lu par la vue), puis les jauges montent. */
-    private fun updateEat(pet: Pet, dt: Float) {
+    private fun updateEat(pet: Pet) {
         val b = pet.body
         b.pose = Pose.EAT
         b.eatProgress = b.actTime / 3f
@@ -268,10 +269,11 @@ class ToyController(private val ctx: PetCtx) {
     private fun updatePlay(pet: Pet, dt: Float) {
         val p = ctx.world.currentToy()
         pet.mind.playTime += dt
-        if (p == null) { pet.setAct(Act.IDLE); return }
+        val toy = p?.toy
+        if (p == null || toy == null) { pet.setAct(Act.IDLE); return }
         val limit = pet.species.behavior(pet.personality).playSeconds
         if (pet.mind.playTime > limit || pet.stats.energy < ctx.rules.playStopEnergyBelow) { endPlay(p); return }
-        p.toy!!.spec.play(tctx, pet, p, dt)
+        toy.spec.play(tctx, pet, p, dt)
     }
 
     private fun endPlay(p: Prop) {

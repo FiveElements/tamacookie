@@ -34,7 +34,7 @@ class DirectorTest {
 
     @Test fun seulAvecLuiMeme_toujoursPermis() {
         for (act in Director.MISCHIEF_ACTS) { a.setAct(act); assertTrue(dir.mayStartMischief(a)) }
-        assertTrue(dir.mayUseChest(a))
+        assertTrue(dir.mayHeadTo(a, StationKind.CHEST))
     }
 
     /** Le compagnon ignoré ne lance rien (et ne tire pas au sort) tant que le résident fait une bêtise. */
@@ -65,10 +65,10 @@ class DirectorTest {
     @Test fun unSeulAnimalAuCoffre() {
         val b = ctx.addPet("b")
         a.setAct(Act.GOTO_CHEST)
-        assertFalse(dir.mayUseChest(b))
-        assertTrue(dir.mayUseChest(a))
+        assertFalse(dir.mayHeadTo(b, StationKind.CHEST))
+        assertTrue(dir.mayHeadTo(a, StationKind.CHEST))
         a.setAct(Act.IDLE)
-        assertTrue(dir.mayUseChest(b))
+        assertTrue(dir.mayHeadTo(b, StationKind.CHEST))
     }
 
     @Test fun stationDeCapacite1_unSeulOccupant() {

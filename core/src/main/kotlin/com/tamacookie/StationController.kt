@@ -2,6 +2,7 @@ package com.tamacookie
 
 import com.tamacookie.feature.ActHandler
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.station.BowlStation
 import com.tamacookie.feature.station.ChestStation
 import com.tamacookie.feature.station.StationBehavior
 import com.tamacookie.feature.station.StationCtx
@@ -54,7 +55,8 @@ class StationController(
     private val pet: Pet get() = ctx.pet
     private val overlay get() = ctx.overlay
 
-    operator fun get(k: StationKind): Station = stations[k]!!
+    /** Toutes les stations existent après [create] (une par [StationKind]). */
+    operator fun get(k: StationKind): Station = stations.getValue(k)
 
     /** Ce que reçoivent les comportements de station : la façade, plus la sortie et les panneaux. */
     private val sctx: StationCtx = object : StationCtx, PetCtx by ctx {
@@ -82,10 +84,16 @@ class StationController(
         override fun update(pet: Pet, dt: Float) = updateGoToChest(pet, dt)
     }
 
-    /** Dans une station, aller au coffre : la boucle et le toucher délèguent à ce contrôleur. */
+    /** [Act.GOTO_BOWL] : il va de lui-même à la gamelle. */
+    private val goingToBowl = object : ActHandler {
+        override fun update(pet: Pet, dt: Float) = updateGoToBowl(pet, dt)
+    }
+
+    /** Dans une station, aller au coffre, à la gamelle : la boucle et le toucher délèguent à ce contrôleur. */
     fun registerActs(acts: ActRegistry) {
         acts.register(Act.IN_STATION, ::handlerFor)
         acts.register(Act.GOTO_CHEST) { goingToChest }
+        acts.register(Act.GOTO_BOWL) { goingToBowl }
     }
 
     /** Station qui garde [p] avec elle (la cage) : il la suit d'une vue à l'autre. */
@@ -376,9 +384,12 @@ class StationController(
     }
 
     /** Le coffre s'il est visible sur la page du lapin (et pas déjà ouvert par l'utilisateur). */
-    fun visibleChest(): Station? {
-        val s = get(StationKind.CHEST)
-        if (!shown(s) || panels.chestOpen || ctx.pages.bunnyElsewhere()) return null
+    fun visibleChest(): Station? = if (panels.chestOpen) null else visibleOnPage(StationKind.CHEST)
+
+    /** La station [k] si elle est affichée, dans l'écran, sur la page de l'animal courant. */
+    private fun visibleOnPage(k: StationKind): Station? {
+        val s = get(k)
+        if (!shown(s) || ctx.pages.bunnyElsewhere()) return null
         if (s.x + s.w < 0 || s.x > arena.screenW) return null
         return s
     }
@@ -393,6 +404,43 @@ class StationController(
             pet.body.facing = -side
             ctx.say(ctx.pick(*pet.species.lines.GOING_TO_CHEST), 1.8f)
             ctx.actor.jumpTo(pet, cx, s.y + s.h * 0.6f, Act.IDLE)
+        }
+    }
+
+    // --- Gamelle : il y va de lui-même ---
+    /**
+     * La gamelle attend [p] (animal courant) : son espèce l'accepte, elle est libre pour lui
+     * (`Occupancy.canEnter`), aucun autre animal n'y va (`Director.mayHeadTo`), pas de nourriture au sol
+     * (elle passe avant), elle est affichée sur sa page et il a faim sans refuser le repas
+     * ([BowlStation.hungry]). Sans aléatoire : le cerveau ne tire au sort que si c'est vrai.
+     */
+    fun bowlAvailable(p: Pet): Boolean {
+        val k = StationKind.BOWL
+        if (!p.species.accepts(k) || !ctx.world.station(k).canEnter(p.id)) return false
+        if (ctx.world.hasFood() || !ctx.director.mayHeadTo(p, StationKind.BOWL)) return false
+        return visibleOnPage(k) != null && BowlStation.hungry(ctx, p)
+    }
+
+    /** Il part vers la gamelle (décision du cerveau) : il se tourne vers elle et le dit. */
+    fun goToBowl(p: Pet) {
+        val s = get(StationKind.BOWL)
+        p.body.facing = if (s.x + s.w / 2f - ctx.pages.bunnyShift < p.body.fx) -1f else 1f
+        ctx.say(ctx.pick(*BowlStation.GOING), 1.8f)
+    }
+
+    /**
+     * Act.GOTO_BOWL : il marche jusqu'à la gamelle et y entre ([enterStation], comme si on l'y déposait :
+     * [BowlStation] fait le reste). La gamelle n'est plus pour lui (rangée, prise, nourriture au sol, plus
+     * faim) : il renonce.
+     */
+    private fun updateGoToBowl(pet: Pet, dt: Float) {
+        val s = get(StationKind.BOWL)
+        if (!bowlAvailable(pet)) { pet.setAct(Act.IDLE, 2f); return }
+        val cx = s.x + s.w / 2f - ctx.pages.bunnyShift
+        if (ctx.actor.walkToward(pet, cx, 140 * d, dt)) {
+            val keep = ctx.lastInteraction            // ce n'est pas l'utilisateur qui s'est occupé de lui
+            enterStation(StationKind.BOWL, announce = true, p = pet)
+            ctx.lastInteraction = keep
         }
     }
 

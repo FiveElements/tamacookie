@@ -68,7 +68,6 @@
     <ID>MaxLineLength:BunnyPhysics.kt:BunnyPhysics$/** Saut balistique pour atterrir précisément en (tx, ty), avec un sommet [apexRise] px au-dessus du plus haut des deux points. */</ID>
     <ID>MaxLineLength:BunnyPhysicsTest.kt:BunnyPhysicsTest$private</ID>
     <ID>MaxLineLength:CarrotDispute.kt:CarrotDispute$private val LOSER = arrayOf("Hé ! C'était pour moi !", "Pfff, trop rapide 😤", "La prochaine est à moi !", "C'est pas juste !")</ID>
-    <ID>MaxLineLength:ChewEdgeMischief.kt:ChewEdgeMischief$ctx.say(ctx.pick("Miam, le bord de l'écran ! 😋", "Croc croc… ça croustille !", "Il a un goût de pixel…"), 2.5f)</ID>
     <ID>MaxLineLength:Clock.kt:Clock$/** Temps monotone depuis le démarrage (ms), pour les durées et le défilement (`SystemClock.uptimeMillis` sur Android). */</ID>
     <ID>MaxLineLength:Director.kt:Director.BubbleQueue$val next = queue.maxWithOrNull(compareBy&lt;Line&gt; { it.priority }.thenByDescending { it.waited }) ?: return null</ID>
     <ID>MaxLineLength:DirectorTest.kt:DirectorTest$assertEquals(NotifierTexts.alertText(a.name, a.stats.mood), dir.alerts { NotifierTexts.alertText(it.name, it.stats.mood) })</ID>
@@ -78,9 +77,7 @@
     <ID>MaxLineLength:FrisbeeToy.kt:FrisbeeToy$ctx.actor.jump(pet, BunnyPhysics.impulseForHeight(pet.body.phys.gravity, (h - 30 * d).coerceAtLeast(10 * d)), dx * 2.5f, then = Act.PLAY)</ID>
     <ID>MaxLineLength:FrisbeeToy.kt:FrisbeeToy$if</ID>
     <ID>MaxLineLength:FrisbeeToy.kt:FrisbeeToy$if (abs(tx - pet.body.fx) &gt; 24 * d) ctx.actor.walkToward(pet, tx, 230 * d, dt, stopDist = 24 * d) else pet.body.pose = Pose.IDLE</ID>
-    <ID>MaxLineLength:GardenStation.kt:GardenStation$ctx.say(ctx.pick("Quel bonheur, l'herbe ! 🌿", "Un peu de terre… mais heureux !", "J'ai trouvé un trèfle !"))</ID>
     <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$ctx.actor</ID>
-    <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$ctx.say(ctx.pick("Cache-cache ! Compte jusqu'à 10… 🙈", "Tu ne me trouveras jamais ! 🫣", "Attrape-moi si tu peux !"), 2.5f)</ID>
     <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$if</ID>
     <ID>MaxLineLength:HideSeekMischief.kt:HideSeekMischief$override</ID>
     <ID>MaxLineLength:Look.kt:Look.Companion$accessory = if (accessory in 0 until Accessory.LEGACY_COUNT) Accessory.entries[accessory] else Accessory.NONE</ID>
@@ -119,7 +116,6 @@
     <ID>MaxLineLength:PetStore.kt:PetStore.Companion$fun</ID>
     <ID>MaxLineLength:PetTest.kt:PetTest$assertEquals(rec.copy(identity = rec.identity.copy(name = "Noisette")), a.toRecord().copy(lastUpdate = rec.lastUpdate))</ID>
     <ID>MaxLineLength:PlushToy.kt:PlushToy$if (before &lt; 4f) pet.body.targetX = (pet.body.fx + (rnd.nextFloat() * 2f - 1f) * a.screenW * 0.3f).coerceIn(a.minX, a.maxX)</ID>
-    <ID>MaxLineLength:PlushToy.kt:PlushToy$if (pet.stats.energy &lt; ctx.rules.plushNapEnergyBelow) { ctx.say("Dodo avec mon doudou… 💤"); ctx.startSleep(pet); return }</ID>
     <ID>MaxLineLength:PlushToy.kt:PlushToy$if (rnd.nextFloat() &lt; dt * 2.5f) { ctx.emit(pet, PType.HEART); ctx.on(pet, PetEvent.PlayHit(Toy.PLUSH, 0.6f)) }</ID>
     <ID>MaxLineLength:Prefs.kt:Prefs$*</ID>
     <ID>MaxLineLength:RabbitLines.kt:RabbitLines$Mood.HAPPY -&gt; arrayOf("La vie est belle ! ✨", "♪ La la la ♫", "Je t'aime bien 💕", "Tu fais quoi ?", "Il fait beau sur ton écran !")</ID>
@@ -135,8 +131,6 @@
     <ID>MaxLineLength:SpeciesTest.kt:SpeciesTest$assertEquals(BehaviorMods(attentionFactor = 0.5f, mischiefChanceFactor = 1.5f), Rabbit.behavior(Personality.PRANKSTER))</ID>
     <ID>MaxLineLength:SpeciesTest.kt:SpeciesTest$assertEquals(BehaviorMods(pageWanderChance = 0.12f, platformChance = 0.6f), Rabbit.behavior(Personality.CURIOUS))</ID>
     <ID>MaxLineLength:SpeechTest.kt:SpeechTest$assertEquals("se cache… trouve-le sur une autre page ! 🫣", NotifierTexts.moodText(Mood.SICK, false, hiding = true))</ID>
-    <ID>MaxLineLength:SquatMischief.kt:SquatMischief$ctx.pick("C'est MON bouton maintenant 😼", "Tu voulais appuyer ici ? Trop tard ! 😜")</ID>
-    <ID>MaxLineLength:SquatMischief.kt:SquatMischief$ctx.pick("Je m'installe ici ! 😼", "Tu ne m'as pas vu ? Et là ? 😏", "Coucou ! Je bloque ? 😇")</ID>
     <ID>MaxLineLength:SquatMischief.kt:SquatMischief$val</ID>
     <ID>MaxLineLength:StationBehavior.kt:StationBehavior$/** Il y entre ([announce] = il le dit ; faux à la restauration au démarrage). Son activité est déjà [com.tamacookie.Act.IN_STATION]. */</ID>
     <ID>MaxLineLength:StationController.kt:StationController$for (s in all) if (shown(s) &amp;&amp; pet.species.accepts(s.kind) &amp;&amp; ctx.world.station(s.kind).canEnter(pet.id) &amp;&amp; s.contains(hx, hy, 12 * d)) { found = s.kind; break }</ID>
@@ -178,7 +172,6 @@
     <ID>TooManyFunctions:StationController.kt:StationController</ID>
     <ID>TooManyFunctions:ToyController.kt:ToyController</ID>
     <ID>TooManyFunctions:World.kt:World</ID>
-    <ID>UnusedParameter:ToyController.kt:ToyController$dt: Float</ID>
     <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Menu --- val GETTING_UP: String</ID>
     <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Plateformes et chutes --- val PLATFORM_LOST: Array&lt;String&gt;</ID>
     <ID>VariableNaming:SpeciesLines.kt:SpeciesLines$// --- Toucher, glisser, lancer --- val FOUND_WHILE_DRAGGED: String</ID>

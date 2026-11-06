@@ -11,6 +11,9 @@ import kotlin.math.hypot
 
 /** Doudou : câlins, promenade, lancers ; il s'endort avec s'il est fatigué. */
 object PlushToy : ToySpec {
+    /** Fatigué, il s'endort avec son doudou. */
+    const val NAP = "Dodo avec mon doudou… 💤"
+
     override val toy get() = Toy.PLUSH
     override val wDp = 40
     override val hDp = 44
@@ -46,7 +49,7 @@ object PlushToy : ToySpec {
                 if (ctx.actor.walkToward(pet, pet.body.targetX, 80 * d, dt)) pet.body.pose = Pose.IDLE
             }
             else -> {
-                if (pet.stats.energy < ctx.rules.plushNapEnergyBelow) { ctx.say("Dodo avec mon doudou… 💤"); ctx.startSleep(pet); return }
+                if (pet.stats.energy < ctx.rules.plushNapEnergyBelow) { ctx.say(NAP); ctx.startSleep(pet); return }
                 p.held = false; p.onGround = false
                 p.vy = -(650 + rnd.nextFloat() * 250) * d
                 p.vx = pet.body.facing * rnd.nextFloat() * 120 * d

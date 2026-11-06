@@ -72,7 +72,7 @@ interface StationBehavior {
 
     /** Tap sur la station (l'animal n'est pas dedans). */
     fun onTap(ctx: StationCtx) {
-        ctx.say("$tapHint\n(appui long pour déplacer)", 3f)
+        ctx.say("$tapHint\n$LONG_PRESS_HINT", 3f)
     }
 
     /** Il y entre ([announce] = il le dit ; faux à la restauration au démarrage). Son activité est déjà [com.tamacookie.Act.IN_STATION]. */
@@ -94,4 +94,9 @@ interface StationBehavior {
 
     /** La station (avec lui dedans) réapparaît sur la vue affichée ([holdsPet] seulement). */
     fun onShownAgain(ctx: StationCtx, pet: Pet, onScreen: Boolean) {}
+
+    companion object {
+        /** Ajouté à l'explication d'une station touchée ([onTap]). */
+        const val LONG_PRESS_HINT = "(appui long pour déplacer)"
+    }
 }

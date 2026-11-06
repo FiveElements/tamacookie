@@ -14,6 +14,13 @@ import com.tamacookie.feature.toy.Food
  * (`PetEvent.Grazed` : petite joie, un peu de satiété, un peu de terre).
  */
 object GardenStation : StationBehavior {
+    /** Il arrive au jardin. */
+    val ENTER = arrayOf("Le jardin ! 🌱", "Ça sent l'herbe fraîche !", "Des pissenlits !")
+    /** Il a grignoté et s'est roulé dans l'herbe. */
+    val DONE = arrayOf("Quel bonheur, l'herbe ! 🌿", "Un peu de terre… mais heureux !", "J'ai trouvé un trèfle !")
+    /** Réplique « occupé » (on lui propose autre chose). */
+    const val BUSY = "Je suis au jardin ! 🌱"
+
     const val NIBBLE_SECONDS = 2.5f
     const val ROLL_SECONDS = 2.5f
     /** Il change de côté toutes les [FLIP_SECONDS] en se roulant. */
@@ -24,11 +31,11 @@ object GardenStation : StationBehavior {
     override val travel = Travel.BUSY
     override val seat = Seat(0f, 12f)
 
-    override fun busyLine(ctx: PetCtx) = "Je suis au jardin ! 🌱"
+    override fun busyLine(ctx: PetCtx) = BUSY
 
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
         pet.body.eatProgress = 0f
-        if (announce) ctx.say(ctx.pick("Le jardin ! 🌱", "Ça sent l'herbe fraîche !", "Des pissenlits !"))
+        if (announce) ctx.say(ctx.pick(*ENTER))
     }
 
     override fun update(ctx: StationCtx, pet: Pet, dt: Float) {
@@ -48,7 +55,7 @@ object GardenStation : StationBehavior {
         if (t >= NIBBLE_SECONDS + ROLL_SECONDS) {
             ctx.on(pet, PetEvent.Grazed)
             ctx.emit(pet, PType.HEART, 1)
-            ctx.say(ctx.pick("Quel bonheur, l'herbe ! 🌿", "Un peu de terre… mais heureux !", "J'ai trouvé un trèfle !"))
+            ctx.say(ctx.pick(*DONE))
             ctx.leaveStation(pet, hopOut = true)
         }
     }

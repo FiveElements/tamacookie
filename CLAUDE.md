@@ -630,9 +630,9 @@ Principes :
       le lit comme dans la cage. Le lit n'est **pas** `holdsPet` (il ne suit pas l'animal d'une vue à l'autre).
     - 🥣 **Gamelle** (`BowlStation`, nourriture `Food.HAY`) : il renifle 1 s ; s'il a faim (satiété <
       `bowlHungryBelow` = 70 et repas non refusé), il mange 3 s (`Pose.EAT`, `eatProgress`) puis
-      `PetEvent.Fed(HAY)` — un repas ordinaire ; sinon il ressort. **Écart** : il n'y va pas tout seul (on l'y dépose) ;
-      aller à la gamelle de lui-même demanderait une décision du cerveau (comme `GOTO_CHEST`) — à faire avec une
-      évolution « cerveau ».
+      `PetEvent.Fed(HAY)` — un repas ordinaire ; sinon il ressort. **Écart** (à l'origine : il n'y allait pas tout
+      seul, on l'y déposait) : **résorbé** après l'étape 8 — il y va de lui-même quand il a faim (`Act.GOTO_BOWL`,
+      voir « Corrections après l'étape 8 — cœur »).
     - 🎡 **Roue** (`WheelStation`, `animated` : les rayons tournent quand elle est occupée) : il court 6 s
       (`Pose.WALK`), puis **`PetEvent.WheelRun`** (énergie −10, bonheur +10 × `PLAY_JOY`, satiété −3 ; refusé sous
       `playMinEnergy` ou endormi : il le dit et ressort aussitôt).
@@ -935,11 +935,9 @@ Principes :
     WindowManager / services, voulus —, TooManyFunctions 6, ReturnCount 4, LongMethod 4, divers 6).
   - **Corrigés** (commit séparé, trouvés par l'analyse avec résolution de types) : 2 imports inutilisés
     (`AccColor` dans `RabbitRenderer`, `Context` dans `FakePrefs`), 2 `var` jamais réaffectées (`PetRules.elapsed`),
-    3 `?: ""` → `orEmpty()`. **Non corrigés, rapportés** : 4 `!!` (`StationController`, `ToyController`,
-    `HideSeekMischief` : invariants du code, à revoir un par un), `dt` inutilisé de `ToyController.updateEat`
-    (signature de gestionnaire), deux `sealed class` sans membre concret (`BunnyBrain`, `BunnyPhysics` → `sealed
-    interface` possible), `pet?.identity` superflu dans `AdoptActivity`, ombrages de `it` et `"%.2f".format` sans
-    locale dans les tests. **Faux positifs** de l'alpha : `EmptyElseBlock` sur `BunnyService.onStartCommand` et
+    3 `?: ""` → `orEmpty()`. **Non corrigés, rapportés** : ombrages de `it` et `"%.2f".format` sans locale dans
+    les tests. (Les 4 `!!`, le `dt` inutilisé de `ToyController.updateEat`, les deux `sealed class` sans membre et
+    `pet?.identity` dans `AdoptActivity` sont corrigés : « Corrections après l'étape 8 — cœur ».) **Faux positifs** de l'alpha : `EmptyElseBlock` sur `BunnyService.onStartCommand` et
     `TouchHandler` (le `else` n'est pas vide), `UnusedPrivateProperty` sur `StationPanelWindows.windows` (utilisée
     dans les initialiseurs) — dans la baseline ou hors CI, sans toucher au code.
   - **CI** : `detekt` rejoint la commande Gradle du job `build` (avec `--continue` : un échec de detekt laisse
@@ -1113,6 +1111,57 @@ Principes :
     `A11yActionIdsTest` (app, +2). **498 → 518 tests** (489 dans `:core`, 29 dans `:app`).
   - **Non couvert par les tests JVM** (vues Android, TalkBack) : voir « Accessibilité » en fin de fichier, liste
     d'essais sur tablette.
+
+- **Corrections après l'étape 8 — cœur** (comportement inchangé sauf la gamelle) — 3 commits (gamelle ; nettoyage
+  qualité ; ce fichier) :
+  - **Il va de lui-même à la gamelle** (`Act.GOTO_BOWL`, dans `MOVING` ; `Decision.GoToBowl`). Conditions,
+    calculées par l'hôte **sans aléatoire** (`StationController.bowlAvailable` → `BrainInput.bowlAvailable`, via
+    `PetBehavior.Hooks.bowlAvailable` — défaut `false`, les faux des tests n'ont pas changé) : son espèce l'accepte
+    (`Species.accepts`), elle est libre pour lui (`Occupancy.canEnter`), aucun autre animal n'est en route
+    (`Director.mayHeadTo`), pas de nourriture au sol, elle est affichée **sur sa page** et dans l'écran, et il a faim
+    sans refuser le repas (`BowlStation.hungry` : satiété < `bowlHungryBelow`, `wouldRefuse(Fed(HAY))`). Le cerveau
+    ne tire au sort (`BunnyBrain.BOWL_CHANCE` = 0,5) **que si** c'est vrai : sans gamelle affichée — cas de toutes
+    les traces seedées —, mêmes décisions et mêmes tirages qu'avant (testé ; `BunnyBrainTest`, `MischiefTest`,
+    `MultiPetTest`, `SocialSystemTest`, `PetRulesTest.GOLDEN` passent sans retouche).
+  - **Ordre** dans `BunnyBrain.decide` : sommeil, bêtise, **coffre** (inchangé), **gamelle**, social, page voisine,
+    puis le reste. Une nourriture au sol passe avant (l'activité `IDLE` part vers elle avant toute décision, et la
+    gamelle ne l'attend pas tant qu'il y en a une) ; un jouet sorti aussi (`IDLE` → `PLAY`).
+  - **Trajet** (`StationController.updateGoToBowl`, par `ActRegistry` comme `GOTO_CHEST`) : il se tourne vers elle,
+    le dit (`BowlStation.GOING`, priorité normale), marche jusqu'à son centre et y entre par `enterStation` — comme
+    si on l'y déposait, `BowlStation` fait le reste (renifle, mange, ressort) ; le compteur d'attention
+    (`lastInteraction`) n'est pas remis à zéro (ce n'est pas l'utilisateur). Il renonce (`IDLE`) si la gamelle n'est
+    plus pour lui en chemin (rangée, prise, nourriture tombée, plus faim). Voyage : `FOLLOWS` (comme le coffre). Pas
+    de délai entre deux visites : tant qu'il a faim après un repas (+25), il peut y retourner (une chance sur deux à
+    chaque décision).
+  - **Plusieurs animaux** : `Director.mayUseChest` devient **`mayHeadTo(p, station)`** (coffre et gamelle, table
+    `GOING_TO` : aucun autre en route ni dedans) — déduit du monde ; le premier qui décide part, les autres ne la
+    voient plus (pas de tirage), et une fois dedans la capacité 1 la garde.
+  - Lecteur d'écran : « va à la gamelle » (`A11yTexts.ACTIVITIES`). Pas de réplique qui nomme la nourriture : pas de
+    membre de `SpeciesLines`.
+  - **Nettoyage detekt** (rapportés en 8b) : les 4 `!!` → `stations.getValue(k)` (`StationController.get`, la table
+    est remplie par `create()`), valeur non nulle lue une fois avec garde (`c.food` dans `updateGoToFood`, `p.toy`
+    dans `updatePlay`), garde `page == null` **avant** le tirage dans `HideSeekMischief.startFrom` (garantie par
+    `canStart`) ; `ToyController.updateEat(pet)` (le gestionnaire garde `update(pet, dt)`) ; `Decision` et `AirEvent`
+    en `sealed interface` ; `AdoptActivity` : `pet.identity.name` (déjà non nul à cet endroit), la chaîne
+    `adopt_your_pet` devenue inutile est retirée (et de `StringsResourceTest.speciesWordsAllowed`, 10 clés) ; import
+    inutilisé dans `OverlayWindows`.
+  - **Répliques encore écrites dans le code d'une méthode** (règle 8c) regroupées dans l'`object` de leur
+    fonctionnalité : bêtises (`HideSeekMischief.START` / `FOUND` / `GAVE_UP` / `GIGGLE` / `NEEDS_*`,
+    `KnockMischief.KNOCKING`, `SquatMischief`, `ChewEdgeMischief`, `TongueMischief`, `StartleMischief`,
+    `ScrollDizzy.DIZZY`), stations (`BathStation`, `VetStation`, `CageStation`, `BedStation`, `WheelStation`,
+    `GardenStation`, `BowlStation` : `ENTER`, `BUSY`…, et `StationBehavior.LONG_PRESS_HINT`), `PlushToy.NAP`. Mêmes
+    tableaux dans le même ordre, `ctx.pick(*TABLEAU)` : mêmes tirages.
+  - **detekt** : `detektBaseline` relancé pour **nettoyer** — 9 entrées retirées (7 cœur, 2 app : `MaxLineLength`
+    devenues sans objet, dont celles laissées par 8d, et `UnusedParameter`), aucune ajoutée. Audit avec résolution
+    de types : les signalements ci-dessus ont disparu ; restent, non bloquants, `SpreadOperator` (le
+    `ctx.pick(*TABLEAU)` voulu par 8c), `LongParameterList`, et dans les tests des ombrages de `it`, des `!!` sur
+    `map.get` (`MischiefTest`, trace seedée non retouchée) et `"%.2f".format` sans locale.
+  - Tests : `BowlVisitTest` (cerveau seul — pas de tirage sans gamelle ou hors de sa page, coffre prioritaire —,
+    conditions, boucle avec `FakePetCtx` : il y va, entre, mange ; renonce si on la range ; deux animaux : un seul
+    part, l'autre ne tire rien ; `Director` ; `A11yTexts`). **518 → 530 tests** (501 dans `:core`, 29 dans `:app`).
+  - **À vérifier sur tablette** : gamelle installée sur la page, lapin affamé (satiété < 70) — il y va tout seul,
+    mange et ressort ; gamelle sur une autre page ou rangée : il n'y va pas ; deux lapins affamés : un seul y va ;
+    nourriture lancée pendant le trajet : il part vers elle.
 
 #### Schéma de persistance v1
 
@@ -1327,9 +1376,9 @@ décrite dans les écarts 8c (port `UiTexts` + `object` de répliques par langue
   faim** (`NotifierTexts.statusLine`, `WidgetTexts.gauges`, humeur « faim » des compagnons, `GLUTTON`, fiche du véto,
   boutons « Nourrir ») : à rendre propre à l'espèce (`Species.foodEmoji`) le jour où une espèce ne mange pas de
   carottes. Les commentaires et noms historiques (`BunnyService`, « le lapin » dans la KDoc) ne sont pas du texte.
-- **App** (`StringsResourceTest.speciesWordsAllowed`, 11 clés) : le **personnage de l'app** — l'adoption ne crée que
+- **App** (`StringsResourceTest.speciesWordsAllowed`, 10 clés) : le **personnage de l'app** — l'adoption ne crée que
   des lapins (pas de choix d'espèce) : `main_tagline`, `main_name_hint`, `adopt_name_hint`, `main_reset`,
-  `main_reset_title`, `main_reset_message`, `adopt_title_new`, `adopt_your_pet`, `notif_channel_pet_desc`, et les
+  `main_reset_title`, `main_reset_message`, `adopt_title_new`, `notif_channel_pet_desc`, et les
   textes de divulgation de l'accessibilité (`main_a11y_dialog_message`, `a11y_description`). Avec une deuxième
   espèce adoptable, ces textes deviennent neutres (« ton animal ») ou par espèce (recette « Ajouter une espèce »,
   étape 4). « Cookie » (canaux de notification, widget, tuile, `a11y_summary`) est le nom par défaut du personnage

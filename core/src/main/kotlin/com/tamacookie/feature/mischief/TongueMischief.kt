@@ -14,6 +14,11 @@ import java.util.EnumSet
  * au sort qu'après toutes les autres, ce qui laisse leurs tirages inchangés (évolution 4a).
  */
 object TongueMischief : Mischief {
+    /** Il tire la langue. */
+    val TEASING = arrayOf("😛 Bleeeh !", "Nananère ! 😜", "Même pas cap ! 😝")
+    /** Caressé : il rit et arrête. */
+    val STOPPED = arrayOf("Hihi, je rigolais ! 😇", "Bon, d'accord… 😊")
+
     const val TEASE_SECONDS = 2.5f
 
     override val acts: Set<Act> = EnumSet.of(Act.TEASE)
@@ -27,7 +32,7 @@ object TongueMischief : Mischief {
         ctx.actor.faceToward(pet, r.centerX)
         pet.setAct(Act.TEASE)
         pet.express(Expr.TONGUE, TEASE_SECONDS)
-        ctx.say(ctx.pick("😛 Bleeeh !", "Nananère ! 😜", "Même pas cap ! 😝"), 2f)
+        ctx.say(ctx.pick(*TEASING), 2f)
         ctx.cooldownUntil = ev.now + 30_000
         return true
     }
@@ -40,7 +45,7 @@ object TongueMischief : Mischief {
 
     override fun onPet(ctx: MischiefCtx, pet: Pet): Boolean {
         pet.express(Expr.HAPPY, 1.5f)
-        ctx.say(ctx.pick("Hihi, je rigolais ! 😇", "Bon, d'accord… 😊"), 2f)
+        ctx.say(ctx.pick(*STOPPED), 2f)
         pet.setAct(Act.IDLE, 3f)
         return true
     }
