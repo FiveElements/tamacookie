@@ -103,5 +103,7 @@ kotlin {
 
 // Aucune dépendance AndroidX : uniquement le framework Android + Kotlin stdlib.
 dependencies {
+    // Le cœur Kotlin/JVM pur (règles, monde, cerveau, ports, fonctionnalités) : voir core/build.gradle.kts.
+    implementation(project(":core"))
     testImplementation("junit:junit:4.13.2")
 }

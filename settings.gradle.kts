@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "TamaCookie"
-include(":app")
+include(":app", ":core")
