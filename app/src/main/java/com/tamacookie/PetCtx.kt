@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.view.MotionEvent
 import com.tamacookie.BunnyView.PType
+import com.tamacookie.feature.ActRegistry
 import kotlin.random.Random
 
 /**
@@ -26,6 +27,8 @@ interface PetCtx {
     val prefs: SharedPreferences
     /** Vues / pages du bureau et défilement (où se trouve chaque chose). */
     val pages: PageTracker
+    /** Quelle fonctionnalité prend en charge l'activité courante d'un animal (stations…). */
+    val acts: ActRegistry
 
     // --- État global ---
     /** Tout est masqué (« Cacher ») : aucune fenêtre. */
@@ -50,10 +53,16 @@ interface PetCtx {
     /** Dernière interaction de l'utilisateur (heure murale, ms). */
     var lastInteraction: Long
     fun noteInteraction()
-    /** Station où se trouve l'animal (null = dehors). */
-    val inStation: StationKind?
-    /** Vrai (et il le dit) s'il est occupé dans une station ou à cache-cache. */
-    fun busyInStation(): Boolean
+    /**
+     * Vrai (et il le dit) s'il est occupé : à cache-cache ou dans une station ([World.busy]).
+     * La réplique vient du comportement de la station ([com.tamacookie.feature.station.StationBehavior.busyLine]).
+     */
+    fun sayIfBusy(pet: Pet = this.pet): Boolean {
+        if (pet.isHiding) { say("Je joue à cache-cache ! 🫣"); return true }
+        val k = world.stationOf(pet) ?: return false
+        say(k.behavior.busyLine(this))
+        return true
+    }
     fun endHiding()
     fun startSleep(pet: Pet)
     fun feed(food: Food = Food.CARROT, from: Station? = null)

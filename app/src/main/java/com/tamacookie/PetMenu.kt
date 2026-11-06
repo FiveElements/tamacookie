@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.feature.station.StationKind
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
@@ -162,8 +163,6 @@ class StationsPanel(
         addView(small("Chaque objet reste sur la page (ou l'app) où tu l'as mis.").apply {
             setPadding(0, (2 * d).toInt(), 0, (8 * d).toInt())
         })
-        val names = mapOf(StationKind.BATH to "🛁 Baignoire", StationKind.VET to "🩺 Véto",
-            StationKind.CAGE to "🔒 Cage", StationKind.CHEST to "🧰 Coffre")
         for (k in StationKind.values()) {
             val row = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
             val info = TextView(context).apply {
@@ -179,7 +178,7 @@ class StationsPanel(
             row.addView(btn, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
             addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })
             rows[k] = Pair(info, btn)
-            info.tag = names[k]
+            info.tag = k.behavior.name
         }
         refresh()
     }

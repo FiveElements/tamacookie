@@ -5,10 +5,12 @@ import android.content.SharedPreferences
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.ViewConfiguration
-import android.view.WindowManager
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
-import com.tamacookie.BunnyView.Pose
+import com.tamacookie.feature.ActHandler
+import com.tamacookie.feature.station.StationBehavior
+import com.tamacookie.feature.station.StationCtx
+import com.tamacookie.feature.station.StationKind
 import java.util.EnumMap
 import kotlin.math.hypot
 import kotlin.math.max
@@ -17,15 +19,16 @@ import kotlin.math.roundToInt
 /**
  * "Widgets" flottants : baignoire, véto, cage et coffre (nourriture / jouets).
  * Chaque station est installée sur une vue (app ou page du bureau) ; on y dépose le lapin.
+ *
+ * Ce contrôleur gère les **fenêtres** (création, placement, ancrage, toucher, panneaux) et l'entrée /
+ * la sortie ; ce qui est propre à chaque station est dans son [StationBehavior] (`feature/station/`).
+ * Qui occupe quelle station est dans le monde ([World.station], [World.stationOf]).
  */
 class StationController(private val ctx: PetCtx) {
     private val stations = EnumMap<StationKind, Station>(StationKind::class.java)
     /** Toutes les stations, dans l'ordre de [StationKind] (parcours sans allocation). */
     private lateinit var all: Array<Station>
 
-    /** Station où se trouve le lapin (null = dehors). */
-    var inStation: StationKind? = null
-        private set
     private var hoverStation: StationKind? = null
 
     private var vetTimer = 0f
@@ -74,6 +77,30 @@ class StationController(private val ctx: PetCtx) {
     private val pet: Pet get() = ctx.pet
 
     operator fun get(k: StationKind): Station = stations[k]!!
+
+    /** Ce que reçoivent les comportements de station : la façade, plus la sortie et les panneaux. */
+    private val sctx: StationCtx = object : StationCtx, PetCtx by ctx {
+        override fun leaveStation(pet: Pet, hopOut: Boolean) = this@StationController.leaveStation(pet, hopOut)
+        override fun openVetPanel(pet: Pet) = this@StationController.openVetPanel(pet)
+        override fun closeVetPanel() = this@StationController.closeVetPanel()
+        override fun openChest() = this@StationController.openChest(get(StationKind.CHEST))
+    }
+
+    /** [Act.IN_STATION] : la boucle et le toucher délèguent au comportement de la station occupée. */
+    private inner class InStation(private val b: StationBehavior) : ActHandler {
+        override val slowFrames get() = b.slowFrames
+        override val travel get() = b.travel
+        override fun update(pet: Pet, dt: Float) = b.update(sctx, pet, dt)
+        override fun onPet(pet: Pet): Boolean { b.onPet(sctx, pet); return true }
+    }
+
+    private val handlers: Array<ActHandler> = Array(StationKind.entries.size) { InStation(StationKind.entries[it].behavior) }
+
+    /** Gestionnaire de [Act.IN_STATION] (enregistré dans [com.tamacookie.feature.ActRegistry] par le service). */
+    fun handlerFor(p: Pet): ActHandler? = ctx.world.stationOf(p)?.let { handlers[it.ordinal] }
+
+    /** Station qui garde [p] avec elle (la cage) : il la suit d'une vue à l'autre. */
+    fun holdingStation(p: Pet): StationKind? = ctx.world.stationOf(p)?.takeIf { it.behavior.holdsPet }
 
     // =====================================================================
     //  Création, placement, positions sauvegardées
@@ -149,41 +176,43 @@ class StationController(private val ctx: PetCtx) {
         }
     }
 
-    /** Lapin dans la cage : il suit la cage (et disparaît avec elle). */
-    fun followCage() {
-        val cage = get(StationKind.CAGE)
+    /** [p] dans une station qui le garde ([StationBehavior.holdsPet]) : il la suit (et disparaît avec elle). */
+    fun followHolder(k: StationKind, p: Pet = pet) {
+        val st = get(k)
         val pages = ctx.pages
-        val off = pages.visibleOffset(cage.anchor)
+        val off = pages.visibleOffset(st.anchor)
         val vis = !off.isNaN()
-        val raw = pages.anchorOffset(cage.anchor)
+        val raw = pages.anchorOffset(st.anchor)
         pages.bunnyShift = if (raw.isNaN()) 0f else raw
         if (!vis && !ctx.bunnyAway) {
             ctx.setBunnyAway(true)
         } else if (vis && ctx.bunnyAway) {
-            positionInStation(StationKind.CAGE)
-            // le lapin doit rester SOUS la cage
-            if (cage.shown) { ctx.windows.safeRemove(cage.view); cage.shown = false }
+            positionInStation(p, k)
+            // le lapin doit rester SOUS la station
+            if (st.shown) { ctx.windows.safeRemove(st.view); st.shown = false }
             ctx.setBunnyAway(false)
-            ctx.windows.add(cage.view, cage.lp); cage.shown = true
-            if (off == 0f) ctx.say(ctx.pick("Tu es revenu ! 🥺", "Je suis toujours là… dans ma cage"), 2.5f)
+            ctx.windows.add(st.view, st.lp); st.shown = true
+            k.behavior.onShownAgain(sctx, p, onScreen = off == 0f)
         }
-        pages.split(cage.anchor ?: "").second?.let { pages.bunnyPage = it }
+        pages.split(st.anchor ?: "").second?.let { pages.bunnyPage = it }
     }
 
     fun detachAll() {
         for (s in all) if (s.shown) { ctx.windows.safeRemove(s.view); s.shown = false }
     }
 
-    /** Animation de la baignoire et rafraîchissement du panneau véto. */
+    /** Animation des stations au décor animé (baignoire) et rafraîchissement du panneau véto. */
     fun update(dt: Float) {
-        val bath = get(StationKind.BATH)
-        if (bath.shown) { bath.view.t += dt; bath.view.invalidate() }
+        for (s in all) if (s.shown && s.behavior.animated) { s.view.t += dt; s.view.invalidate() }
         vetTimer += dt
         if (vetTimer > 1f) { vetTimer = 0f; vetPanel.view?.refresh() }
     }
 
     /** Une station animée est visible (baignoire, couvercle du coffre). */
-    fun animating(): Boolean = get(StationKind.BATH).shown || chestLid > 0f || chestPop != null
+    fun animating(): Boolean {
+        for (s in all) if (s.shown && s.behavior.animated) return true
+        return chestLid > 0f || chestPop != null
+    }
 
     // =====================================================================
     //  Toucher : appui long pour déplacer, tap pour le coffre / une explication
@@ -200,7 +229,7 @@ class StationController(private val ctx: PetCtx) {
             s.view.animate().scaleX(1.08f).scaleY(1.08f).setDuration(100).start()
         }
         s.view.setOnTouchListener { _, ev ->
-            if (ev.actionMasked == MotionEvent.ACTION_DOWN) forwarding = s.kind == inStation
+            if (ev.actionMasked == MotionEvent.ACTION_DOWN) forwarding = ctx.world.station(s.kind).has(pet.id)
             // Lapin à l'intérieur : les touchers vont au lapin (pour le sortir / le caresser)
             if (forwarding) return@setOnTouchListener ctx.forwardTouch(ev)
             when (ev.actionMasked) {
@@ -219,15 +248,8 @@ class StationController(private val ctx: PetCtx) {
                     if (moving) {
                         s.view.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
                         saveStationPos(s)
-                    } else if (tap && s.kind == StationKind.CHEST) {
-                        openChest(s)
                     } else if (tap) {
-                        ctx.say(when (s.kind) {
-                            StationKind.BATH -> "Glisse-moi dans la baignoire pour me laver 🛁"
-                            StationKind.VET -> "Dépose-moi chez le véto pour voir ma santé 🩺"
-                            StationKind.CAGE -> "La cage… tu ne vas pas m'y mettre, hein ? 🥺"
-                            StationKind.CHEST -> ""
-                        } + "\n(appui long pour déplacer)", 3f)
+                        s.behavior.onTap(sctx)
                     }
                     moving = false
                 }
@@ -240,7 +262,7 @@ class StationController(private val ctx: PetCtx) {
     fun updateHover() {
         val hx = pet.body.fx; val hy = pet.body.fy - 45 * d
         var found: StationKind? = null
-        for (s in all) if (s.shown && s.kind != StationKind.CHEST && s.contains(hx, hy, 12 * d)) { found = s.kind; break }
+        for (s in all) if (s.shown && ctx.world.station(s.kind).canEnter(pet.id) && s.contains(hx, hy, 12 * d)) { found = s.kind; break }
         if (found != hoverStation) {
             hoverStation?.let { get(it).view.highlight = false }
             hoverStation = found
@@ -259,115 +281,60 @@ class StationController(private val ctx: PetCtx) {
         return h
     }
 
-    fun positionInStation(k: StationKind) {
+    /** Assoit [p] à sa place dans la station ([StationBehavior.seat]). */
+    fun positionInStation(p: Pet, k: StationKind) {
         val s = get(k)
-        when (k) {
-            StationKind.BATH -> { pet.body.fx = s.cx; pet.body.fy = s.bottom - 14 * d }
-            StationKind.VET -> { pet.body.fx = s.cx + 12 * d; pet.body.fy = s.bottom - 26 * d }
-            StationKind.CAGE -> { pet.body.fx = s.cx; pet.body.fy = s.bottom - 16 * d }
-            StationKind.CHEST -> {}
-        }
+        val seat = k.behavior.seat
+        p.body.fx = s.cx + seat.dxDp * d; p.body.fy = s.bottom - seat.aboveBottomDp * d
         ctx.placeBunny()
+    }
+
+    /** Nouvelle taille d'écran : l'animal reprend sa place dans sa station. */
+    fun repositionOccupant(p: Pet = pet) {
+        ctx.world.stationOf(p)?.let { positionInStation(p, it) }
     }
 
     // =====================================================================
     //  Entrée / sortie
     // =====================================================================
-    fun enterStation(k: StationKind, announce: Boolean = true) {
-        if (k == StationKind.CHEST) return
+    fun enterStation(k: StationKind, announce: Boolean = true, p: Pet = pet) {
+        val occ = ctx.world.station(k)
+        if (!occ.canEnter(p.id)) return
+        // Une seule station à la fois (ne devrait pas arriver : le glisser le fait sortir avant)
+        ctx.world.stationOf(p)?.let { prev ->
+            val o = ctx.world.station(prev)
+            o.leave(p.id); get(prev).view.occupied = !o.isEmpty
+        }
         val s = get(k)
         ctx.noteInteraction()
         // Une station utilisée est installée sur la vue courante
         val here = ctx.pages.currentView
         if (here.isNotEmpty() && s.anchor != here) { s.anchor = here; saveAnchor(s) }
         ctx.layoutAnchored()
-        inStation = k
+        occ.enter(p.id)
         s.view.occupied = true
-        pet.body.platform = null; pet.body.phys.airLandY = null; pet.body.phys.stop()
+        p.body.platform = null; p.body.phys.airLandY = null; p.body.phys.stop()
         ctx.world.currentToy()?.held = false
-        positionInStation(k)
-        when (k) {
-            StationKind.CHEST -> {}
-            StationKind.BATH -> {
-                pet.stats.sleeping = false
-                pet.setAct(Act.BATH)
-                if (announce) ctx.say(ctx.pick("Un bain ! 🫧", "Splash ! 💦", "Brrr, elle est froide !"))
-            }
-            StationKind.VET -> {
-                pet.setAct(Act.VET)
-                openVetPanel()
-                if (announce) ctx.say(ctx.pick("Bonjour docteur… 😳", "J'ai peur des piqûres…", "Ça va être long ?"))
-            }
-            StationKind.CAGE -> {
-                pet.stats.caged = true; pet.stats.save()
-                pet.mind.chatterIn = 20f
-                pet.setAct(Act.CAGED)
-                if (announce) {
-                    pet.express(Expr.SAD, 2f)
-                    ctx.say(ctx.pick("Hé ! Pourquoi la cage ?? 🥺", "Laisse-moi sortir ! 😢", "J'ai rien fait !"))
-                }
-                ctx.updateNotification(force = true)
-            }
-        }
+        positionInStation(p, k)
+        p.setAct(Act.IN_STATION)
+        k.behavior.onEnter(sctx, p, announce)
         ctx.layoutAnchored()
     }
 
-    fun leaveStation(hopOut: Boolean) {
-        val k = inStation ?: return
-        get(k).view.occupied = false
-        inStation = null
-        if (k == StationKind.VET) closeVetPanel()
-        if (k == StationKind.CAGE) {
-            pet.stats.caged = false; pet.stats.save()
-            pet.express(Expr.HAPPY, 2f)
-            ctx.emit(pet, PType.HEART, 3)
-            ctx.say(ctx.pick("Libre !! 🎉", "Enfin dehors ! Merci !", "Je serai sage, promis 😇"))
-            ctx.updateNotification(force = true)
-        }
+    /** Au démarrage : il retourne dans la station où il était (la cage, sauvegardée). */
+    fun restore(p: Pet = pet) {
+        for (k in StationKind.entries) if (k.behavior.restores(p)) { enterStation(k, announce = false, p = p); return }
+    }
+
+    fun leaveStation(p: Pet = pet, hopOut: Boolean) {
+        val k = ctx.world.stationOf(p) ?: return
+        val occ = ctx.world.station(k)
+        occ.leave(p.id)
+        get(k).view.occupied = !occ.isEmpty
+        k.behavior.onLeave(sctx, p)
         ctx.layoutAnchored()
-        if (hopOut) ctx.actor.jumpTo(pet, (pet.body.fx + (if (pet.body.fx < arena.screenW / 2) 90 else -90) * d).coerceIn(arena.minX, arena.maxX), arena.groundY, Act.IDLE)
-        else pet.setAct(Act.IDLE, 2f)
-    }
-
-    /** Vrai (et il le dit) s'il est dans la baignoire / chez le véto / en cage, ou en train de se cacher. */
-    fun busyInStation(): Boolean {
-        if (pet.isHiding) { ctx.say("Je joue à cache-cache ! 🫣"); return true }
-        val s = inStation ?: return false
-        ctx.say(when (s) {
-            StationKind.CAGE -> ctx.pick("Je ne peux pas sortir… 🥺", "Ouvre la cage d'abord !")
-            StationKind.BATH -> "Attends, je prends mon bain ! 🫧"
-            StationKind.VET -> "Je suis chez le docteur !"
-            StationKind.CHEST -> ""
-        })
-        return true
-    }
-
-    /** Act.BATH */
-    fun updateBath(pet: Pet, dt: Float) {
-        pet.body.pose = Pose.IDLE
-        pet.express(Expr.HAPPY, 0.2f)
-        if (ctx.rnd.nextFloat() < dt * 14f) ctx.emit(pet, PType.SPARKLE)
-        if (ctx.rnd.nextFloat() < dt * 6f) ctx.emit(pet, PType.BUBBLE)
-        if (pet.body.actTime > 4f) {
-            pet.stats.clean()
-            ctx.say(ctx.pick("Tout propre ! ✨", "Ça sent bon la fraise !", "Brrr… mais je brille !"))
-            leaveStation(hopOut = true)
-        }
-    }
-
-    /** Act.CAGED */
-    fun updateCaged(pet: Pet, dt: Float) {
-        val st = pet.stats
-        pet.body.pose = if (st.sleeping) Pose.SLEEP else Pose.SIT
-        if (!st.sleeping) {
-            pet.express(Expr.SAD, 0.3f)
-            pet.mind.chatterIn -= dt
-            if (pet.mind.chatterIn <= 0f) {
-                pet.mind.chatterIn = 25f + ctx.rnd.nextFloat() * 20f
-                ctx.say(ctx.pick("Laisse-moi sortir… 🥺", "J'ai été sage, promis !", "C'est tout petit ici…",
-                    "Snif… 😢", "Je m'ennuie dans ma cage"))
-            }
-        }
+        if (hopOut) ctx.actor.jumpTo(p, (p.body.fx + (if (p.body.fx < arena.screenW / 2) 90 else -90) * d).coerceIn(arena.minX, arena.maxX), arena.groundY, Act.IDLE)
+        else p.setAct(Act.IDLE, 2f)
     }
 
     // =====================================================================
@@ -390,14 +357,16 @@ class StationController(private val ctx: PetCtx) {
             },
             onToggle = { k ->
                 val s = get(k)
+                val b = k.behavior
+                val inside = ctx.world.station(k).has(pet.id)
                 if (s.anchor == pages.currentView) {
-                    if (inStation == k) ctx.say(if (k == StationKind.CAGE) "Je suis dedans ! 🥺" else "Attends, je suis dedans !")
+                    if (inside) ctx.say(b.occupiedLine)
                     else { s.anchor = null; saveAnchor(s) }
                 } else {
-                    if (inStation == k && k == StationKind.CAGE) {
-                        ctx.say("La cage reste où elle est… avec moi dedans 🥺")
+                    if (inside && b.holdsPet) {
+                        ctx.say(b.stayLine)
                     } else {
-                        if (inStation == k) leaveStation(hopOut = false)
+                        if (inside) leaveStation(pet, hopOut = false)
                         s.anchor = pages.currentView; saveAnchor(s)
                     }
                 }
@@ -515,7 +484,7 @@ class StationController(private val ctx: PetCtx) {
     }
 
     // --- Véto ---
-    private fun openVetPanel() {
+    private fun openVetPanel(pet: Pet) {
         closeVetPanel()
         val st = pet.stats
         val p = VetPanel(ctx.context, st,
@@ -529,7 +498,7 @@ class StationController(private val ctx: PetCtx) {
                 }
                 vetPanel.view?.refresh()
             },
-            onClose = { leaveStation(hopOut = true) })
+            onClose = { leaveStation(pet, hopOut = true) })
         vetPanel.open(p)
     }
 
@@ -537,7 +506,7 @@ class StationController(private val ctx: PetCtx) {
 
     /** Après "Montrer" : s'il est toujours chez le véto, le panneau revient (sinon il y resterait bloqué). */
     fun reopenVetPanelIfNeeded() {
-        if (inStation == StationKind.VET && !vetPanel.isOpen) openVetPanel()
+        if (ctx.world.stationOf(pet) == StationKind.VET && !vetPanel.isOpen) openVetPanel(pet)
     }
 
     /** Nouvelle taille d'écran : les panneaux ouverts sont replacés dans l'écran. */

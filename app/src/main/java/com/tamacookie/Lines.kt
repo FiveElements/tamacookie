@@ -49,7 +49,6 @@ object Lines {
     const val FOUND_WHILE_DRAGGED = "Trouvé !! 🎉"
     val DRAGGED = arrayOf("Waaah !", "Hé ! Pose-moi !", "Je voleeee !", "Hiii !")
     val THROWN = arrayOf("Wiiiiii !", "Je vole !!", "Aaaaah !")
-    val PETTED_IN_CAGE = arrayOf("Un câlin à travers les barreaux… 🥺", "Fais-moi sortir !", "Snif, merci…")
     val WOKEN_BY_TAP = arrayOf("Hmpf… je dormais !", "Encore 5 minutes…", "Grrr… 😾")
     val TICKLED = arrayOf("Ça chatouille !! 🤭", "Arrête, hihi !")
     val PETTED = arrayOf("Hihi ! 💕", "Encore !", "J'adore les câlins", "Mmmh…", "Tu es gentil·le !", "*ronronne* (oui, les lapins aussi)")

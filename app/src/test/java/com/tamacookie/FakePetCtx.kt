@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.view.MotionEvent
 import com.tamacookie.BunnyView.PType
+import com.tamacookie.feature.ActRegistry
 import kotlin.random.Random
 
 /** Horloge de test, avancée à la main. */
@@ -29,6 +30,7 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
     override val clock = FakeClock()
     override val rnd = Random(seed)
     override val pages: PageTracker by lazy { PageTracker(this) }
+    override val acts = ActRegistry()
 
     val stats: PetState = newPet(prefs)
     override val pet: Pet = Pet.resident(stats, BunnyPhysics(arena.d), rnd).also {
@@ -52,8 +54,6 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
 
     // --- État piloté par le test ---
     override var hidden = false
-    override var inStation: StationKind? = null
-    var busy = false
     var foreground: String? = null
     val labels = HashMap<String, String>()
     override var bunnyAway = false
@@ -72,7 +72,6 @@ class FakePetCtx(seed: Int = 42, override val prefs: FakePrefs = FakePrefs()) : 
 
     override var lastInteraction = clock.wallMs()
     override fun noteInteraction() { lastInteraction = clock.wallMs() }
-    override fun busyInStation() = busy
     override fun endHiding() { dockShowsHiding = false }
     override fun startSleep(pet: Pet) { sleepRequests++; pet.stats.sleeping = true; pet.setActOrAfterAir(Act.SLEEP) }
     override fun feed(food: Food, from: Station?) { fed += food }

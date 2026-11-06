@@ -1,5 +1,6 @@
 package com.tamacookie
 
+import com.tamacookie.feature.station.StationKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

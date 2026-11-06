@@ -28,6 +28,8 @@ import android.view.WindowManager
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
+import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.Travel
 import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.max
@@ -90,6 +92,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         private set
     override lateinit var pages: PageTracker
         private set
+    /** Activités prises en charge par une fonctionnalité (stations : [Act.IN_STATION]). */
+    override val acts = ActRegistry()
     private lateinit var stations: StationController
     private lateinit var toys: ToyController
     private lateinit var mischief: MischiefController
@@ -163,6 +167,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         windows = OverlayWindows(this)
         pages = PageTracker(this)
         stations = StationController(this)
+        acts.register(Act.IN_STATION, stations::handlerFor)
         toys = ToyController(this)
         mischief = MischiefController(this)
         touch = TouchHandler(this, stations, mischief)
@@ -194,7 +199,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         handler.postDelayed({
             if (!ready) return@postDelayed
             pages.currentView = pages.computeView()
-            if (resident.stats.caged) stations.enterStation(StationKind.CAGE, announce = false)
+            stations.restore(resident)
             applyView()
         }, 300)
         lastTickWall = clock.wallMs()
@@ -279,7 +284,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             // stations et dock : recalculés depuis les fractions sauvegardées
             stations.reloadPositions()
             windows.reloadDockPosition()
-            stations.inStation?.let { stations.positionInStation(it) }
+            stations.repositionOccupant(resident)
             stations.repositionPanels()
             requestFrames()
         }
@@ -424,17 +429,18 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         if (hidden) return
         stations.layout()
         toys.layoutPoops()
-        if (stations.inStation == StationKind.CAGE) stations.followCage() else pages.updateBunnyPage()
+        val holder = stations.holdingStation(resident)
+        if (holder != null) stations.followHolder(holder, resident) else pages.updateBunnyPage()
     }
 
     /** Changement de vue : bain/véto interrompus, cache-cache. */
     override fun applyView() {
         if (hidden) return
-        val st = stations.inStation
-        if (st != null && st != StationKind.CAGE && !stations.anchoredHere(st)) stations.leaveStation(hopOut = false)
+        val st = world.stationOf(resident)
+        if (st != null && !st.behavior.holdsPet && !stations.anchoredHere(st)) stations.leaveStation(resident, hopOut = false)
         stations.refreshStationsPanel()
         mischief.onViewChanged()
-        if (stations.inStation == StationKind.CAGE) { layoutAnchored(); return }
+        if (stations.holdingStation(resident) != null) { layoutAnchored(); return }
         setBunnyAway(resident.act == Act.HIDDEN, fadeIn = true)
         layoutAnchored()
     }
@@ -472,7 +478,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         val act = resident.act
         return when {
             act in Act.MOVING || toys.anyMoving() || pages.scrollingRecently() -> Tuning.FPS_MOVING
-            act in Act.SLOW -> Tuning.FPS_SLEEP
+            act in Act.SLOW || acts.handlerFor(resident)?.slowFrames == true -> Tuning.FPS_SLEEP
             else -> Tuning.FPS_IDLE
         }
     }
@@ -593,6 +599,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         val m = p.mind
         val st = p.stats
         val d = arena.d
+        // Activité prise en charge par une fonctionnalité (stations…) : elle fait tout
+        acts.handlerFor(p)?.let { it.update(p, dt); return }
         when (b.act) {
             Act.IDLE -> {
                 b.pose = Pose.IDLE
@@ -680,12 +688,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                     actor.jump(p, -420 * d, 0f, then = Act.DANCE)
                 }
             }
-            Act.BATH -> stations.updateBath(p, dt)
-            Act.VET -> {
-                b.pose = Pose.SIT
-                actor.faceToward(p, arena.screenW / 2)
-            }
-            Act.CAGED -> stations.updateCaged(p, dt)
+            // Station introuvable (ne devrait pas arriver) : il ne reste pas figé
+            Act.IN_STATION -> p.setAct(Act.IDLE, 2f)
             Act.SQUAT -> mischief.updateSquat(p, dt)
             Act.HIDE_RUN, Act.HIDDEN, Act.PEEK -> mischief.updateHide(p, dt)
             Act.KNOCK -> mischief.updateKnock(p, dt)
@@ -812,8 +816,9 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         pet.stats.sleeping = true
         pet.stats.save()
         speech.sayOneOf(Lines.GOING_TO_SLEEP)
-        if (stations.inStation == StationKind.CAGE) return   // il dort dans sa cage
-        if (stations.inStation != null) stations.leaveStation(hopOut = false)
+        val k = world.stationOf(pet)
+        if (k != null && k.behavior.holdsPet) return   // il dort dans sa cage
+        if (k != null) stations.leaveStation(pet, hopOut = false)
         pet.setActOrAfterAir(Act.SLEEP)
     }
 
@@ -869,8 +874,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
             else -> Act.IDLE
         }
         val act = p.act
-        if (act == Act.CAGED || act == Act.VET || p.isHiding) return
-        if (act in Act.BUSY_FOR_TRAVEL) {
+        if (p.isHiding) return
+        val feature = acts.handlerFor(p)
+        if (feature?.travel == Travel.IGNORES) return
+        if (act in Act.BUSY_FOR_TRAVEL || feature?.blocksTravel == true) {
             if (act != Act.SLEEP && rnd.nextFloat() < 0.5f) say(comment, 3f)
             return
         }
@@ -923,10 +930,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         set(v) { mischief.lastInteraction = v }
 
     override fun noteInteraction() = mischief.noteInteraction()
-
-    override val inStation: StationKind? get() = stations.inStation
-
-    override fun busyInStation(): Boolean = stations.busyInStation()
 
     override fun endHiding() = mischief.endHiding()
 

@@ -224,7 +224,7 @@ class PageTracker(private val ctx: PetCtx) {
 
     /** Sur une autre page : après un moment (ou s'il y a à jouer / manger), il revient sur la page affichée. */
     fun checkPageReturn() {
-        if (ctx.hidden || ctx.inStation != null) return
+        if (ctx.hidden || ctx.world.stationOf(pet) != null) return
         val cp = launcherPage()
         if (cp == 0 || bunnyPage <= 0 || bunnyPage == cp) { returnAt = 0L; return }
         val now = ctx.clock.uptimeMs()

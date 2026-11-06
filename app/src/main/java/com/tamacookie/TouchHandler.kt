@@ -125,7 +125,7 @@ class TouchHandler(
         closeMenu()
         pet.body.platform = null
         pet.body.phys.airLandY = null
-        if (ctx.inStation != null) stations.leaveStation(hopOut = false)
+        stations.leaveStation(pet, hopOut = false)
         if (st.sleeping) { st.sleeping = false; st.happiness = (st.happiness - 3f).coerceAtLeast(0f) }
         ctx.world.dropHeldToy()
         ctx.noteInteraction()
@@ -147,17 +147,12 @@ class TouchHandler(
         val st = pet.stats
         ctx.haptic(pet, HapticFeedbackConstants.CONFIRM)
         ctx.noteInteraction()
+        // Activité prise en charge par une fonctionnalité (dans une station…) : elle réagit à la caresse
+        ctx.acts.handlerFor(pet)?.let { if (it.onPet(pet)) return }
         when (pet.body.act) {
             Act.PEEK -> { mischief.foundBunny(); return }
             Act.HIDE_RUN -> return
             Act.SQUAT -> { mischief.onSquatPetted(); return }
-            Act.CAGED -> {
-                st.pet()
-                ctx.emit(pet, PType.HEART, 1)
-                ctx.speech.sayOneOf(Lines.PETTED_IN_CAGE, 2f)
-                return
-            }
-            Act.BATH, Act.VET -> { ctx.emit(pet, PType.HEART, 1); return }
             else -> {}
         }
         if (pet.body.act == Act.SLEEP || st.sleeping) {

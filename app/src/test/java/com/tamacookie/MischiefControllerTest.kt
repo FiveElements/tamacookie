@@ -2,6 +2,7 @@ package com.tamacookie
 
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
+import com.tamacookie.feature.station.StationKind
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,7 +41,7 @@ class MischiefControllerTest {
 
     @Test
     fun `pas de betise dans une station`() {
-        ctx.inStation = StationKind.BATH
+        ctx.world.station(StationKind.BATH).enter(pet.id)
         ctx.lastInteraction = ctx.clock.wallMs() - 3_600_000L
         assertFalse(mis.maybeSeekAttention())
         assertTrue(ctx.said.isEmpty())

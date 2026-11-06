@@ -50,7 +50,7 @@ class MischiefController(private val ctx: PetCtx) {
 
     /** Appelé quand il choisit quoi faire : s'il est ignoré depuis longtemps, il fait une bêtise. */
     fun maybeSeekAttention(): Boolean {
-        if (ctx.inStation != null) return false
+        if (ctx.world.stationOf(pet) != null) return false
         val now = ctx.clock.wallMs()
         val thresholdMs = BunnyBrain.attentionThresholdMs(level, pet.stats.personality)
         if (!BunnyBrain.canSeekAttention(now, lastInteraction, cooldownUntil, thresholdMs)) return false
@@ -158,7 +158,7 @@ class MischiefController(private val ctx: PetCtx) {
         val newType = seenTyping != -1 && tv != seenTyping
         val newScroll = seenScroll != -1 && sv != seenScroll
         seenClick = cv; seenTyping = tv; seenScroll = sv
-        if (level == 0 || pet.stats.sleeping || ctx.inStation != null || ctx.hidden) return
+        if (level == 0 || pet.stats.sleeping || ctx.world.stationOf(pet) != null || ctx.hidden) return
         if (newType) typingCount++
         val now = ctx.clock.wallMs()
         if (pet.body.act !in Act.FREE || now < cooldownUntil || exemptApp()) return
@@ -215,7 +215,7 @@ class MischiefController(private val ctx: PetCtx) {
     }
 
     fun startHideSeek(fromMenu: Boolean): Boolean {
-        if (ctx.inStation != null || pet.stats.sleeping || isHiding()) return false
+        if (ctx.world.stationOf(pet) != null || pet.stats.sleeping || isHiding()) return false
         if (!canHideSeek()) {
             if (fromMenu) ctx.say(
                 if (!Platforms.connected) "Active l'accessibilité pour jouer à cache-cache 🫣"

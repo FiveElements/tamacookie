@@ -112,7 +112,7 @@ class ToyController(private val ctx: PetCtx) {
     /** Donne à manger. [from] = le coffre d'où sort la nourriture (sinon elle tombe du ciel). */
     fun feed(food: Food = Food.CARROT, from: Station? = null) {
         val st = pet.stats
-        if (ctx.busyInStation()) return
+        if (ctx.sayIfBusy(pet)) return
         ctx.noteInteraction()
         if (st.sleeping) { ctx.say("Chut… il dort 💤"); return }
         if (st.satiety > 95f && food != Food.STRAWBERRY) { ctx.say(ctx.pick("J'ai plus faim !", "Mon ventre va exploser !")); return }
@@ -189,7 +189,7 @@ class ToyController(private val ctx: PetCtx) {
     fun startPlay(toy: Toy, from: Station? = null) {
         val st = pet.stats
         val rnd = ctx.rnd
-        if (ctx.busyInStation()) return
+        if (ctx.sayIfBusy(pet)) return
         if (st.sleeping) { ctx.say("Chut… il dort"); return }
         if (!st.startPlay()) { ctx.say(ctx.pick("Trop fatigué… 😴", "Plus tard, j'ai plus d'énergie")); return }
         props.filter { it.toy != null }.forEach { removeProp(it) }

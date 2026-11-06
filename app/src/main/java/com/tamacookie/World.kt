@@ -1,5 +1,8 @@
 package com.tamacookie
 
+import com.tamacookie.feature.station.Occupancy
+import com.tamacookie.feature.station.StationKind
+
 /**
  * Géométrie de l'écran partagée par tous les animaux (pixels), recalculée par le service
  * à chaque changement de taille / d'orientation.
@@ -20,7 +23,7 @@ class Arena {
 }
 
 /**
- * Le monde : les animaux et ce qu'ils partagent (objets posés ; stations à l'étape 3).
+ * Le monde : les animaux et ce qu'ils partagent (objets posés, occupation des stations).
  * Un seul animal pour l'instant (le résident), mais rien ne suppose qu'il est unique.
  */
 class World {
@@ -29,7 +32,22 @@ class World {
     /** Nourriture, crottes et jouets posés à l'écran (gérés par [ToyController]). */
     val props = ArrayList<Prop>()
 
+    /** Qui occupe chaque station, dans l'ordre de [StationKind] (les fenêtres sont dans `StationController`). */
+    private val stations: Array<Occupancy> = Array(StationKind.entries.size) { Occupancy(StationKind.entries[it]) }
+
     fun add(pet: Pet) { pets[pet.id] = pet }
+
+    fun station(k: StationKind): Occupancy = stations[k.ordinal]
+
+    /** Station où se trouve [pet] (null = dehors). Sans allocation : appelé à chaque image. */
+    fun stationOf(pet: Pet): StationKind? {
+        val id = pet.id
+        for (s in stations) if (s.has(id)) return s.kind
+        return null
+    }
+
+    /** Occupé (cache-cache ou dans une station) : on ne peut ni le nourrir ni jouer avec lui. */
+    fun busy(pet: Pet): Boolean = pet.isHiding || stationOf(pet) != null
 
     /** L'animal résident (le premier ajouté). */
     val resident: Pet get() = pets.values.first()
