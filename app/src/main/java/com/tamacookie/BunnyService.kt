@@ -168,7 +168,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         repo = Pets.repository(this)
         resident = loadResident(BunnyPhysics(d))
         world.add(resident)
-        watcher = ForegroundAppWatcher(this, screen)
+        watcher = graph.foregroundWatcher()
         wm = getSystemService(WindowManager::class.java)
         overlayManager = OverlayManager(wm)
         windows = OverlayWindows(this, arena, { prefs }, overlayManager, bubbleAnchor)

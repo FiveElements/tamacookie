@@ -266,7 +266,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private fun refresh() {
         val overlay = Settings.canDrawOverlays(this)
         val notif = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        val usage = ForegroundAppWatcher.hasPermission(this)
+        val usage = UsageStatsForegroundSource.hasPermission(this)
         setPerm(overlayBtn, overlay, "Afficher par-dessus les autres apps", "obligatoire")
         setPerm(notifBtn, notif, "Notifications", "recommandé")
         setPerm(usageBtn, usage, "Accès aux données d'utilisation", "pour qu'il te suive d'app en app")
