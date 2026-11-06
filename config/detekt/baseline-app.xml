@@ -1,0 +1,112 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:BunnyService.kt:BunnyService$!hidden &amp;&amp; !isAway(p) &amp;&amp; world.isShown(p) &amp;&amp; director.bubbles.request(Director.BubbleQueue.Line(p.id, text, seconds, speech.priority))</ID>
+    <ID>ComplexCondition:BunnyService.kt:BunnyService$p != null &amp;&amp; !hidden &amp;&amp; !isAway(p) &amp;&amp; world.isShown(p)</ID>
+    <ID>CyclomaticComplexMethod:AdoptActivity.kt:AdoptActivity$override fun onCreate</ID>
+    <ID>CyclomaticComplexMethod:BunnyService.kt:BunnyService$override fun onCreate</ID>
+    <ID>CyclomaticComplexMethod:BunnyService.kt:BunnyService$private fun command: Int</ID>
+    <ID>CyclomaticComplexMethod:BunnyService.kt:BunnyService$private fun update</ID>
+    <ID>CyclomaticComplexMethod:MainActivity.kt:MainActivity$override fun onCreate</ID>
+    <ID>CyclomaticComplexMethod:RabbitRenderer.kt:RabbitRenderer$override fun draw</ID>
+    <ID>CyclomaticComplexMethod:RabbitRenderer.kt:RabbitRenderer$private fun drawAccessory</ID>
+    <ID>CyclomaticComplexMethod:RabbitRenderer.kt:RabbitRenderer$private fun drawBunny</ID>
+    <ID>CyclomaticComplexMethod:RabbitRenderer.kt:RabbitRenderer$private fun drawFace</ID>
+    <ID>CyclomaticComplexMethod:TouchHandler.kt:TouchHandler$@SuppressLint("ClickableViewAccessibility") fun attach</ID>
+    <ID>EmptyElseBlock:BunnyService.kt:BunnyService$if (hidden) show()</ID>
+    <ID>EmptyElseBlock:TouchHandler.kt:TouchHandler$if (menu === m) closeMenu()</ID>
+    <ID>LargeClass:BunnyService.kt:BunnyService : ServiceFrameCallbackPetCtx</ID>
+    <ID>LongMethod:AdoptActivity.kt:AdoptActivity$override fun onCreate</ID>
+    <ID>LongMethod:BunnyService.kt:BunnyService$override fun onCreate</ID>
+    <ID>LongMethod:MainActivity.kt:MainActivity$override fun onCreate</ID>
+    <ID>LongMethod:RabbitRenderer.kt:RabbitRenderer$private fun drawBunny</ID>
+    <ID>LoopWithTooManyJumpStatements:OverlayWindows.kt:OverlayWindows$for</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$accessory = Accessory.entries[r.nextInt(Accessory.entries.size)]</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$eyes = EyeColor.entries[r.nextInt(EyeColor.entries.size)]</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$list.addView(card, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$root</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$root.addView(btnRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = (22 * d).toInt() })</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$row.addView(c, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { rightMargin = (8 * d).toInt() })</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$setStroke((if (sel) 4 * d else 1.5f * d).toInt(), Color.parseColor(if (sel) "#F07893" else "#B9ACA3"))</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$setText(if (asCompanion) COMPANION_NAMES.firstOrNull { it !in taken }.orEmpty() else pet?.identity?.name ?: Identity.DEFAULT_NAME)</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$text = "${personality.emoji} ${personality.label} — ${personality.desc}\n(le caractère se choisit à l'adoption)"</ID>
+    <ID>MaxLineLength:AdoptActivity.kt:AdoptActivity$val name = Adoption.cleanName(nameEdit.text.toString()) ?: if (asCompanion) COMPANION_NAMES.random() else Identity.DEFAULT_NAME</ID>
+    <ID>MaxLineLength:AndroidForegroundApps.kt:UsageStatsForegroundSource$class</ID>
+    <ID>MaxLineLength:BalloonToyDrawer.kt:BalloonToyDrawer$path.moveTo(w * 0.44f, w * 1.05f)</ID>
+    <ID>MaxLineLength:BedStationDrawer.kt:BedStationDrawer$r.set(16 * d, h * 0.42f, w * 0.38f, h * 0.62f)</ID>
+    <ID>MaxLineLength:BedStationDrawer.kt:BedStationDrawer$r.set(w * 0.40f, h * 0.42f, w * 0.64f, h * 0.62f)</ID>
+    <ID>MaxLineLength:BunnyService.kt:BunnyService$PetCommands.ACTION_REMOVE_PET -&gt; intent.getStringExtra(PetCommands.EXTRA_ID)?.let { removeCompanion(PetId(it)) }</ID>
+    <ID>MaxLineLength:BunnyService.kt:BunnyService$addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT); addAction(Intent.ACTION_SCREEN_ON)</ID>
+    <ID>MaxLineLength:BunnyService.kt:BunnyService$if</ID>
+    <ID>MaxLineLength:BunnyService.kt:BunnyService$if (!sharedPrefs.getBoolean(Prefs.ENABLED, false)) sharedPrefs.edit().putBoolean(Prefs.ENABLED, true).apply()</ID>
+    <ID>MaxLineLength:BunnyService.kt:BunnyService$if (st != null &amp;&amp; !st.behavior.holdsPet &amp;&amp; !stations.anchoredHere(st)) stations.leaveStation(p, hopOut = false)</ID>
+    <ID>MaxLineLength:BunnyService.kt:BunnyService.&lt;no name provided&gt;$else</ID>
+    <ID>MaxLineLength:ChestStationDrawer.kt:ChestStationDrawer$for (i in 0..2) c.drawCircle(w * (0.3f + i * 0.2f), boxTop - 14 * d - (t * 20 + i * 7) % 14 * d, 2.4f * d, p)</ID>
+    <ID>MaxLineLength:EntityWindows.kt:EntityWindows$*</ID>
+    <ID>MaxLineLength:FakePrefs.kt:FakePrefs$override</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$if (full) companionBtn.text = "💞 Maison pleine (${Tuning.MAX_PETS} animaux)" else companionBtn.text = "💞 Adopter un compagnon"</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$petList.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$root</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$root.addView(nameRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = (12 * d).toInt() })</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$text</ID>
+    <ID>MaxLineLength:MainActivity.kt:MainActivity$val nameRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }</ID>
+    <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$dockY = y.roundToInt().coerceIn(arena.topY.toInt(), (arena.groundY - dockLp.height).toInt().coerceAtLeast(arena.topY.toInt()))</ID>
+    <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$if (overlay.isAttached(WindowId.Dock)) overlay.move(WindowId.Dock, dockX, dockY) else { dockLp.x = dockX; dockLp.y = dockY }</ID>
+    <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$placeDock(prefs.getFloat(Prefs.DOCK_FX, 1f) * arena.screenW, prefs.getFloat(Prefs.DOCK_FY, 0.42f) * arena.groundY)</ID>
+    <ID>MaxLineLength:OverlayWindows.kt:OverlayWindows$val lp = params(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, touchable = false)</ID>
+    <ID>MaxLineLength:PetCommands.kt:PetCommands$ctx.startService(Intent(ctx, BunnyService::class.java).setAction(ACTION_REMOVE_PET).putExtra(EXTRA_ID, id.value))</ID>
+    <ID>MaxLineLength:PetMenu.kt:ChestPanel$for (t in chunk) toys.addView(button(t.emoji, t.label + if (t == pet.favoriteToy) "⭐" else "") { onToy(t) }, btnLp())</ID>
+    <ID>MaxLineLength:PetMenu.kt:Panel$MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -&gt; v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()</ID>
+    <ID>MaxLineLength:PetMenu.kt:Panel$protected fun rowLp</ID>
+    <ID>MaxLineLength:PetMenu.kt:PetMenu$addView</ID>
+    <ID>MaxLineLength:PetMenu.kt:StationsPanel$addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
+    <ID>MaxLineLength:PetMenu.kt:VetPanel$addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { bottomMargin = (6 * d).toInt() })</ID>
+    <ID>MaxLineLength:PetMenu.kt:VetPanel$diag.text = if (issues.isEmpty()) "✅ Diagnostic : en pleine forme !" else "📋 Diagnostic : " + issues.joinToString(", ")</ID>
+    <ID>MaxLineLength:PetMenu.kt:VetPanel$info.text</ID>
+    <ID>MaxLineLength:PetMigrations.kt:PetMigrations$Migration(0, "clés à plat du fichier « pet », apparence par index → clés par PetId, apparence par id", ::v0toV1)</ID>
+    <ID>MaxLineLength:PetNotifier.kt:PetNotifier$.</ID>
+    <ID>MaxLineLength:PetNotifier.kt:PetNotifier$?:</ID>
+    <ID>MaxLineLength:PetNotifier.kt:PetNotifier$nm</ID>
+    <ID>MaxLineLength:PetNotifier.kt:PetNotifier$private fun statusLine: String</ID>
+    <ID>MaxLineLength:PetRepositoryTest.kt:PetRepositoryTest$/** Persistance des animaux : schéma 1, migration depuis le schéma 0 (version installée), lectures sans effet de bord. */</ID>
+    <ID>MaxLineLength:PetRepositoryTest.kt:PetRepositoryTest$it !in setOf(Prefs.ENABLED, Prefs.MISCHIEF, Prefs.DOCK_FX, Prefs.DOCK_FY) &amp;&amp; !it.startsWith("pageW2_") &amp;&amp; !it.startsWith("st_")</ID>
+    <ID>MaxLineLength:PetRepositoryTest.kt:PetRepositoryTest$pets.edit().putString("pet.${id.value}.look.fur", "licorne").putString("pet.${id.value}.favoriteToy", "TOUPIE").apply()</ID>
+    <ID>MaxLineLength:PetRepositoryTest.kt:PetRepositoryTest$private fun companion</ID>
+    <ID>MaxLineLength:PetRepositoryTest.kt:PetRepositoryTest$stats = PetStats(1f, 2f, 3f, 4f, 5f, sleeping = true, poops = 4, poopAccumulator = 0.5f, visitedApps = 9, caged = true)</ID>
+    <ID>MaxLineLength:PetRepositoryTest.kt:PetRepositoryTest$val adopted = repo.adopt(Adoption("Praline", Look(fur = Fur.CREAM), Personality.LAZY, Toy.BALLOON, isNew = true))</ID>
+    <ID>MaxLineLength:PetView.kt:PetView$PType.CRUMB -&gt; { pPaint.color = Palette.CARROT; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }</ID>
+    <ID>MaxLineLength:PetView.kt:PetView$PType.DROP -&gt; { pPaint.color = Palette.DROP; pPaint.alpha = alpha; c.drawCircle(p.x, p.y, p.size, pPaint) }</ID>
+    <ID>MaxLineLength:PetView.kt:PetView$PType.SPARKLE -&gt; { pPaint.color = Palette.SPARKLE; pPaint.alpha = alpha; sparkle(c, p.x, p.y, p.size * (0.6f + a)) }</ID>
+    <ID>MaxLineLength:PropDrawer.kt:PropDrawers$/** Le dessin de chaque objet (`when` exhaustifs sur [Toy] et [Food] : un nouvel objet ne compile pas sans son dessin). */</ID>
+    <ID>MaxLineLength:RabbitRenderer.kt:RabbitRenderer$c.drawCircle(-12f, -10f, 1.6f, goldLight)</ID>
+    <ID>MaxLineLength:RabbitRenderer.kt:RabbitRenderer$c.drawRect(bodyCx - bodyRx - 2f, bodyCy - bodyRy - 2f, bodyCx - bodyRx * 0.1f, bodyCy + bodyRy + 2f, patch)</ID>
+    <ID>MaxLineLength:RabbitRenderer.kt:RabbitRenderer$closed -&gt; { c.drawLine(e1x - 3.5f, ey, e1x + 3.5f, ey, line); c.drawLine(e2x - 3.5f, ey, e2x + 3.5f, ey, line) }</ID>
+    <ID>MaxLineLength:ScreenSensorService.kt:ScreenSensorService.Companion$val enabled = Settings.Secure.getString(ctx.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: return false</ID>
+    <ID>MaxLineLength:StationPanelWindows.kt:StationPanelWindows$override</ID>
+    <ID>MaxLineLength:StationPanelWindows.kt:StationPanelWindows$private</ID>
+    <ID>MaxLineLength:TouchHandler.kt:TouchHandler$/** Pose l'écouteur sur la fenêtre [bunny] de l'animal [petOf] (relu à chaque geste : la fenêtre peut changer d'animal). */</ID>
+    <ID>MaxLineLength:TouchHandler.kt:TouchHandler$fun</ID>
+    <ID>MaxLineLength:TouchHandler.kt:TouchHandler$if (ctx.rnd.nextFloat() &lt; 0.35f) ctx.actor.jump(pet, -560 * arena.d, 0f, then = Act.IDLE) else pet.setAct(Act.IDLE, 2.5f)</ID>
+    <ID>MaxLineLength:TouchHandler.kt:TouchHandler$if (hypot(phys.vx, phys.vy) &gt; Tuning.THROW_SHOUT_DP * arena.d) ctx.speech.sayOneOf(pet.species.lines.THROWN, 1.6f)</ID>
+    <ID>MaxLineLength:TunnelToyDrawer.kt:TunnelToyDrawer$p.color = Palette.TUNNEL</ID>
+    <ID>ReturnCount:BunnyService.kt:BunnyService$override fun onCreate</ID>
+    <ID>ReturnCount:BunnyService.kt:BunnyService$private fun command: Int</ID>
+    <ID>ReturnCount:PropDrawer.kt:PropDrawers$fun of: PropDrawer</ID>
+    <ID>ReturnCount:TouchHandler.kt:TouchHandler$private fun onPetTap</ID>
+    <ID>TooGenericExceptionCaught:BootReceiver.kt:BootReceiver$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BunnyService.kt:BunnyService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BunnyService.kt:BunnyService.&lt;no name provided&gt;$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:OverlayManager.kt:OverlayManager.Backend$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PetTileService.kt:PetTileService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PetTileService.kt:PetTileService.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:PetWidget.kt:PetWidget.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ScreenSensorService.kt:ScreenSensorService$e: Exception</ID>
+    <ID>TooManyFunctions:AdoptActivity.kt:AdoptActivity : ActivityFrameCallback</ID>
+    <ID>TooManyFunctions:BunnyService.kt:BunnyService : ServiceFrameCallbackPetCtx</ID>
+    <ID>TooManyFunctions:MainActivity.kt:MainActivity : ActivityFrameCallback</ID>
+    <ID>TooManyFunctions:OverlayWindows.kt:OverlayWindows</ID>
+    <ID>TooManyFunctions:PetRepository.kt:PetRepository : PetStore</ID>
+    <ID>TooManyFunctions:RabbitRenderer.kt:RabbitRenderer : PetRenderer</ID>
+  </CurrentIssues>
+</SmellBaseline>
