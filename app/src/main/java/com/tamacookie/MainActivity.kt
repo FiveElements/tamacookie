@@ -37,6 +37,10 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     private lateinit var nameEdit: EditText
     private var lastNs = 0L
     private var previewT = 0f
+    /** Ce qu'affiche l'aperçu (il n'a pas de [Pet] : son état est fabriqué ici). */
+    private var previewLook = Look()
+    private var previewExpr = BunnyView.Expr.NORMAL
+    private var previewFacing = 1f
     /** Le lapin vient d'être lancé : on passera en arrière-plan après la réponse à la demande de permission. */
     private var backgroundAfterPermission = false
 
@@ -73,8 +77,8 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         preview = BunnyView(this)
         preview.setOnClickListener {
             preview.emit(BunnyView.PType.HEART, 3)
-            preview.expr = BunnyView.Expr.HAPPY
-            preview.postDelayed({ preview.expr = BunnyView.Expr.NORMAL }, 1200)
+            previewExpr = BunnyView.Expr.HAPPY
+            preview.postDelayed({ previewExpr = BunnyView.Expr.NORMAL }, 1200)
         }
         root.addView(preview, LinearLayout.LayoutParams((170 * d).toInt(), (170 * d).toInt()).apply {
             topMargin = (8 * d).toInt()
@@ -218,7 +222,7 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
     override fun onResume() {
         super.onResume()
         val pet = PetState(this).load()
-        preview.look = pet.look
+        previewLook = pet.look.copy()
         nameEdit.setText(pet.name)
         refresh()
         Choreographer.getInstance().postFrameCallback(this)
@@ -245,10 +249,14 @@ class MainActivity : Activity(), Choreographer.FrameCallback {
         previewT += dt
         // petite marche sur place dans l'aperçu
         val cycle = previewT % 8f
-        preview.pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE
-        preview.walkPhase = (previewT * 2.2f) % 1f
-        if (cycle < 0.02f) preview.facing = -preview.facing
-        preview.update(dt)
+        if (cycle < 0.02f) previewFacing = -previewFacing
+        preview.render(BunnyRenderState(
+            pose = if (cycle < 3f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+            expr = previewExpr,
+            facing = previewFacing,
+            walkPhase = (previewT * 2.2f) % 1f,
+            look = previewLook,
+        ), dt)
         Choreographer.getInstance().postFrameCallback(this)
     }
 

@@ -37,6 +37,7 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
     private var isNew = true
     private var lastNs = 0L
     private var t = 0f
+    private var previewFacing = 1f
     private val refreshers = ArrayList<() -> Unit>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,7 +74,6 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         })
 
         preview = BunnyView(this)
-        preview.look = look
         preview.setOnClickListener { preview.emit(BunnyView.PType.HEART, 3) }
         root.addView(preview, LinearLayout.LayoutParams((200 * d).toInt(), (200 * d).toInt()))
 
@@ -143,15 +143,18 @@ class AdoptActivity : Activity(), Choreographer.FrameCallback {
         lastNs = frameTimeNanos
         t += dt
         val cycle = t % 7f
-        preview.pose = if (cycle < 2.5f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE
-        preview.walkPhase = (t * 2.2f) % 1f
-        if (cycle < 0.02f) preview.facing = -preview.facing
-        preview.update(dt)
+        if (cycle < 0.02f) previewFacing = -previewFacing
+        // L'aperçu affiche l'apparence en cours de choix (copiée : [look] est modifié par les boutons)
+        preview.render(BunnyRenderState(
+            pose = if (cycle < 2.5f) BunnyView.Pose.WALK else BunnyView.Pose.IDLE,
+            facing = previewFacing,
+            walkPhase = (t * 2.2f) % 1f,
+            look = look.copy(),
+        ), dt)
         Choreographer.getInstance().postFrameCallback(this)
     }
 
     private fun refreshAll() {
-        preview.look = look
         refreshers.forEach { it() }
     }
 

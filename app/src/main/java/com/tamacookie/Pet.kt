@@ -30,7 +30,7 @@ class Identity(val id: PetId, val origin: Origin = Origin.Resident, private val 
 /**
  * Corps : position (dans [phys]), activité courante, posture et orientation.
  * Les pieds sont en ([fx], [fy]), dans les coordonnées de sa page (voir [PageTracker.bunnyShift]).
- * [pose] et [facing] sont lus par [BunnyView] (qui ne les possède plus).
+ * Le rendu en est tiré à chaque image ([BunnyRenderState.of]) : la vue ne lit ni n'écrit le corps.
  */
 class Body(val phys: BunnyPhysics = BunnyPhysics()) {
     var fx: Float

@@ -10,7 +10,6 @@ import android.content.SharedPreferences
 import android.content.pm.ApplicationInfo
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
-import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
@@ -29,7 +28,6 @@ import com.tamacookie.BunnyView.PType
 import com.tamacookie.BunnyView.Pose
 import com.tamacookie.feature.ActRegistry
 import com.tamacookie.feature.Travel
-import com.tamacookie.feature.toy.Food
 import java.util.Calendar
 import kotlin.math.abs
 import kotlin.math.max
@@ -144,8 +142,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private var lastSaveWall = 0L
     private var notifTimer = 0f
     private var menuTimer = 0f
-    /** Nourriture dont la vue a la couleur (évite un parseColor à chaque image). */
-    private var shownFood = Food.CARROT
 
     // =====================================================================
     //  Cycle de vie
@@ -263,7 +259,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
                 st.reloadAppearance()
                 mischief.loadLevel()
                 applyView()
-                bunny.look = st.look
                 emit(resident, PType.SPARKLE, 6)
                 speech.sayOneOf(Lines.newLook(st.name))
                 requestFrames()
@@ -338,8 +333,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     // =====================================================================
     private fun createWindows() {
         val v = BunnyView(this)
-        v.body = resident.body
-        v.look = resident.stats.look
+        v.render(BunnyRenderState.of(resident), 0f)
         petWindows[resident.id] = PetWindow(WindowId.Pet(resident.id), v, windows.params(arena.bw, arena.bh, touchable = true))
         attachPet(resident)
         touch.attach(v)
@@ -579,14 +573,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         updateBehavior(p, dt)
         stations.checkChestBump(dt)
 
-        val st = p.stats
-        bunny.dirty = st.cleanliness < 45f || st.poops >= 3
-        bunny.veryDirty = st.cleanliness < 20f
-        bunny.expr = p.mind.exprOverride ?: moodExpr(st)
-        bunny.walkPhase = p.body.walkPhase
-        bunny.eatProgress = p.body.eatProgress
-        if (p.body.eatingFood != shownFood) { shownFood = p.body.eatingFood; bunny.foodColor = Color.parseColor(shownFood.color) }
-        bunny.update(dt)
+        // Rendu : chaque animal affiché reçoit son état de l'image
+        for (pet in world.pets.values) petWindows[pet.id]?.view?.render(BunnyRenderState.of(pet), dt)
         placeBunny()
         windows.updateBubbles(dt)
         // Au plus un updateViewLayout par fenêtre et par image
@@ -613,13 +601,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         }
         if (newPoops > 0 && p.act != Act.SLEEP) speech.sayOneOf(Lines.POOPED)
         if (now - lastSaveWall > Tuning.SAVE_EVERY_MS) { st.save(); lastSaveWall = now }
-    }
-
-    private fun moodExpr(st: PetState): Expr = when (st.mood) {
-        PetState.Mood.HAPPY, PetState.Mood.OK, PetState.Mood.DIRTY -> Expr.NORMAL
-        PetState.Mood.HUNGRY, PetState.Mood.SAD -> Expr.SAD
-        PetState.Mood.SLEEPY -> Expr.SLEEPY
-        PetState.Mood.SICK -> Expr.SICK
     }
 
     // =====================================================================
@@ -783,7 +764,6 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         val b = p.body
         b.pose = Pose.AIR
         val ev = b.phys.stepAir(dt, platforms())
-        bunny.airVy = b.phys.airVy
         if (b.phys.facing != 0f) b.facing = b.phys.facing
         when (ev) {
             AirEvent.ForcedLanded -> p.setAct(b.afterAir, 3f)
@@ -921,7 +901,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
     } catch (_: Exception) { null }
 
-    override fun emit(pet: Pet, type: PType, n: Int) { petWindows[pet.id]?.view?.emit(type, n) }
+    override fun emit(pet: Pet, type: PType, n: Int) { petWindows[pet.id]?.view?.emit(type, n, pet.body.facing) }
 
     override fun haptic(pet: Pet, feedback: Int) { petWindows[pet.id]?.view?.performHapticFeedback(feedback) }
 

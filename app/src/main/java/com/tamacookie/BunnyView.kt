@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import com.tamacookie.feature.toy.Food
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -17,51 +18,34 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Dessin et animation de Cookie, entièrement en Canvas (aucune image).
- * Le service pilote la pose / l'expression ; la vue gère le clignement des yeux,
- * les petits mouvements et les particules (cœurs, Zzz, notes...).
+ * Dessin de Cookie, entièrement en Canvas (aucune image). La vue n'affiche qu'un [BunnyRenderState]
+ * immuable ([render]) : elle n'écrit ni ne lit l'état du jeu. L'animation ambiante (clignement,
+ * oreilles, particules) est calculée par son [AmbientAnimator] (aléatoire injectable).
  */
 @SuppressLint("ViewConstructor")
-class BunnyView(context: Context) : View(context) {
+class BunnyView(
+    context: Context,
+    private val ambient: AmbientAnimator = AmbientAnimator(Random(System.nanoTime())),
+) : View(context) {
 
     enum class Pose { IDLE, WALK, AIR, SLEEP, EAT, DRAGGED, SIT }
     enum class Expr { NORMAL, HAPPY, SAD, SLEEPY, SURPRISED, SICK, ANGRY, DIZZY }
     enum class PType { HEART, ZZZ, NOTE, SPARKLE, DROP, CRUMB, STAR, BUBBLE }
 
-    private class Particle(
-        var type: PType, var x: Float, var y: Float, var vx: Float, var vy: Float,
-        var life: Float, val maxLife: Float, val size: Float, val rot: Float
-    )
-
-    // --- Pilotage par le service ---
-    /**
-     * Corps affiché : la posture et l'orientation sont de l'état de jeu, possédé par le [Body] de l'animal
-     * (le service y branche celui du résident ; les aperçus gardent leur propre corps). → RenderState à l'étape 4.
-     */
-    var body = Body()
-    var pose: Pose
-        get() = body.pose
-        set(v) { body.pose = v }
-    var expr = Expr.NORMAL
-    var facing: Float                // 1 = droite, -1 = gauche
-        get() = body.facing
-        set(v) { body.facing = v }
-    var walkPhase = 0f              // 0..1, cycle de saut pendant la marche
-    var airVy = 0f                  // vitesse verticale (px/s) pour l'étirement en l'air
-    var eatProgress = 0f            // 0..1
-    var foodColor = Palette.CARROT
-        set(v) { field = v; carrot.color = v }
-    var dirty = false
-    var veryDirty = false
+    /** Dernier état affiché. */
+    var state = BunnyRenderState()
+        private set
+    private val pose get() = state.pose
+    private val expr get() = state.expr
+    private val facing get() = state.facing
+    private val walkPhase get() = state.walkPhase
+    private val airVy get() = state.airVy
+    private val eatProgress get() = state.eatProgress
+    private val dirty get() = state.dirty
+    private val look get() = state.look
+    private val t get() = ambient.t
 
     private val d = resources.displayMetrics.density
-    private var t = 0f
-    private var blinkIn = 2.5f
-    private var blink = 0f
-    private var earTwitch = 0f
-    private var earTwitchIn = 4f
-    private val particles = ArrayList<Particle>()
-    private val rnd = Random(System.nanoTime())
 
     // --- Peintures ---
     private val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -102,11 +86,10 @@ class BunnyView(context: Context) : View(context) {
     private val flowerCenter = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.YELLOW }
     private val lens = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Palette.LENS }
     private var darkFur = false
+    /** Nourriture dont la couleur est dans [carrot] (parseColor seulement quand elle change). */
+    private var paintedFood = Food.CARROT
 
-    var look: Look = Look()
-        set(v) { field = v.copy(); applyLook() }
-
-    private fun applyLook() {
+    private fun applyLook(look: Look) {
         val f = Options.furColor(look.fur)
         fur.color = f
         furShade.color = Options.shade(f, 0.93f)
@@ -122,76 +105,30 @@ class BunnyView(context: Context) : View(context) {
         }
         acc.color = Options.accColor(look.accColor)
         accStroke.color = outline.color
+    }
+
+    init { applyLook(state.look) }
+
+    /**
+     * Affiche [s] et avance l'animation ambiante de [dt] secondes. Ne redessine que si l'image change
+     * (état différent, clignement, oreille, particules, ou dessin qui dépend du temps).
+     */
+    fun render(s: BunnyRenderState, dt: Float) {
+        val old = state
+        state = s
+        if (s.look != old.look) applyLook(s.look)
+        if (s.food != paintedFood) { paintedFood = s.food; carrot.color = Color.parseColor(s.food.color) }
+        val moving = ambient.update(dt, s, width.toFloat(), height.toFloat(), d)
+        if (moving || s != old) invalidate()
+    }
+
+    /** Ajoute des particules au-dessus de la tête (cœurs, notes…), [facing] = sens du regard. */
+    fun emit(type: PType, count: Int = 1, facing: Float = state.facing) {
+        ambient.emit(type, count, width.toFloat(), height.toFloat(), d, facing)
         invalidate()
     }
 
-    init { applyLook() }
-
-    /** Avance l'animation de [dt] secondes. */
-    fun update(dt: Float) {
-        t += dt
-        // clignement
-        if (blink > 0f) blink -= dt
-        else {
-            blinkIn -= dt
-            if (blinkIn <= 0f) { blink = 0.14f; blinkIn = 2f + rnd.nextFloat() * 4f }
-        }
-        // petit mouvement d'oreille
-        if (earTwitch > 0f) earTwitch -= dt
-        else {
-            earTwitchIn -= dt
-            if (earTwitchIn <= 0f) { earTwitch = 0.35f; earTwitchIn = 3f + rnd.nextFloat() * 6f }
-        }
-        // particules ambiantes
-        if (pose == Pose.SLEEP && rnd.nextFloat() < dt * 0.9f) emit(PType.ZZZ)
-        if (pose == Pose.EAT && rnd.nextFloat() < dt * 4f) emit(PType.CRUMB)
-        if (expr == Expr.SAD && rnd.nextFloat() < dt * 0.4f) emit(PType.DROP)
-        if (expr == Expr.SICK && rnd.nextFloat() < dt * 0.3f) emit(PType.DROP)
-        if (expr == Expr.DIZZY && rnd.nextFloat() < dt * 5f) emit(PType.STAR)
-        if (veryDirty && rnd.nextFloat() < dt * 0.6f) emit(PType.BUBBLE)
-
-        val it = particles.iterator()
-        while (it.hasNext()) {
-            val p = it.next()
-            p.life -= dt
-            if (p.life <= 0f) { it.remove(); continue }
-            p.x += p.vx * dt; p.y += p.vy * dt
-            if (p.type == PType.CRUMB || p.type == PType.DROP) p.vy += 300f * d * dt
-            if (p.type == PType.ZZZ || p.type == PType.NOTE) p.x += sin(t * 3f + p.rot) * 12f * d * dt
-        }
-        invalidate()
-    }
-
-    /** Ajoute une particule au-dessus de la tête. */
-    fun emit(type: PType, count: Int = 1) {
-        repeat(count) {
-            val cx = width / 2f
-            val headY = height - 6f * d - 60f * d * unit()
-            val p = when (type) {
-                PType.HEART -> Particle(type, cx + rnd.nextFloat(-25f, 25f) * d, headY,
-                    rnd.nextFloat(-20f, 20f) * d, -55f * d, 1.4f, 1.4f, rnd.nextFloat(9f, 14f) * d, 0f)
-                PType.ZZZ -> Particle(type, cx + 20f * d * facing, headY + 6f * d, 8f * d * facing,
-                    -28f * d, 2.2f, 2.2f, rnd.nextFloat(11f, 16f) * d, rnd.nextFloat() * 6f)
-                PType.NOTE -> Particle(type, cx + rnd.nextFloat(-30f, 30f) * d, headY,
-                    rnd.nextFloat(-10f, 10f) * d, -45f * d, 1.6f, 1.6f, rnd.nextFloat(13f, 18f) * d, rnd.nextFloat() * 6f)
-                PType.SPARKLE -> Particle(type, cx + rnd.nextFloat(-40f, 40f) * d,
-                    height - rnd.nextFloat(10f, 80f) * d, 0f, -15f * d, 0.8f, 0.8f, rnd.nextFloat(5f, 9f) * d, 0f)
-                PType.DROP -> Particle(type, cx + 16f * d * facing, headY + 8f * d, 6f * d * facing,
-                    -20f * d, 0.9f, 0.9f, 4f * d, 0f)
-                PType.CRUMB -> Particle(type, cx + 24f * d * facing, height - 50f * d, rnd.nextFloat(-30f, 30f) * d,
-                    -40f * d, 0.7f, 0.7f, 2.2f * d, 0f)
-                PType.STAR -> Particle(type, cx, headY - 4f * d, 0f, 0f, 0.6f, 0.6f, 5f * d, rnd.nextFloat() * 6.28f)
-                PType.BUBBLE -> Particle(type, cx + rnd.nextFloat(-20f, 20f) * d, height - 40f * d,
-                    rnd.nextFloat(-6f, 6f) * d, -25f * d, 1.5f, 1.5f, rnd.nextFloat(3f, 6f) * d, 0f)
-            }
-            particles.add(p)
-        }
-    }
-
-    private fun Random.nextFloat(a: Float, b: Float) = a + nextFloat() * (b - a)
-
-    /** Échelle du lapin : 1 unité de dessin = unit() dp. */
-    private fun unit() = 0.95f
+    private fun unit() = AmbientAnimator.UNIT
 
     override fun onDraw(c: Canvas) {
         val cx = width / 2f
@@ -249,6 +186,7 @@ class BunnyView(context: Context) : View(context) {
     private fun drawBunny(c: Canvas) {
         val dragged = pose == Pose.DRAGGED
         // Oreilles : angle selon l'humeur
+        val earTwitch = ambient.earTwitch
         val twitch = if (earTwitch > 0f) sin(earTwitch * 30f) * 8f else 0f
         var a1: Float
         var a2: Float
@@ -430,7 +368,7 @@ class BunnyView(context: Context) : View(context) {
 
     private fun drawFace(c: Canvas, hx: Float, hy: Float) {
         val e1x = hx - 7f; val e2x = hx + 9f; val ey = hy - 1f
-        val closed = blink > 0f
+        val closed = ambient.blinking
         when {
             expr == Expr.HAPPY -> { arcEye(c, e1x, ey, up = true); arcEye(c, e2x, ey, up = true) }
             expr == Expr.SURPRISED || pose == Pose.DRAGGED -> { bigEye(c, e1x, ey); bigEye(c, e2x, ey) }
@@ -559,7 +497,7 @@ class BunnyView(context: Context) : View(context) {
     //  Particules
     // ------------------------------------------------------------------
     private fun drawParticles(c: Canvas) {
-        for (p in particles) {
+        for (p in ambient.particles) {
             val a = (p.life / p.maxLife).coerceIn(0f, 1f)
             val alpha = (min(1f, a * 2.5f) * 255).toInt()
             when (p.type) {
