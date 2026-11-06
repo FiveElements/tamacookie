@@ -1,0 +1,80 @@
+package com.tamacookie
+
+import com.tamacookie.BunnyView.Expr
+import com.tamacookie.feature.menu.MenuCtx
+import com.tamacookie.feature.menu.MenuEntries
+import com.tamacookie.feature.menu.MenuEntry
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Menu rapide en liste d'entrées (`feature/menu/`) : chaque entrée a une action et un texte. */
+class MenuEntryTest {
+
+    /** Faux contexte du menu : la façade de test + les panneaux / jeux pilotés par le toucher. */
+    private class FakeMenuCtx(val base: FakePetCtx = FakePetCtx()) : MenuCtx, PetCtx by base {
+        var stationsPanels = 0
+        var hideSeeks = 0
+        override fun toggleStationsPanel() { stationsPanels++ }
+        override fun startHideSeek(): Boolean { hideSeeks++; return true }
+    }
+
+    /** Tout ce qu'une entrée peut avoir fait, résumé (pour vérifier qu'elle fait quelque chose). */
+    private fun effects(c: FakeMenuCtx) = listOf(
+        c.stationsPanels, c.hideSeeks, c.base.hideRequests, c.base.sleepRequests, c.base.said.size,
+    )
+
+    @Test
+    fun `chaque entree a un bouton et une action qui fait quelque chose`() {
+        assertEquals(listOf("Dodo", "Objets", "Cache-cache", "Ranger"), MenuEntries.ALL.map { it.label })
+        assertEquals(MenuEntries.ALL.size, MenuEntries.ALL.map { it.emoji }.toSet().size)
+        for (e in MenuEntries.ALL) {
+            val c = FakeMenuCtx()
+            c.pet.stats.energy = 50f
+            assertTrue(e.text(c.pet.stats).startsWith(e.emoji))
+            val before = effects(c)
+            e.run(c, c.pet)
+            assertTrue("${e.label} ne fait rien", effects(c) != before)
+        }
+    }
+
+    @Test
+    fun `chaque action est la sienne`() {
+        fun ran(e: MenuEntry) = FakeMenuCtx().also { it.pet.stats.energy = 50f; e.run(it, it.pet) }
+        assertEquals(1, ran(MenuEntries.STATIONS).stationsPanels)
+        assertEquals(1, ran(MenuEntries.HIDE_SEEK).hideSeeks)
+        assertEquals(1, ran(MenuEntries.HIDE).base.hideRequests)
+        assertEquals(1, ran(MenuEntries.SLEEP).base.sleepRequests)
+    }
+
+    @Test
+    fun `dodo - pas fatigue, il refuse`() {
+        val c = FakeMenuCtx()
+        c.pet.stats.energy = 95f
+        MenuEntries.SLEEP.run(c, c.pet)
+        assertEquals(0, c.base.sleepRequests)
+        assertTrue(c.base.said.single() in Lines.NOT_TIRED)
+    }
+
+    @Test
+    fun `dodo - s'il dort, le bouton le reveille`() {
+        val c = FakeMenuCtx()
+        val st = c.pet.stats
+        assertEquals("💤\nDodo", MenuEntries.SLEEP.text(st))
+        st.sleeping = true
+        c.pet.setAct(Act.SLEEP)
+        assertTrue(MenuEntries.SLEEP.text(st).endsWith("Réveil"))
+        MenuEntries.SLEEP.run(c, c.pet)
+        assertFalse(st.sleeping)
+        assertEquals(Act.IDLE, c.pet.act)
+        assertEquals(Expr.SLEEPY, c.pet.mind.exprOverride)
+        assertEquals(listOf(Lines.GETTING_UP), c.base.said)
+    }
+
+    @Test
+    fun `seul le dodo change de texte`() {
+        assertEquals(listOf(MenuEntries.SLEEP), MenuEntries.ALL.filter { it.dynamic })
+        for (e in MenuEntries.ALL.filter { !it.dynamic }) assertEquals("${e.emoji}\n${e.label}", e.text(FakePetCtx().stats))
+    }
+}

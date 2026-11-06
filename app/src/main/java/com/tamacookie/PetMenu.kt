@@ -13,6 +13,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.tamacookie.feature.menu.MenuEntries
+import com.tamacookie.feature.menu.MenuEntry
 import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.toy.Food
 import com.tamacookie.feature.toy.Toy
@@ -101,37 +103,41 @@ open class Panel(context: Context) : LinearLayout(context) {
 }
 
 /**
- * Menu rapide (double-touche / appui long sur le lapin) : dodo, objets, cache-cache, ranger.
+ * Menu rapide (double-touche / appui long sur le lapin) : un bouton par [MenuEntry] ([MenuEntries.ALL] :
+ * dodo, objets, cache-cache, ranger), [MenuEntries.PER_ROW] par rangée.
  * Les soins se font dans les "widgets" flottants : baignoire, véto, cage.
  */
 @SuppressLint("ViewConstructor", "SetTextI18n")
 class PetMenu(
     context: Context,
     private val pet: PetState,
-    private val onAction: (Action) -> Unit,
+    entries: List<MenuEntry>,
+    onEntry: (MenuEntry) -> Unit,
+    onClose: () -> Unit,
 ) : Panel(context) {
 
     // Manger, jouer, se laver, voir sa santé : ça passe par les objets posés à l'écran
     // (coffre, baignoire, véto, cage), pas par ce menu.
-    enum class Action { SLEEP, STATIONS, HIDE_SEEK, HIDE, CLOSE }
 
     private val title = TextView(context)
     private val moodText = small()
-    private lateinit var sleepBtn: TextView
+    /** Boutons dont le texte dépend de l'état de l'animal (ex. Dodo / Réveil). */
+    private val dynamic = ArrayList<Pair<MenuEntry, TextView>>()
 
     init {
-        header(title) { onAction(Action.CLOSE) }
+        header(title) { onClose() }
         moodText.setPadding(0, (2 * d).toInt(), 0, (4 * d).toInt())
         addView(moodText)
 
-        val row1 = row(); val row2 = row()
-        sleepBtn = button("💤", "Dodo") { onAction(Action.SLEEP) }
-        row1.addView(sleepBtn, btnLp())
-        row1.addView(button("🏠", "Objets") { onAction(Action.STATIONS) }, btnLp())
-        row2.addView(button("🫣", "Cache-cache") { onAction(Action.HIDE_SEEK) }, btnLp())
-        row2.addView(button("🙈", "Ranger") { onAction(Action.HIDE) }, btnLp())
-        addView(row1, rowLp(6))
-        addView(row2, rowLp())
+        entries.chunked(MenuEntries.PER_ROW).forEachIndexed { i, chunk ->
+            val r = row()
+            for (e in chunk) {
+                val b = button(e.emoji, e.label) { onEntry(e) }
+                if (e.dynamic) dynamic.add(e to b)
+                r.addView(b, btnLp())
+            }
+            addView(r, if (i == 0) rowLp(6) else rowLp())
+        }
         addView(small("💡 Touche le coffre pour lui donner à manger ou un jouet. Glisse ${pet.name} dans la baignoire pour le laver, chez le véto pour voir sa santé.").apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f); setPadding(0, (6 * d).toInt(), 0, 0)
         })
@@ -141,7 +147,7 @@ class PetMenu(
     fun refresh() {
         title.text = "🐰 ${pet.name} · ${pet.personality.emoji} ${pet.personality.label}"
         moodText.text = moodLabel(pet)
-        sleepBtn.text = if (pet.sleeping) "☀️\nRéveil" else "💤\nDodo"
+        for ((e, b) in dynamic) b.text = e.text(pet)
     }
 }
 

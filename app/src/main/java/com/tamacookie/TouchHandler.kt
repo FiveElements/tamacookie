@@ -9,6 +9,8 @@ import android.view.View
 import android.view.ViewConfiguration
 import com.tamacookie.BunnyView.Expr
 import com.tamacookie.BunnyView.PType
+import com.tamacookie.feature.menu.MenuCtx
+import com.tamacookie.feature.menu.MenuEntries
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.min
@@ -41,6 +43,12 @@ class TouchHandler(
         private set
 
     val menuOpen: Boolean get() = menu != null
+
+    /** Ce que reçoivent les entrées du menu ([MenuEntries]) : la façade + le panneau 🏠 et le cache-cache. */
+    private val menuCtx: MenuCtx = object : MenuCtx, PetCtx by ctx {
+        override fun toggleStationsPanel() = stations.toggleStationsPanel()
+        override fun startHideSeek() = mischief.startHideSeek(fromMenu = true)
+    }
 
     fun refreshMenu() { menu?.refresh() }
 
@@ -189,11 +197,15 @@ class TouchHandler(
         val windows = ctx.windows
         val d = arena.d
         lateinit var m: PetMenu
-        m = PetMenu(ctx.context, pet.stats) { a ->
-            // Sécurité : si ce panneau n'est plus le menu courant, on le retire quand même
-            if (menu !== m) { windows.safeRemove(m); if (a != PetMenu.Action.CLOSE) onMenuAction(a) }
-            else onMenuAction(a)
-        }
+        m = PetMenu(ctx.context, pet.stats, MenuEntries.ALL,
+            onEntry = { e ->
+                // Sécurité : si ce panneau n'est plus le menu courant, on le retire quand même
+                if (menu !== m) windows.safeRemove(m)
+                closeMenu()
+                e.run(menuCtx, pet)
+            },
+            onClose = { if (menu !== m) windows.safeRemove(m) else closeMenu() },
+        )
         ctx.noteInteraction()
         val w = windows.panelWidth(Tuning.MENU_W_DP)
         val lp = windows.panelParams(w, watchOutside = true)
@@ -222,26 +234,5 @@ class TouchHandler(
             lastMenuClose = ctx.clock.wallMs()
         }
         menu = null
-    }
-
-    private fun onMenuAction(a: PetMenu.Action) {
-        val st = pet.stats
-        when (a) {
-            PetMenu.Action.STATIONS -> { closeMenu(); stations.toggleStationsPanel() }
-            PetMenu.Action.HIDE_SEEK -> { closeMenu(); mischief.startHideSeek(fromMenu = true) }
-            PetMenu.Action.SLEEP -> {
-                closeMenu()
-                if (st.sleeping) {
-                    st.sleeping = false; st.save()
-                    pet.express(Expr.SLEEPY, 2f)
-                    ctx.say(Lines.GETTING_UP)
-                    pet.setActOrAfterAir(Act.IDLE, 3f)
-                } else if (st.energy > 92f) {
-                    ctx.speech.sayOneOf(Lines.NOT_TIRED)
-                } else ctx.startSleep(pet)
-            }
-            PetMenu.Action.HIDE -> { closeMenu(); ctx.hide() }
-            PetMenu.Action.CLOSE -> closeMenu()
-        }
     }
 }
