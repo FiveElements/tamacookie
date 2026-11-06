@@ -15,7 +15,19 @@ Code, commentaires, commits et UI sont **en français**.
 #   core/build/reports/jacoco/test/ (html/, jacocoTestReport.xml) et app/build/reports/coverage/test/debug/ (index.html, report.xml)
 #   total : python .github/scripts/coverage_badge.py core/…/jacocoTestReport.xml app/…/report.xml sortie.svg
 ./gradlew lintDebug           # ⚠️ plante avec JDK 25 (UastFacade) : lancer Gradle avec un JDK 17/21
+./gradlew detekt              # analyse statique des deux modules (bloquant en CI) : rapports dans <module>/build/reports/detekt/
+./gradlew detektBaseline      # régénère config/detekt/baseline-<module>.xml — voir « Baseline detekt » ci-dessous
 ```
+
+**Baseline detekt** (`config/detekt/baseline-core.xml`, `baseline-app.xml`) : elle fige les problèmes **d'avant**
+detekt (étape 8b). Un nouveau problème se **corrige** (ou, s'il est voulu, se supprime localement par
+`@Suppress("NomDeLaRègle")` avec un commentaire) — **jamais** en régénérant la baseline. `./gradlew detektBaseline`
+ne sert qu'à la **nettoyer** après avoir corrigé des entrées (elle ne doit alors que rétrécir : vérifier le diff), ou
+après un changement de règle / de version de detekt décidé et justifié dans ce fichier. Les identifiants sont
+`Règle:signature` (pas de numéro de ligne) : déplacer du code ne la périme pas, renommer une fonction si.
+Audit plus poussé, non bloquant : `./gradlew :core:detektMain :core:detektTest :app:detektDebug` (résolution de
+types : imports inutilisés, `!!`, `var` → `val`… ; leurs baselines `baseline-<module>-<source set>.xml` ne sont pas
+versionnées, les problèmes existants y apparaissent donc tous).
 
 ## Pièges connus
 
@@ -130,7 +142,7 @@ Principes :
 | 6 | Port `ScreenSensor` devant `Platforms`, événements au lieu des compteurs, scan sur `HandlerThread` | ✅ |
 | 7 | Multi-animal : `Species` (lapin = 1re), `Director`, `SocialSystem`, rendu de plusieurs animaux plafonné | ✅ |
 | — | **Prochaine** : évolutions de contenu (stations, jouets, interactions, espèces) sur les plugins — voir « Évolutions » | ⏳ |
-| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ; **8c** chaînes dans `strings.xml` ; **8d** accessibilité | ⏳ |
+| 8 | Qualité : **8a** module `:core` (JVM pur) ✅ ; **8b** detekt ✅ ; **8c** chaînes dans `strings.xml` ; **8d** accessibilité | ⏳ |
 | — | Ensuite : échange Bluetooth (BLE + L2CAP) — visites et transfert, protocole en deux phases | |
 
 ### Évolutions (contenu sur les plugins : comportement existant inchangé, seulement des ajouts)
@@ -874,6 +886,53 @@ Principes :
     par `DrawersTest`, `argb`).
   - `lint-baseline.xml` inchangé (ses entrées `StationController` étaient déjà périmées depuis l'étape 4 ; lint
     ne passe pas sur `:core`, module JVM sans plugin lint — detekt viendra en 8b).
+
+- **Étape 8b** (detekt ; comportement inchangé) — 4 commits (plugin + config + baselines ; corrections ; CI ; ce
+  fichier) :
+  - **Version : detekt `2.0.0-alpha.6`** (plugin Gradle `dev.detekt`, déclaré dans le `build.gradle.kts` racine et
+    appliqué aux deux modules par `subprojects`). **Justification de la dépendance** (outil de build seulement,
+    rien dans l'APK) : lint ne passe pas sur `:core` (module JVM), detekt couvre les deux modules avec les mêmes
+    règles. **Pourquoi une alpha** : detekt 1.23.8 (dernière stable) embarque Kotlin 2.0.21 et refuse un
+    compilateur plus récent (contournements : forcer la version de Kotlin de sa configuration, ou désactiver la
+    vérification — et analyser du Kotlin 2.4 avec un analyseur 2.0) ; la ligne 2.x est celle de K2 et
+    `2.0.0-alpha.6` (août 2026) est **compilée avec Kotlin 2.4.10** : le plugin s'applique tel quel avec Kotlin
+    2.4.21 et AGP 9.5, sans option de contournement ni CLI lancé à la main. Version épinglée exactement ; à
+    remplacer par la 2.0.0 stable quand elle sortira (règles renommées possibles → régénérer les baselines, en le
+    notant ici).
+  - **Tâche bloquante : `detekt`** (une par module, sources `main` + `test`, **sans** résolution de types) — une
+    seule baseline par module, rapide, ne dépend pas de la compilation. Les tâches avec résolution de types
+    (`detektMain`, `detektTest`, `detektDebug`…) existent mais ne sont pas en CI : chaque source set / variante y
+    aurait sa propre baseline (`baseline-app-debug.xml`, `-release`, `-debugUnitTest`…), pour ~50 signalements de
+    plus, surtout dans les tests.
+  - **Configuration** `config/detekt/detekt.yml` (`buildUponDefaultConfig`, `config.validation`) — seuls écarts :
+    `MagicNumber` **désactivée** (~1 700 signalements : proportions des dessins, physique des jouets, probabilités
+    du cerveau ; les valeurs qui comptent sont déjà nommées dans `Tuning`, `GameRules`, `SpeciesSpec`,
+    `BehaviorMods`) ; `MaxLineLength` 120 (le défaut, fixé explicitement) ; `ReturnCount` avec
+    `excludeGuardClauses` (les gardes `if (…) return` en tête de fonction sont le style du projet : 52 → 21) ;
+    `EmptyFunctionBlock` `ignoreOverridden` (faux des tests, rappels Android imposés comme `onInterrupt`) ;
+    `TooManyFunctions` et `FunctionNaming` hors tests (faux qui implémentent un port entier ; noms de tests en
+    phrases françaises) ; `UnusedImport` activée (effective seulement avec résolution de types).
+    `TooManyFunctions` / `LongMethod` / `CyclomaticComplexMethod` / `LargeClass` du service et des contrôleurs :
+    **baseline, pas désactivation** (un nouveau dépassement doit se voir).
+  - **Baselines** : **198 entrées pour `:core`** (MaxLineLength 109, VariableNaming 18 — les répliques en
+    MAJUSCULES de `SpeciesLines`, ComplexCondition 18, ReturnCount 17, CyclomaticComplexMethod 12,
+    TooManyFunctions 8, LoopWithTooManyJumpStatements 7, divers 9) ; **106 pour `:app`** (MaxLineLength 68,
+    CyclomaticComplexMethod 10, TooGenericExceptionCaught 8 — `catch (e: Exception)` autour des appels
+    WindowManager / services, voulus —, TooManyFunctions 6, ReturnCount 4, LongMethod 4, divers 6).
+  - **Corrigés** (commit séparé, trouvés par l'analyse avec résolution de types) : 2 imports inutilisés
+    (`AccColor` dans `RabbitRenderer`, `Context` dans `FakePrefs`), 2 `var` jamais réaffectées (`PetRules.elapsed`),
+    3 `?: ""` → `orEmpty()`. **Non corrigés, rapportés** : 4 `!!` (`StationController`, `ToyController`,
+    `HideSeekMischief` : invariants du code, à revoir un par un), `dt` inutilisé de `ToyController.updateEat`
+    (signature de gestionnaire), deux `sealed class` sans membre concret (`BunnyBrain`, `BunnyPhysics` → `sealed
+    interface` possible), `pet?.identity` superflu dans `AdoptActivity`, ombrages de `it` et `"%.2f".format` sans
+    locale dans les tests. **Faux positifs** de l'alpha : `EmptyElseBlock` sur `BunnyService.onStartCommand` et
+    `TouchHandler` (le `else` n'est pas vide), `UnusedPrivateProperty` sur `StationPanelWindows.windows` (utilisée
+    dans les initialiseurs) — dans la baseline ou hors CI, sans toucher au code.
+  - **CI** : `detekt` rejoint la commande Gradle du job `build` (avec `--continue` : un échec de detekt laisse
+    tourner tests, lint et APK) ; artefact `detekt-reports` (HTML, SARIF, XML, Markdown par module, même en cas
+    d'échec) ; job **`detekt-sarif`** (seul à avoir `security-events: write`, même si le build a échoué, pas pour
+    une PR venue d'un fork) : `github/codeql-action/upload-sarif` épinglé par SHA (v4.39.0), une catégorie par
+    module (`detekt-core`, `detekt-app`). Les chemins du SARIF sont déjà relatifs à la racine (`%SRCROOT%`).
 
 #### Schéma de persistance v1
 
