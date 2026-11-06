@@ -13,6 +13,15 @@ import com.tamacookie.feature.Travel
  * énergie ↓, bonheur ↑). Trop fatigué ou endormi, il refuse et ressort aussitôt.
  */
 object WheelStation : StationBehavior {
+    /** Réplique « occupé » (on lui propose autre chose). */
+    val BUSY = arrayOf("Je cours ! 🎡", "Pas le temps, je m'entraîne !")
+    /** Trop fatigué pour courir : il ressort. */
+    val TOO_TIRED = arrayOf("Trop fatigué pour courir… 😮‍💨", "Pas maintenant, je suis épuisé…")
+    /** Il monte dans la roue. */
+    val ENTER = arrayOf("À fond ! 🎡", "Je cours, je cours !", "Regarde comme je vais vite !")
+    /** Course finie. */
+    val DONE = arrayOf("Pfiou ! Quel sprint ! 💨", "Record battu !", "J'ai couru jusqu'à la lune !")
+
     const val RUN_SECONDS = 6f
 
     override val name = "🎡 Roue"
@@ -21,15 +30,15 @@ object WheelStation : StationBehavior {
     override val animated = true
     override val seat = Seat(0f, 24f)
 
-    override fun busyLine(ctx: PetCtx) = ctx.pick("Je cours ! 🎡", "Pas le temps, je m'entraîne !")
+    override fun busyLine(ctx: PetCtx) = ctx.pick(*BUSY)
 
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
         if (pet.wouldRefuse(PetEvent.WheelRun, ctx.clock.wallMs(), ctx.rules)) {
-            ctx.say(ctx.pick("Trop fatigué pour courir… 😮‍💨", "Pas maintenant, je suis épuisé…"))
+            ctx.say(ctx.pick(*TOO_TIRED))
             ctx.leaveStation(pet, hopOut = true)
             return
         }
-        if (announce) ctx.say(ctx.pick("À fond ! 🎡", "Je cours, je cours !", "Regarde comme je vais vite !"))
+        if (announce) ctx.say(ctx.pick(*ENTER))
     }
 
     override fun update(ctx: StationCtx, pet: Pet, dt: Float) {
@@ -42,7 +51,7 @@ object WheelStation : StationBehavior {
             b.walkPhase = 0f
             if (!ctx.on(pet, PetEvent.WheelRun).refused) {
                 ctx.emit(pet, PType.HEART, 2)
-                ctx.say(ctx.pick("Pfiou ! Quel sprint ! 💨", "Record battu !", "J'ai couru jusqu'à la lune !"))
+                ctx.say(ctx.pick(*DONE))
             }
             ctx.leaveStation(pet, hopOut = true)
         }

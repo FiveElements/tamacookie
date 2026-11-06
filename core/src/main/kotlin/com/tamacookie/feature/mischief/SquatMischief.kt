@@ -16,6 +16,28 @@ import kotlin.math.abs
  * caresse le fait descendre.
  */
 object SquatMischief : Mischief {
+    /** Il s'assoit sur une icône. */
+    val ON_ICON = arrayOf("Je m'installe ici ! 😼", "Tu ne m'as pas vu ? Et là ? 😏", "Coucou ! Je bloque ? 😇")
+    /** Il s'assoit sur le bouton qu'on vient de toucher. */
+    val ON_BUTTON = arrayOf("C'est MON bouton maintenant 😼", "Tu voulais appuyer ici ? Trop tard ! 😜")
+    /** Il commente un toucher sans s'y asseoir. */
+    val CLICK_COMMENT = arrayOf("Ooh, qu'est-ce que tu as touché ? 👀", "Je peux appuyer aussi ?", "Clic clic !")
+    /** Il s'assoit sur le clavier. */
+    val ON_KEYBOARD = arrayOf("Je t'aide à écrire ! ⌨️", "Tu écris à qui ? 👀 Je regarde !")
+    /** Il commente la frappe sans s'y asseoir. */
+    val TYPING_COMMENT = arrayOf("Tu écris à qui ? 👀", "Tu tapes vite !", "Dis-lui que je fais coucou !")
+    /** Personne ne réagit : il s'en va. */
+    val BORED = arrayOf("Bon… je m'ennuie ici.", "Tu ne veux pas jouer ? Tant pis…")
+    /** Ce sur quoi il est assis a bougé. */
+    val MOVED = arrayOf("Whoaaa !", "Oups, tout a bougé !")
+    /** On le touche : il ne bouge pas (pas encore). */
+    val STAYS = arrayOf(
+        "Je ne bouge pas ! 😼", "C'est MA place maintenant", "Un câlin et je m'en vais…",
+        "Tu veux appuyer ici ? Hihi 😜", "Un bisou magique pour passer ? 😘",
+    )
+    /** Câlin reçu : il descend. */
+    val LEAVES = arrayOf("Bon d'accord… 😇 je descends", "Un câlin ? Ça marche, je bouge !", "Hihi, gagné ! 💕")
+
     override val acts: Set<Act> = EnumSet.of(Act.SQUAT)
 
     override fun chance(level: Int) = if (level == 2) 0.6f else 0.35f
@@ -31,7 +53,7 @@ object SquatMischief : Mischief {
         val p = ctx.screen.snapshot.platforms.items.sortedBy { abs(it.box.centerX - w / 2) + abs(it.box.centerY - midY) }
             .take(4).random(ctx.rnd)
         squatOn(ctx, pet, p.box, (p.box.centerY + 46 * d).coerceAtMost(a.groundY), if (ctx.level == 2) 60f else 25f,
-            ctx.pick("Je m'installe ici ! 😼", "Tu ne m'as pas vu ? Et là ? 😏", "Coucou ! Je bloque ? 😇"), kbd = false)
+            ctx.pick(*ON_ICON), kbd = false)
         return true
     }
 
@@ -46,11 +68,11 @@ object SquatMischief : Mischief {
             if (rnd.nextFloat() < (if (level == 2) 0.22f else 0.10f)) {
                 if (level == 2 && r.width < 600 * d && r.height < 300 * d && r.top > a.topY + 120 * d) {
                     squatOn(ctx, pet, r, (r.centerY + 46 * d).coerceAtMost(a.groundY), 40f,
-                        ctx.pick("C'est MON bouton maintenant 😼", "Tu voulais appuyer ici ? Trop tard ! 😜"), kbd = false)
+                        ctx.pick(*ON_BUTTON), kbd = false)
                 } else {
                     ctx.actor.faceToward(pet, r.centerX)
                     pet.express(Expr.SURPRISED, 1f)
-                    ctx.say(ctx.pick("Ooh, qu'est-ce que tu as touché ? 👀", "Je peux appuyer aussi ?", "Clic clic !"))
+                    ctx.say(ctx.pick(*CLICK_COMMENT))
                     ctx.cooldownUntil = ev.now + 30_000
                 }
                 return true
@@ -62,9 +84,9 @@ object SquatMischief : Mischief {
                 if (level == 2) {
                     val x = (ime.left + ime.width * (0.25f + rnd.nextFloat() * 0.5f)).toInt()
                     squatOn(ctx, pet, Box(x - 1f, ime.top, x + 1f, ime.top), ime.top, 15f,
-                        ctx.pick("Je t'aide à écrire ! ⌨️", "Tu écris à qui ? 👀 Je regarde !"), kbd = true)
+                        ctx.pick(*ON_KEYBOARD), kbd = true)
                 } else {
-                    ctx.say(ctx.pick("Tu écris à qui ? 👀", "Tu tapes vite !", "Dis-lui que je fais coucou !"))
+                    ctx.say(ctx.pick(*TYPING_COMMENT))
                     ctx.cooldownUntil = ev.now + 45_000
                 }
                 return true
@@ -92,7 +114,7 @@ object SquatMischief : Mischief {
         pet.body.pose = Pose.SIT
         ctx.actor.faceToward(pet, ctx.arena.screenW / 2)
         if (pet.body.actTime > s.squatLimit) {
-            ctx.say(ctx.pick("Bon… je m'ennuie ici.", "Tu ne veux pas jouer ? Tant pis…"))
+            ctx.say(ctx.pick(*BORED))
             hopOff(ctx, pet)
             return
         }
@@ -105,15 +127,14 @@ object SquatMischief : Mischief {
         if (s.squatKbd || version != s.squatVersion) s.squatVersion = version
         if (gone) {
             pet.body.phys.stop(); pet.body.afterAir = Act.IDLE
-            ctx.say(ctx.pick("Whoaaa !", "Oups, tout a bougé !"), 1.4f)
+            ctx.say(ctx.pick(*MOVED), 1.4f)
             pet.setAct(Act.AIR)
             return
         }
         pet.mind.chatterIn -= dt
         if (pet.mind.chatterIn <= 0f) {
             pet.mind.chatterIn = 7f + ctx.rnd.nextFloat() * 5f
-            ctx.say(ctx.pick("Je ne bouge pas ! 😼", "C'est MA place maintenant", "Un câlin et je m'en vais…",
-                "Tu veux appuyer ici ? Hihi 😜", "Un bisou magique pour passer ? 😘"), 2.2f)
+            ctx.say(ctx.pick(*STAYS), 2.2f)
         }
     }
 
@@ -122,7 +143,7 @@ object SquatMischief : Mischief {
         ctx.on(pet, PetEvent.Petted)
         ctx.emit(pet, PType.HEART, 3)
         pet.express(Expr.HAPPY, 1.5f)
-        ctx.say(ctx.pick("Bon d'accord… 😇 je descends", "Un câlin ? Ça marche, je bouge !", "Hihi, gagné ! 💕"), 2f)
+        ctx.say(ctx.pick(*LEAVES), 2f)
         hopOff(ctx, pet)
         return true
     }

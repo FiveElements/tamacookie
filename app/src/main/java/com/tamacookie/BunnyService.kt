@@ -23,6 +23,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import com.tamacookie.feature.ActRegistry
+import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.wellbeing.WellbeingCoach
 import com.tamacookie.feature.wellbeing.WellbeingTracker
 import com.tamacookie.persist.Adoption
@@ -891,7 +892,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
 
     /** Ce que le comportement demande aux autres domaines. */
     private val behaviorHooks = object : PetBehavior.Hooks {
-        override fun chestVisible(p: Pet) = stations.visibleChest() != null && director.mayUseChest(p)
+        override fun chestVisible(p: Pet) = stations.visibleChest() != null && director.mayHeadTo(p, StationKind.CHEST)
         override val lastSelfServe: Long get() = stations.selfServeAt
         override fun goToChest(p: Pet, now: Long) { stations.selfServeAt = now }
         override fun seekAttention(p: Pet) = mischief.maybeSeekAttention()
@@ -899,6 +900,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         override fun hour() = hourNow()
         override fun nearest(p: Pet) = social.nearest(p)
         override fun socialize(p: Pet, other: Neighbor) = social.tryStart(p, other)
+        override fun bowlAvailable(p: Pet) = stations.bowlAvailable(p)
+        override fun goToBowl(p: Pet) = stations.goToBowl(p)
     }
 
     override fun startSleep(pet: Pet) = world.asPet(pet) {

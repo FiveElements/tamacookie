@@ -13,6 +13,17 @@ import com.tamacookie.Pose
  * du lit ; le sortir le réveille en douceur. « Dodo » ne le fait pas sortir ([sleepsInside]).
  */
 object BedStation : StationBehavior {
+    /** Réplique « occupé » (on lui propose autre chose). */
+    val BUSY = arrayOf("Chut… je fais la sieste 💤", "Laisse-moi dormir encore un peu…")
+    /** Pas fatigué : il s'assoit un moment. */
+    val NOT_TIRED = arrayOf("Pas fatigué… mais qu'il est moelleux ! 🛏️", "Je teste le matelas !")
+    /** Il se couche. */
+    val ENTER = arrayOf("Au lit ! 🛏️", "Bonne nuit… 💤", "Qu'il est douillet !")
+    /** Il se lève. */
+    val GET_UP = arrayOf("Hop, debout ! ☀️", "Le lit était tout chaud…", "Quelle bonne sieste !")
+    /** Réveillé par une caresse. */
+    val WOKEN = arrayOf("Mmh… bonjour ! 😴", "Déjà le matin ?")
+
     /** Pas fatigué, ou réveillé : il reste assis ce temps-là (s) avant de sortir. */
     const val AWAKE_SECONDS = 3f
     private val LEFT = Seat(-32f, 20f)
@@ -28,17 +39,17 @@ object BedStation : StationBehavior {
 
     override fun seatFor(rank: Int) = if (rank == 0) LEFT else RIGHT
 
-    override fun busyLine(ctx: PetCtx) = ctx.pick("Chut… je fais la sieste 💤", "Laisse-moi dormir encore un peu…")
+    override fun busyLine(ctx: PetCtx) = ctx.pick(*BUSY)
 
     override fun onEnter(ctx: StationCtx, pet: Pet, announce: Boolean) {
         if (pet.stats.energy > ctx.rules.notTiredAbove) {
-            if (announce) ctx.say(ctx.pick("Pas fatigué… mais qu'il est moelleux ! 🛏️", "Je teste le matelas !"))
+            if (announce) ctx.say(ctx.pick(*NOT_TIRED))
             return
         }
         if (!pet.stats.sleeping) ctx.on(pet, PetEvent.FellAsleep)
         pet.express(Expr.SLEEPY, 1f)
         ctx.emit(pet, PType.ZZZ)
-        if (announce) ctx.say(ctx.pick("Au lit ! 🛏️", "Bonne nuit… 💤", "Qu'il est douillet !"))
+        if (announce) ctx.say(ctx.pick(*ENTER))
     }
 
     override fun update(ctx: StationCtx, pet: Pet, dt: Float) {
@@ -52,7 +63,7 @@ object BedStation : StationBehavior {
         }
         b.pose = Pose.SIT
         if (b.actTime > AWAKE_SECONDS) {
-            ctx.say(ctx.pick("Hop, debout ! ☀️", "Le lit était tout chaud…", "Quelle bonne sieste !"))
+            ctx.say(ctx.pick(*GET_UP))
             ctx.leaveStation(pet, hopOut = true)
         }
     }
@@ -67,7 +78,7 @@ object BedStation : StationBehavior {
         ctx.on(pet, PetEvent.Woken(grumpy = false))
         pet.express(Expr.SLEEPY, 2f)
         ctx.emit(pet, PType.HEART, 1)
-        ctx.say(ctx.pick("Mmh… bonjour ! 😴", "Déjà le matin ?"))
+        ctx.say(ctx.pick(*WOKEN))
         pet.body.actTime = 0f
     }
 }

@@ -16,6 +16,11 @@ import kotlin.math.abs
  * près d'un bord le tirage des autres bêtises est celui d'avant (évolution 4a).
  */
 object ChewEdgeMischief : Mischief {
+    /** Il mâchouille le bord. */
+    val CHEWING = arrayOf("Miam, le bord de l'écran ! 😋", "Croc croc… ça croustille !", "Il a un goût de pixel…")
+    /** Caressé en pleine bêtise : il arrête. */
+    val CAUGHT = arrayOf("Oups, pris la patte dans le sac ! 😇", "Je goûtais, c'est tout !")
+
     const val EDGE_DP = 160f
     const val CHEW_SECONDS = 4f
 
@@ -50,7 +55,7 @@ object ChewEdgeMischief : Mischief {
             s.chewing = true
             b.actTime = 0f
             b.facing = if (b.targetX <= a.minX) -1f else 1f          // tourné vers le bord
-            ctx.say(ctx.pick("Miam, le bord de l'écran ! 😋", "Croc croc… ça croustille !", "Il a un goût de pixel…"), 2.5f)
+            ctx.say(ctx.pick(*CHEWING), 2.5f)
         }
         b.pose = Pose.EAT
         b.eatProgress = 0.9f                     // un petit bout d'écran dans la bouche
@@ -60,7 +65,7 @@ object ChewEdgeMischief : Mischief {
     }
 
     override fun onPet(ctx: MischiefCtx, pet: Pet): Boolean {
-        stop(ctx, pet, ctx.pick("Oups, pris la patte dans le sac ! 😇", "Je goûtais, c'est tout !"))
+        stop(ctx, pet, ctx.pick(*CAUGHT))
         pet.express(Expr.SURPRISED, 1f)
         return true
     }

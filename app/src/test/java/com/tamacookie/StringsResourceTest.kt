@@ -18,7 +18,7 @@ class StringsResourceTest {
     /** Textes qui désignent le personnage de l'app : l'adoption ne crée que des lapins (pas de choix d'espèce). */
     private val speciesWordsAllowed = setOf(
         "main_tagline", "main_name_hint", "main_a11y_dialog_message", "main_reset", "main_reset_title",
-        "main_reset_message", "adopt_title_new", "adopt_name_hint", "adopt_your_pet", "notif_channel_pet_desc",
+        "main_reset_message", "adopt_title_new", "adopt_name_hint", "notif_channel_pet_desc",
         "a11y_description",
     )
 

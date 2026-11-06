@@ -28,20 +28,20 @@ interface PropBody {
 }
 
 /** Résultat d'un pas de vol du lapin. */
-sealed class AirEvent {
+sealed interface AirEvent {
     /** Toujours en l'air. */
-    object Flying : AirEvent()
+    object Flying : AirEvent
     /** A touché un bord de l'écran et rebondi (toujours en l'air). */
-    object HitWall : AirEvent()
+    object HitWall : AirEvent
     /** Impact fort au sol : il rebondit (toujours en l'air). */
-    object Bounced : AirEvent()
+    object Bounced : AirEvent
     /** Arrivé au point visé par [BunnyPhysics.airLandY] (bêtise : assis sur un bouton). */
-    object ForcedLanded : AirEvent()
+    object ForcedLanded : AirEvent
     /**
      * Posé. [platform] = indice de l'icône dans la liste passée à [BunnyPhysics.stepAir], -1 = le sol.
      * [hard] = atterrissage brutal (il sera étourdi).
      */
-    data class Landed(val platform: Int, val hard: Boolean) : AirEvent() {
+    data class Landed(val platform: Int, val hard: Boolean) : AirEvent {
         val onPlatform: Boolean get() = platform >= 0
     }
 }

@@ -32,6 +32,10 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
         fun nearest(p: Pet): Neighbor? = null
         /** Il va vers [other] (interaction sociale) ; false = rien n'a commencé. */
         fun socialize(p: Pet, other: Neighbor): Boolean = false
+        /** La gamelle l'attend ([BrainInput.bowlAvailable]) — sans aléatoire ; faux par défaut (pas de gamelle). */
+        fun bowlAvailable(p: Pet): Boolean = false
+        /** Il part vers la gamelle (avant de passer en [Act.GOTO_BOWL]). */
+        fun goToBowl(p: Pet) {}
     }
 
     private val arena get() = ctx.arena
@@ -142,12 +146,14 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
             hasToyOrFood = ctx.world.hasToyOrFood(),
             nowMs = ctx.clock.wallMs(),
             lastSelfServeMs = hooks.lastSelfServe,
+            bowlAvailable = hooks.bowlAvailable(p),
             nearest = hooks.nearest(p),
         )
         when (val dec = p.mind.brain.decide(input) { hooks.seekAttention(p) }) {
             Decision.Sleep -> ctx.startSleep(p)
             Decision.AttentionSought -> {}
             Decision.GoToChest -> { hooks.goToChest(p, input.nowMs); p.setAct(Act.GOTO_CHEST) }
+            Decision.GoToBowl -> { hooks.goToBowl(p); p.setAct(Act.GOTO_BOWL) }
             Decision.PageWander -> hooks.startPageWander(p)
             is Decision.Socialize -> if (!hooks.socialize(p, dec.other)) p.setAct(Act.IDLE, 2f + rnd.nextFloat() * 3f)
             is Decision.JumpDown -> actor.jumpTo(p, dec.targetX, arena.groundY, Act.IDLE)
