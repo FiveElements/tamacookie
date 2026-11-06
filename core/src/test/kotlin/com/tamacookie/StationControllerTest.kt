@@ -193,6 +193,59 @@ class StationControllerTest {
         assertEquals(0.5f, s.t, 1e-6f)          // pas affichée : pas animée
     }
 
+    @Test fun `un ecran de l'app visible retire les stations vides, puis elles reviennent a leur place`() {
+        val bath = install(StationKind.BATH)
+        val wheel = install(StationKind.WHEEL)
+        val at = overlay.shownAt(wheel.windowId)
+        sc.enterStation(StationKind.BATH)
+        sc.ownAppVisible = true
+        sc.layout(); overlay.flush()
+        assertFalse(overlay.isAttached(wheel.windowId))      // vide : ne recouvre plus l'écran de l'app
+        assertTrue(overlay.isAttached(bath.windowId))        // occupée : reste avec son occupant
+        assertEquals(StationKind.BATH, ctx.world.stationOf(pet))
+        assertTrue(sc.anchoredHere(StationKind.WHEEL))       // placement inchangé
+        sc.leaveStation(hopOut = true)
+        sc.layout(); overlay.flush()
+        assertFalse(overlay.isAttached(bath.windowId))       // vidée pendant que l'app est visible
+        sc.ownAppVisible = false
+        sc.layout(); overlay.flush()
+        assertTrue(overlay.isAttached(bath.windowId))
+        assertEquals(at, overlay.shownAt(wheel.windowId))
+    }
+
+    @Test fun `la cage occupee reste affichee avec l'animal pendant qu'un ecran de l'app est visible`() {
+        val cage = install(StationKind.CAGE)
+        sc.enterStation(StationKind.CAGE)
+        sc.ownAppVisible = true
+        sc.layout(); overlay.flush()
+        assertTrue(overlay.isAttached(cage.windowId))
+        assertEquals(StationKind.CAGE, ctx.world.stationOf(pet))
+    }
+
+    @Test fun `une station retiree par l'app ne recoit pas l'animal glisse`() {
+        val cage = install(StationKind.CAGE)
+        sc.ownAppVisible = true
+        sc.layout(); overlay.flush()
+        pet.body.fx = cage.cx; pet.body.fy = cage.cy + 45f
+        sc.updateHover()
+        assertFalse(cage.highlight)
+        assertNull(sc.takeHover())
+    }
+
+    @Test fun `ecrans de l'app comptes un par un`() {
+        val screens = OwnAppScreens()
+        val seen = ArrayList<Boolean>()
+        screens.visible.observe { seen += it }
+        screens.started("principal")
+        screens.started("adoption")          // l'adoption démarre avant que l'écran principal s'arrête
+        screens.stopped("principal")
+        assertTrue(screens.visible.value)
+        screens.stopped("adoption")
+        assertFalse(screens.visible.value)
+        screens.stopped("adoption")          // arrêt en double : sans effet
+        assertEquals(listOf(true, false), seen)
+    }
+
     @Test fun `une baignoire ou une roue vide affichee ne demande pas d'images`() {
         for (k in listOf(StationKind.BATH, StationKind.WHEEL)) {
             val s = install(k)

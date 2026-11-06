@@ -180,6 +180,8 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     private val graph: AppGraph by lazy { AppGraph.of(this) }
     /** Ce que voit le service d'accessibilité (plateformes, pages, signaux). */
     override val screen: ScreenSensor get() = graph.screen
+    /** Désabonnement de [AppGraph.ownApp] (nos écrans visibles : stations vides retirées). */
+    private var ownAppUnsub: (() -> Unit)? = null
 
     // --- Visibilité ---
     override var hidden = false
@@ -282,6 +284,10 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         running = true
         ready = true
         visible = !hidden
+        // Un de nos écrans apparaît / disparaît : la prochaine image retire / remet les stations vides
+        // (layoutAnchored lit l'état ; une rotation qui arrête puis redémarre l'écran dans le même message ne
+        // fait donc rien clignoter).
+        ownAppUnsub = graph.ownApp.visible.observe { requestFrames() }
         PetTileService.refresh(this)
         PetWidget.updateAll(this)
 
@@ -500,6 +506,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
         val wasReady = ready
         ready = false
         handler.removeCallbacksAndMessages(null)
+        ownAppUnsub?.invoke(); ownAppUnsub = null
         widgetThrottle.cancel()
         stopLoop()
         handler.removeCallbacks(unlockPoll)
@@ -741,6 +748,7 @@ class BunnyService : Service(), Choreographer.FrameCallback, PetCtx {
     /** Place, montre ou cache chaque objet ancré selon la vue et le défilement. Appelé à chaque image. */
     override fun layoutAnchored() {
         if (hidden) return
+        stations.ownAppVisible = graph.ownApp.visible.value
         stations.layout()
         toys.layoutPoops()
         for (p in shown) world.asPet(p) {

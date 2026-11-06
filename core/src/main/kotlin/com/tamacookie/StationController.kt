@@ -150,11 +150,19 @@ class StationController(
         return a != null && a == ctx.pages.currentView
     }
 
+    /**
+     * Un écran de notre app est visible ([OwnAppScreens]) : les stations **vides** sont retirées à la prochaine
+     * [layout] (elles recouvraient l'écran principal, ouvert en fenêtre pop-up par-dessus le bureau) et reviennent
+     * ensuite à leur place (rien n'est sauvegardé ni déplacé). Une station occupée reste : elle accompagne l'animal,
+     * qui reste affiché, et son occupant n'est pas dérangé (bain, cage, lit…).
+     */
+    var ownAppVisible = false
+
     /** Place, montre ou cache chaque station selon la vue et le défilement (fondu si elle apparaît sur place). */
     fun layout() {
         val pages = ctx.pages
         for (s in all) {
-            val off = pages.visibleOffset(s.anchor)
+            val off = if (ownAppVisible && !s.occupied) Float.NaN else pages.visibleOffset(s.anchor)
             val was = shown(s)
             val x = overlay.placeAnchored(s.windowId, s.cx - s.w / 2f, s.y, off, fadeIn = off == 0f)
             if (x != null) s.x = x
