@@ -1,16 +1,17 @@
 package com.tamacookie.species
 
 import com.tamacookie.Personality
-import com.tamacookie.PetRenderer
 import com.tamacookie.feature.station.StationKind
 import com.tamacookie.feature.toy.Toy
 import com.tamacookie.species.rabbit.Rabbit
 
 /**
- * Une espèce d'animal (plugin) : ce qui la distingue — dessin ([renderer]), gabarit et vitesses ([spec]),
+ * Une espèce d'animal (plugin) : ce qui la distingue — gabarit et vitesses ([spec]),
  * influence du caractère sur le comportement ([behavior]), fonctionnalités acceptées ([accepts]) et
  * répliques ([lines]). Un `object` par espèce dans son sous-package (`species/rabbit/`), enregistré dans
  * [ALL] ; un animal la retrouve par son identifiant sauvegardé ([byId]).
+ *
+ * Son dessin est côté Android (`SpeciesRenderers`, `RabbitRenderer` dans `:app`).
  *
  * Le reste du jeu (jauges, stations, jouets, bêtises, boucle) est commun à toutes les espèces.
  */
@@ -30,9 +31,6 @@ interface Species {
 
     /** Joue avec le jouet [t] (proposé par le coffre, l'adoption). */
     fun accepts(t: Toy): Boolean = true
-
-    /** Dessin (Android) d'un animal de cette espèce ; un par vue. [density] = px par dp. */
-    fun renderer(density: Float): PetRenderer
 
     companion object {
         /** Les espèces connues ; la première est celle par défaut (et celle des anciennes sauvegardes). */

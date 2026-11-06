@@ -10,10 +10,12 @@ import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
+import com.tamacookie.feature.toy.PropDrawer
+import com.tamacookie.feature.toy.PropDrawers
 import com.tamacookie.feature.toy.PropPen
 import com.tamacookie.feature.toy.PropSpec
 
-/** Fenêtre d'un objet posé : affiche l'état de son [Prop] (dessin porté par son spec). */
+/** Fenêtre d'un objet posé : affiche l'état de son [Prop] (dessin : [PropDrawers]). */
 @SuppressLint("ViewConstructor")
 class PropView(context: Context, val prop: Prop) : View(context) {
     val spec: PropSpec get() = prop.spec
@@ -21,11 +23,13 @@ class PropView(context: Context, val prop: Prop) : View(context) {
     val spin: Float get() = prop.spin
     val tint: Int get() = prop.tint
 
-    /** Pinceaux partagés par les dessins des objets ([PropSpec.draw]). */
+    private val drawer: PropDrawer = PropDrawers.of(prop.spec)
+
+    /** Pinceaux partagés par les dessins des objets ([PropDrawer.draw]). */
     internal val pen = PropPen(resources.displayMetrics.density)
 
     override fun onDraw(c: Canvas) {
-        spec.draw(c, this, width.toFloat(), height.toFloat())
+        drawer.draw(c, this, width.toFloat(), height.toFloat())
     }
 }
 

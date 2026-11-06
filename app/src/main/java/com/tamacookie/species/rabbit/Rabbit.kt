@@ -1,7 +1,6 @@
 package com.tamacookie.species.rabbit
 
 import com.tamacookie.Personality
-import com.tamacookie.PetRenderer
 import com.tamacookie.species.BehaviorMods
 import com.tamacookie.species.Species
 import com.tamacookie.species.SpeciesLines
@@ -11,7 +10,7 @@ import java.util.EnumMap
 /**
  * Le lapin : première espèce (et celle de toutes les sauvegardes d'avant l'étape 7).
  * Gabarit et vitesses (ex-`Tuning.BUNNY_*` / `WALK_*`…), influence du caractère (ex-littéraux de
- * `BunnyBrain`, `ToyController`, `StationController`, du service), dessin ([RabbitRenderer]) et
+ * `BunnyBrain`, `ToyController`, `StationController`, du service), dessin (`RabbitRenderer`, côté Android) et
  * répliques ([RabbitLines]). Il accepte toutes les stations et tous les jouets.
  */
 object Rabbit : Species {
@@ -58,6 +57,4 @@ object Rabbit : Species {
     }
 
     override fun behavior(p: Personality): BehaviorMods = mods.getValue(p)
-
-    override fun renderer(density: Float): PetRenderer = RabbitRenderer(density)
 }

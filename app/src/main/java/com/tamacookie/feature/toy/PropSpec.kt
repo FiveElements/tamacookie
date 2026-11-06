@@ -1,34 +1,18 @@
 package com.tamacookie.feature.toy
 
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import com.tamacookie.PetEvent
 import com.tamacookie.BunnyPhysics
 import com.tamacookie.Expr
 import com.tamacookie.PType
-import com.tamacookie.Palette
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
 import com.tamacookie.Prop
-import com.tamacookie.PropView
 import com.tamacookie.Tuning
 
-/** Pinceaux réutilisés par les dessins des objets (aucune allocation pendant le rendu). */
-class PropPen(val d: Float) {
-    val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE; strokeWidth = 2f * d
-        color = Palette.OUTLINE
-    }
-    val path = Path()
-    val r = RectF()
-}
-
 /**
- * Ce qu'est un objet posé à l'écran (jouet, nourriture, crotte) : taille de sa fenêtre et dessin.
- * Un `object` par objet ; aucun état (il est dans [Prop] et dans le contrôleur).
+ * Ce qu'est un objet posé à l'écran (jouet, nourriture, crotte) : taille de sa fenêtre et nature.
+ * Un `object` par objet ; aucun état (il est dans [Prop] et dans le contrôleur). Le dessin est côté
+ * Android (`PropDrawers.of(spec)`, un `…Drawer` par objet dans `:app`).
  */
 interface PropSpec {
     val wDp: Int
@@ -39,9 +23,6 @@ interface PropSpec {
     val toy: Toy? get() = null
     /** La nourriture qu'il représente (null = pas de la nourriture). */
     val food: Food? get() = null
-
-    /** Dessin de l'état du modèle ([Prop.spin], [Prop.tint], lus via `v.spin` / `v.tint`) ; pinceaux dans `v.pen`. */
-    fun draw(c: Canvas, v: PropView, w: Float, h: Float)
 }
 
 /**
@@ -60,7 +41,7 @@ class Launch(
 }
 
 /**
- * Un jouet : taille, teinte, lancer, dessin, jeu ([play], pendant `Act.PLAY`), physique propre
+ * Un jouet : taille, teinte, lancer, jeu ([play], pendant `Act.PLAY`), physique propre
  * ([step], à chaque image), répliques et réaction quand on le lui prend. Rattaché à [Toy.spec].
  */
 interface ToySpec : PropSpec {
@@ -81,7 +62,7 @@ interface ToySpec : PropSpec {
     fun step(ctx: ToyCtx, pet: Pet, p: Prop, dt: Float)
 }
 
-/** Une nourriture : taille, dessin, répliques. La chute et la péremption sont communes. */
+/** Une nourriture : taille, répliques. La chute et la péremption sont communes. */
 interface FoodSpec : PropSpec {
     override val food: Food
     override val wDp: Int get() = 38

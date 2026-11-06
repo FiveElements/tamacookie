@@ -1,10 +1,8 @@
 package com.tamacookie.feature.station
 
-import android.graphics.Canvas
 import com.tamacookie.PType
 import com.tamacookie.Pet
 import com.tamacookie.PetCtx
-import com.tamacookie.StationView
 import com.tamacookie.feature.Travel
 
 /** Où s'assoit l'animal : décalage horizontal depuis le centre et hauteur des pieds au-dessus du bas (dp). */
@@ -29,7 +27,8 @@ interface StationCtx : PetCtx {
 
 /**
  * Le comportement d'une station, rattaché à son [StationKind] : propriétés (lues par la boucle, le
- * toucher, les règles de voyage…), dessin, et ce qui arrive à l'animal qui y entre, y reste et en sort.
+ * toucher, les règles de voyage…) et ce qui arrive à l'animal qui y entre, y reste et en sort. Le dessin
+ * est côté Android (`StationDrawers.of(kind)`, un `…StationDrawer` par station dans `:app`).
  *
  * Un `object` par station, dans son fichier (`BathStation.kt`…). Il ne connaît que [StationCtx] / [PetCtx]
  * et le [Pet] qu'on lui passe ; il ne garde aucun état d'animal (multi-animal).
@@ -70,8 +69,6 @@ interface StationBehavior {
 
     /** Ce qu'il répond quand on veut le nourrir / jouer alors qu'il est dedans. */
     fun busyLine(ctx: PetCtx): String
-
-    fun draw(c: Canvas, v: StationView, w: Float, h: Float)
 
     /** Tap sur la station (l'animal n'est pas dedans). */
     fun onTap(ctx: StationCtx) {
