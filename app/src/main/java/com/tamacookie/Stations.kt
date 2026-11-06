@@ -38,10 +38,6 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         style = Paint.Style.STROKE; strokeWidth = 2.2f * d; color = Color.parseColor("#5B4A55")
         strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND
     }
-    private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER; textSize = 12f * resources.displayMetrics.scaledDensity
-        isFakeBoldText = true; color = Color.parseColor("#3A2E39")
-    }
     private val r = RectF()
     private val path = Path()
 
@@ -86,15 +82,6 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         c.drawRect(w * 0.78f, boxTop, w * 0.84f, h - 4 * d, p)
         r.set(w * 0.43f, boxTop - 4 * d, w * 0.57f, boxTop + 14 * d)
         c.drawRoundRect(r, 3 * d, 3 * d, p); c.drawRoundRect(r, 3 * d, 3 * d, stroke)
-        if (!open) tag(c, w / 2, h * 0.12f, "🧰 Coffre")
-    }
-
-    private fun tag(c: Canvas, x: Float, y: Float, text: String) {
-        val tw = label.measureText(text) / 2 + 7 * d
-        r.set(x - tw, y - 11 * d, x + tw, y + 5 * d)
-        p.color = Color.argb(230, 255, 253, 249)
-        c.drawRoundRect(r, 8 * d, 8 * d, p); c.drawRoundRect(r, 8 * d, 8 * d, stroke)
-        c.drawText(text, x, y, label)
     }
 
     private fun drawBath(c: Canvas, w: Float, h: Float) {
@@ -126,7 +113,6 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         // robinet
         p.color = Color.parseColor("#B8B4BE")
         r.set(w * 0.86f, top - 22 * d, w * 0.92f, top - 4 * d); c.drawRoundRect(r, 2 * d, 2 * d, p)
-        if (!occupied) tag(c, w / 2, h * 0.72f, "🛁 Bain")
     }
 
     private fun drawVet(c: Canvas, w: Float, h: Float) {
@@ -148,7 +134,6 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         r.set(w - 40 * d, 8 * d, w - 12 * d, 36 * d)
         c.drawArc(r, 0f, 180f, false, stroke)
         stroke.color = Color.parseColor("#5B4A55")
-        if (!occupied) tag(c, w / 2, h * 0.55f, "🩺 Véto")
     }
 
     private fun drawCage(c: Canvas, w: Float, h: Float) {
@@ -175,7 +160,6 @@ class StationView(context: Context, val kind: StationKind) : View(context) {
         p.color = Color.parseColor("#E9B949")
         r.set(right - 22 * d, bottom - 40 * d, right - 8 * d, bottom - 26 * d)
         c.drawRoundRect(r, 3 * d, 3 * d, p); c.drawRoundRect(r, 3 * d, 3 * d, stroke)
-        if (!occupied) tag(c, w / 2, h * 0.62f, "🔒 Cage")
     }
 }
 
