@@ -1,22 +1,22 @@
 # 🐰 TamaCookie
 
-[![CI](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml/badge.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
-[![Couverture des tests](https://raw.githubusercontent.com/FiveElements/tamacookie/badges/coverage.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/ci.yml)
-[![Release](https://github.com/FiveElements/tamacookie/actions/workflows/release.yml/badge.svg)](https://github.com/FiveElements/tamacookie/actions/workflows/release.yml)
-[![Dernière version](https://img.shields.io/github/v/release/FiveElements/tamacookie?label=version&logo=github)](https://github.com/FiveElements/tamacookie/releases/latest)
-[![Téléchargements](https://img.shields.io/github/downloads/FiveElements/tamacookie/total?label=t%C3%A9l%C3%A9chargements&logo=android&color=3DDC84)](https://github.com/FiveElements/tamacookie/releases)
-[![Téléchargements (dernière version)](https://img.shields.io/github/downloads/FiveElements/tamacookie/latest/total?label=derni%C3%A8re%20version)](https://github.com/FiveElements/tamacookie/releases/latest)
+[![CI](https://github.com/tt-box/tamacookie/actions/workflows/ci.yml/badge.svg)](https://github.com/tt-box/tamacookie/actions/workflows/ci.yml)
+[![Couverture des tests](https://raw.githubusercontent.com/tt-box/tamacookie/badges/coverage.svg)](https://github.com/tt-box/tamacookie/actions/workflows/ci.yml)
+[![Release](https://github.com/tt-box/tamacookie/actions/workflows/release.yml/badge.svg)](https://github.com/tt-box/tamacookie/actions/workflows/release.yml)
+[![Dernière version](https://img.shields.io/github/v/release/tt-box/tamacookie?label=version&logo=github)](https://github.com/tt-box/tamacookie/releases/latest)
+[![Téléchargements](https://img.shields.io/github/downloads/tt-box/tamacookie/total?label=t%C3%A9l%C3%A9chargements&logo=android&color=3DDC84)](https://github.com/tt-box/tamacookie/releases)
+[![Téléchargements (dernière version)](https://img.shields.io/github/downloads/tt-box/tamacookie/latest/total?label=derni%C3%A8re%20version)](https://github.com/tt-box/tamacookie/releases/latest)
 [![Android 13+](https://img.shields.io/badge/Android-13%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com/about/versions/13)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Dependabot](https://img.shields.io/badge/Dependabot-auto--merge-025E8C?logo=dependabot)](.github/dependabot.yml)
-[![Licence LGPL-3.0](https://img.shields.io/github/license/FiveElements/tamacookie?label=licence&color=blue)](LICENSE)
+[![Licence LGPL-3.0](https://img.shields.io/github/license/tt-box/tamacookie?label=licence&color=blue)](LICENSE)
 
 Un petit lapin façon tamagotchi qui **vit par-dessus tes écrans Android** : il se promène sur le bureau,
 saute sur les icônes, te suit d'application en application… et vient t'embêter quand tu l'oublies.
 
 ## 📥 Télécharger
 
-➡️ **[Télécharger le dernier APK](https://github.com/FiveElements/tamacookie/releases/latest)**
+➡️ **[Télécharger le dernier APK](https://github.com/tt-box/tamacookie/releases/latest)**
 
 1. Télécharge `tamacookie-<version>.apk` depuis la dernière release.
 2. Autorise l'installation d'applications de source inconnue pour ton navigateur / gestionnaire de fichiers.
@@ -163,4 +163,4 @@ TamaCookie est un logiciel libre distribué sous licence
 **GNU Lesser General Public License v3.0 ou ultérieure** (LGPL-3.0-or-later) :
 voir [`LICENSE`](LICENSE), qui complète la [GNU GPL v3](COPYING).
 
-Copyright © 2026 FiveElements
+Copyright © 2026 tt-box
