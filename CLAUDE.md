@@ -570,8 +570,10 @@ Principes :
     (vérifié **avant** tout tirage : un refus ne consomme pas d'aléatoire), cache-cache du menu refusé si un autre
     joue ; coffre : `mayUseChest` (le cerveau ne le voit pas s'il est pris) ; stations de capacité 1 : déjà gardées
     par `Occupancy.canEnter` ; nourriture : `foodWinner` (le plus proche, puis le plus affamé, puis l'ordre du
-    monde), le perdant renonce (`loseFood` / `mayChaseFood`, jusqu'à la prochaine) et le différend est noté
-    (`takeDisputes`) ; bulles : `BubbleQueue` (une réplique à l'écran à la fois ; un animal remplace toujours la
+    monde), le perdant renonce (`loseFood` / `mayChaseFood`) et le différend est noté (`takeDisputes`) — **après
+    l'essai sur tablette** : la nourriture n'est à personne (même donnée au résident par le coffre ou « Nourrir »),
+    un perdant y retourne dès qu'il est **devenu** le plus proche (on l'a déplacé) et l'ancien gagnant renonce à son
+    tour ; un animal qui marche ou est assis la remarque aussi (`PetBehavior.chasesFood`, avant : au repos seulement) ; bulles : `BubbleQueue` (une réplique à l'écran à la fois ; un animal remplace toujours la
     sienne ; un autre attend, ou passe devant s'il est plus prioritaire — `SpeechPriority` LOW / NORMAL / HIGH,
     `Speech.at(p) { … }` : HIGH pour les gestes, le menu et les commandes, LOW pour le bavardage et le social ;
     3 en attente, LOW abandonnée après 5 s ; la bulle interrompue est cachée) ; notifications : `title`

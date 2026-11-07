@@ -57,12 +57,13 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
                 b.pose = Pose.IDLE
                 b.fy = actor.surfaceY(p)
                 if (ctx.world.hasToy()) { p.setAct(Act.PLAY); return }
-                if (ctx.world.hasFood() && ctx.director.mayChaseFood(p)) { p.setAct(Act.GOTO_FOOD); return }
+                if (chasesFood(p)) return
                 m.chatterIn -= dt
                 if (m.chatterIn <= 0f) { m.chatterIn = 50f + rnd.nextFloat() * 80f; chatter(p) }
                 if (b.actTime > b.actDuration) decideNext(p)
             }
             Act.WALK -> {
+                if (chasesFood(p)) return
                 val spec = p.species.spec
                 val speed = when {
                     st.isSick || st.energy < ctx.rules.walkSlowEnergyBelow -> spec.walkSlowDp * d
@@ -106,6 +107,7 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
             Act.SIT -> {
                 b.pose = Pose.SIT
                 b.facing = -1f
+                if (chasesFood(p)) return
                 if (b.actTime > b.actDuration) p.setAct(Act.IDLE, 2f)
             }
             Act.DIZZY -> {
@@ -285,5 +287,15 @@ class PetBehavior(private val ctx: PetCtx, private val hooks: Hooks) {
     private companion object {
         /** Part du bavardage consacrée aux répliques de saison. */
         const val SEASON_LINE_CHANCE = 0.3f
+    }
+
+    /**
+     * Une nourriture est posée : il y court (au repos, en marchant ou assis). Elle n'est à personne : le plus proche
+     * l'emporte (`Director.foodWinner`), et un perdant n'y retourne que s'il est devenu le plus proche.
+     */
+    private fun chasesFood(p: Pet): Boolean {
+        if (!ctx.world.hasFood() || !ctx.director.mayChaseFood(p)) return false
+        p.setAct(Act.GOTO_FOOD)
+        return true
     }
 }
