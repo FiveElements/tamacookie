@@ -68,6 +68,22 @@ jobs:
       - name: Tests unitaires
         run: ./gradlew --no-daemon :core:test testDebugUnitTest
 
+      # APK non signé (à signer soi-même, ou pour les stores qui signent) : construit AVANT le
+      # décodage de la clé, sans aucun secret dans l'environnement — il ne peut pas être signé.
+      - name: APK release non signé
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon assembleRelease \
+            "-PversionName=$VERSION_NAME" \
+            "-PversionCode=$VERSION_CODE"
+          UNSIGNED=app/build/outputs/apk/release/app-release-unsigned.apk
+          [ -f "$UNSIGNED" ] || { echo "::error::APK non signé introuvable"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/unsigned"
+          mv "$UNSIGNED" "$RUNNER_TEMP/unsigned/"
+
       # Une release n'est jamais signée avec la clé de debug : sans clé, on échoue.
       - name: Clé de signature
         env:
@@ -87,7 +103,7 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
           echo "TAMACOOKIE_KEYSTORE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
 
-      - name: APK release
+      - name: APK et AAB release signés
         env:
           TAMACOOKIE_KEYSTORE_PASSWORD: ${{ secrets.TAMACOOKIE_KEYSTORE_PASSWORD }}
           TAMACOOKIE_KEY_ALIAS: ${{ secrets.TAMACOOKIE_KEY_ALIAS }}
@@ -95,7 +111,7 @@ jobs:
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
-          ./gradlew --no-daemon assembleRelease \
+          ./gradlew --no-daemon assembleRelease bundleRelease \
             "-PversionName=$VERSION_NAME" \
             "-PversionCode=$VERSION_CODE"
           rm -f "$TAMACOOKIE_KEYSTORE"
@@ -114,6 +130,20 @@ jobs:
           echo "$out" | grep -E "^Verified using|certificate DN|certificate SHA-256|key algorithm|key size"
           actual="$(echo "$out" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')"
           [ "$actual" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::APK signé par $actual, attendu $EXPECTED_CERT_SHA256"; exit 1; }
+          # AAB (format de publication du Play Store) : signature JAR, même certificat.
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          [ -f "$AAB" ] || { echo "::error::AAB introuvable"; exit 1; }
+          # Pas de -strict : il refuse un certificat auto-signé (normal pour une clé d'app).
+          jarsigner -J-Duser.language=en -verify "$AAB" | grep -q '^jar verified' \
+            || { echo "::error::Signature de l'AAB invalide"; exit 1; }
+          aab_cert="$(keytool -J-Duser.language=en -printcert -jarfile "$AAB" \
+            | grep -m1 'SHA256:' | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')"
+          [ "$aab_cert" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::AAB signé par $aab_cert, attendu $EXPECTED_CERT_SHA256"; exit 1; }
+          echo "AAB signé par $aab_cert"
+          # L'APK non signé ne doit porter aucune signature.
+          if "$APKSIGNER" verify "$RUNNER_TEMP/unsigned/app-release-unsigned.apk" > /dev/null 2>&1; then
+            echo "::error::L'APK « non signé » est signé"; exit 1
+          fi
 
       - name: Préparer les artefacts
         env:
@@ -121,7 +151,9 @@ jobs:
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/tamacookie-$VERSION_NAME.apk"
-          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          cp "$RUNNER_TEMP/unsigned/app-release-unsigned.apk" "dist/tamacookie-$VERSION_NAME-unsigned.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/tamacookie-$VERSION_NAME.aab"
+          (cd dist && sha256sum *.apk *.aab > SHA256SUMS.txt)
 
       - name: Artefact release
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -161,4 +193,5 @@ jobs:
           generate_release_notes: true
           files: |
             dist/*.apk
+            dist/*.aab
             dist/SHA256SUMS.txt
