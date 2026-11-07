@@ -27,8 +27,8 @@ import kotlin.math.sin
  * - **Qui** : un seul animal, le plus proche parmi ceux qui sont affichés, sur la page affichée, éveillés,
  *   tranquilles ([READY] : ni tenu, ni caché, ni dans une station, ni en pleine bêtise) — arbitré par le
  *   `Director` ([com.tamacookie.Director.AdHunt]), déduit du monde comme `mayHeadTo`.
- * - **Priorité** : [check] passe avant les bêtises et le bavardage (appelé avant eux à chaque image), jamais
- *   avant le sommeil (un animal endormi ne part pas).
+ * - **Priorité** : [check] passe avant les bêtises et le bavardage (appelé avant eux à chaque image) et même
+ *   avant le sommeil : le plus proche **endormi** (hors station) est réveillé par la pub, et il y va.
  * - **Une tentative par bouton** : réussie ou abandonnée, on ne recommence qu'une fois le bouton disparu.
  * - **Abandon sans un mot** si le bouton disparaît (ou s'écarte de la cible) en route, ou s'il n'est pas
  *   dessus en [TIMEOUT_MS].
@@ -76,15 +76,27 @@ class AdSkipHunter(private val ctx: PetCtx, private val actions: ScreenActions) 
             box == null -> attempted = false
             !attempted && !ctx.hidden -> ctx.director.adHunt.hunterFor(box) { eligible(it) }?.let { p ->
                 attempted = true
-                ctx.world.asPet(p) { start(p, box) }
+                ctx.world.asPet(p) {
+                    if (p.stats.sleeping) wake(p)
+                    start(p, box)
+                }
             }
         }
     }
 
-    /** Il peut partir : affiché, sur la page affichée, éveillé, tranquille, hors station. */
+    /**
+     * Il peut partir : affiché, sur la page affichée, hors station, et tranquille ([READY]) — ou endormi
+     * ([Act.SLEEP] : la pub le réveille).
+     */
     private fun eligible(p: Pet): Boolean =
-        ctx.world.isShown(p) && !ctx.isAway(p) && !p.stats.sleeping && p.act in READY &&
+        ctx.world.isShown(p) && !ctx.isAway(p) && (p.act in READY || (p.stats.sleeping && p.act == Act.SLEEP)) &&
             ctx.world.stationOf(p) == null && ctx.world.asPet(p) { !ctx.pages.bunnyElsewhere() }
+
+    /** La pub le réveille (sans mauvaise humeur : c'est pour la bonne cause). */
+    private fun wake(p: Pet) {
+        ctx.on(p, PetEvent.Woken(grumpy = false))
+        ctx.say(ctx.pick(*WOKEN), 2f)
+    }
 
     private fun start(p: Pet, box: Box) {
         hunter = p.id; target = box; phase = Phase.RUN; pressed = false
@@ -177,6 +189,9 @@ class AdSkipHunter(private val ctx: PetCtx, private val actions: ScreenActions) 
     }
 
     companion object {
+        /** Ce qu'il dit quand la pub le réveille. */
+        val WOKEN = arrayOf("Hein ?! Une pub ?! 😳", "Mmh… quoi ? Une pub ! J'arrive !", "Une pub ? Pas question ! 😤")
+
         /** Ce qu'il dit en appuyant. */
         val PRESSED = arrayOf("Hop ! Au revoir la pub ! 🐾", "Et hop, pub passée ! 🐾", "Boing ! Plus de pub ! 🐾")
 

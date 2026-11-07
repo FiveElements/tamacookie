@@ -1264,9 +1264,11 @@ Principes :
     dans la baseline) ; le hub gagne `adSkipWanted` et `onAdProbe` (classe déjà dans la baseline).
   - **IA** (`feature/adskip/AdSkipHunter.kt`, pur, `ActHandler` de **`Act.SKIP_AD`** — ajouté à la fin, dans
     `MOVING` et `BUSY_FOR_TRAVEL`, `travel = BUSY` ; « passe la pub » dans `A11yTexts.ACTIVITIES`) : `check()` à
-    chaque image, **avant** `mischief.checkUserEvents()` (et le bavardage, qui vit dans `IDLE`) ; un animal endormi
-    ne part pas. Candidats : affichés, fenêtre présente, éveillés, `IDLE` / `WALK` / `SIT` / `DANCE` (`READY` : ni
-    tenu, ni caché, ni en bêtise, ni en jeu, ni social), hors station, sur la page affichée ; « Cacher » : personne.
+    chaque image, **avant** `mischief.checkUserEvents()` (et le bavardage, qui vit dans `IDLE`) ; **la pub réveille**
+    le plus proche s'il dort (`Act.SLEEP` hors station : `Woken(grumpy = false)`, réplique `WOKEN`, puis il part —
+    demandé après l'essai sur tablette). Candidats : affichés, fenêtre présente, `IDLE` / `WALK` / `SIT` / `DANCE`
+    (`READY` : ni tenu, ni caché, ni en bêtise, ni en jeu, ni social) ou endormis, hors station (le lit, la cage le
+    gardent), sur la page affichée ; « Cacher » : personne.
     **Arbitrage** `Director.AdHunt` (classe imbriquée comme `BubbleQueue` : `Director` était au plafond de
     fonctions) : `hunter()` = un animal en `SKIP_AD`, ou en l'air avec `afterAir == SKIP_AD` (déduit du monde, rien à
     réserver) ; `hunterFor(target, eligible)` = personne si quelqu'un y est, sinon le plus proche (puis l'ordre du
@@ -1291,9 +1293,9 @@ Principes :
   - Tests : `AdSkipScanTest` (faux arbre du dump YouTube : bouton trouvé même dans un lecteur cliquable ; pièges,
     « Ignorer » seul hors YouTube, nœud non cliquable / invisible / vide / éditable, deux enfants : non ; libellés ;
     cible au moment d'appuyer ; hub ; relais), `AdSkipHunterTest` (+ `FakeScreenActions` : traces identiques ; un seul
-    animal, le plus proche, le suivant si celui-ci dort ; course, saut depuis le sol ou une icône, appui unique avec
+    animal, le plus proche, réveillé s'il dort, pas s'il est au lit ; course, saut depuis le sol ou une icône, appui unique avec
     la cible, réplique, retour au sol, pas de deuxième tentative ; abandon — disparu, écarté, en plein saut, 6 s,
-    attrapé, réglage coupé ; port qui refuse : pas de réplique ; endormi / caché / tenu / en jeu / en bêtise / en
+    attrapé, réglage coupé ; port qui refuse : pas de réplique ; caché / tenu / en jeu / en bêtise / en
     station / fenêtre retirée / « Cacher » : personne). **540 → 564 tests** (534 dans `:core`, 30 dans `:app`).
   - **À vérifier sur tablette** : pub YouTube (portrait, paysage, plein écran) — le bouton « Ignorer » apparaît
     après ~5 s, le lapin y court en moins d'une seconde, se pose dessus (pas à côté, pas au-dessus du lecteur), la

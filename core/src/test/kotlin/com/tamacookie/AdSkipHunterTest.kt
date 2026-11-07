@@ -131,7 +131,7 @@ class AdSkipHunterTest {
         assertEquals(listOf(box), h2.actions.pressed)
     }
 
-    @Test fun `un seul animal part, le plus proche, endormi le suivant`() {
+    @Test fun `un seul animal part, le plus proche, meme endormi - la pub le reveille`() {
         val h = Hunt()
         h.ctx.first.body.fx = 100f
         val b = h.ctx.addPet("b", x = 600f)
@@ -143,16 +143,33 @@ class AdSkipHunterTest {
         h.runUntil { h.actions.pressed.isNotEmpty() }
         assertEquals(1, h.ctx.world.pets.values.count { Director.huntsAd(it) })
         assertEquals(1, h.actions.pressed.size)
-        // le plus proche dort : c'est le suivant qui y va
+        // le plus proche dort : la pub le réveille (sans mauvaise humeur), il le dit et y va
         val h2 = Hunt()
         h2.ctx.first.body.fx = 100f
-        val b2 = h2.ctx.addPet("b", x = 600f)
+        h2.ctx.addPet("b", x = 600f)
         val c2 = h2.ctx.addPet("c", x = 950f)
         h2.ctx.on(c2, PetEvent.FellAsleep); c2.setAct(Act.SLEEP)
+        val happy = c2.stats.happiness
         h2.button(box)
         h2.hunter.check()
-        assertEquals(b2.id, h2.hunter.hunterId)
+        assertEquals(c2.id, h2.hunter.hunterId)
+        assertFalse(c2.stats.sleeping)
+        assertEquals(Act.SKIP_AD, c2.act)
+        assertTrue(c2.stats.happiness >= happy)
+        assertTrue(h2.ctx.speakers.isNotEmpty())
+        h2.runUntil { h2.actions.pressed.isNotEmpty() }
+        assertEquals(1, h2.actions.pressed.size)
         assertNotEquals(b.id, c.id)
+    }
+
+    @Test fun `endormi dans le lit - la pub ne le sort pas`() {
+        val h = Hunt()
+        h.ctx.on(h.ctx.first, PetEvent.FellAsleep); h.ctx.first.setAct(Act.SLEEP)
+        h.ctx.world.station(StationKind.BED).enter(h.ctx.first.id)
+        h.button(box)
+        h.hunter.check()
+        assertNull(h.hunter.hunterId)
+        assertTrue(h.ctx.first.stats.sleeping)
     }
 
     @Test fun `le bouton disparait ou s'ecarte en route - il abandonne sans rien dire`() {
@@ -238,9 +255,8 @@ class AdSkipHunterTest {
         assertEquals(1, h.actions.pressed.size)
     }
 
-    @Test fun `endormi, cache, tenu, en station, hors ecran, tout cache ou occupe - personne ne part`() {
+    @Test fun `cache, tenu, en station, hors ecran, tout cache ou occupe - personne ne part`() {
         val cases: List<Pair<String, (Hunt) -> Unit>> = listOf(
-            "endormi" to { h -> h.ctx.on(h.ctx.first, PetEvent.FellAsleep); h.ctx.first.setAct(Act.SLEEP) },
             "caché" to { h -> h.ctx.first.setAct(Act.HIDDEN) },
             "tenu" to { h -> h.ctx.first.setAct(Act.DRAGGED) },
             "joue" to { h -> h.ctx.first.setAct(Act.PLAY) },
