@@ -22,7 +22,12 @@ saute sur les icônes, te suit d'application en application… et vient t'embêt
 2. Autorise l'installation d'applications de source inconnue pour ton navigateur / gestionnaire de fichiers.
 3. Ouvre l'APK, installe, puis lance **TamaCookie** et adopte ton lapin.
 
-Chaque release fournit aussi un fichier `SHA256SUMS.txt` pour vérifier l'APK.
+Chaque release fournit aussi :
+
+- `tamacookie-<version>-unsigned.apk` : le même APK **non signé**, à signer avec ta propre clé
+  (il ne s'installe pas tel quel) ;
+- `tamacookie-<version>.aab` : l'Android App Bundle signé, format de publication du Play Store ;
+- `SHA256SUMS.txt` : les empreintes de tous ces fichiers.
 
 ## ✨ Fonctionnalités
 
@@ -138,7 +143,7 @@ fenêtres, dessin, persistance). Le projet n'utilise que le framework Android et
 | Workflow | Déclencheur | Rôle |
 |---|---|---|
 | [`ci.yml`](.github/workflows/ci.yml) | push sur `main`, pull requests | tests unitaires, couverture (rapport en artefact ; badge SVG commité sur `main`, sans service externe), lint, APK debug (artefact) |
-| [`release.yml`](.github/workflows/release.yml) | tag `v*` ou lancement manuel | tests, APK release signé, publication GitHub Release |
+| [`release.yml`](.github/workflows/release.yml) | tag `v*` ou lancement manuel | tests, APK release signé, APK non signé, AAB signé, publication GitHub Release |
 | [`dependabot-automerge.yml`](.github/workflows/dependabot-automerge.yml) | PR Dependabot | fusion automatique dès que la CI est verte, **uniquement pour les mises à jour patch et minor** (les majeures restent manuelles) |
 
 Les actions GitHub sont épinglées par SHA de commit (le tag est indiqué en commentaire) ; Dependabot les met à jour.
