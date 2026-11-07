@@ -104,8 +104,7 @@ class Director(private val world: World) {
             if (p.act != Act.GOTO_FOOD || lostFood[p.id] == food.id) continue
             val b = best
             if (b == null) { best = p; continue }
-            val dp = abs(p.body.fx - food.x); val db = abs(b.body.fx - food.x)
-            if (dp < db || (dp == db && p.stats.satiety < b.stats.satiety)) best = p
+            if (closer(p, b, food)) best = p
         }
         return best
     }
@@ -129,13 +128,21 @@ class Director(private val world: World) {
         return disputes.toList().also { disputes.clear() }
     }
 
-    /** [p] peut courir vers la nourriture posée (il ne l'a pas déjà perdue). */
+    /**
+     * [p] peut courir vers la nourriture posée. La nourriture n'est réservée à personne : le plus proche l'emporte
+     * ([foodWinner]). Un animal qui l'a perdue n'y retourne que s'il est **devenu** le plus proche (on l'a déplacé,
+     * ou la nourriture a bougé) — et l'ancien gagnant renonce à son tour.
+     */
     fun mayChaseFood(p: Pet): Boolean {
         val lost = lostFood[p.id] ?: return true
-        for (prop in world.props) if (prop.id == lost && prop.food != null) return false
-        lostFood.remove(p.id)            // cette nourriture-là a disparu : il peut courir vers la suivante
+        val food = world.props.firstOrNull { it.id == lost && it.food != null }
+        if (food == null) { lostFood.remove(p.id); return true }   // disparue : il peut courir vers la suivante
+        val winner = foodWinner(food)
+        if (winner != null && !closer(p, winner, food)) return false
+        lostFood.remove(p.id)
         return true
     }
+
 
     // =====================================================================
     //  Bulles : une à la fois, file par priorité
@@ -252,4 +259,10 @@ class Director(private val world: World) {
         /** Activités d'une bêtise (celles de [Mischiefs.ALL]). */
         val MISCHIEF_ACTS: Set<Act> = EnumSet.noneOf(Act::class.java).apply { for (m in Mischiefs.ALL) addAll(m.acts) }
     }
+}
+
+/** [p] l'emporte sur [q] pour [food] : plus près, ou à égalité plus affamé (la règle de `Director.foodWinner`). */
+private fun closer(p: Pet, q: Pet, food: Prop): Boolean {
+    val dp = abs(p.body.fx - food.x); val dq = abs(q.body.fx - food.x)
+    return dp < dq || (dp == dq && p.stats.satiety < q.stats.satiety)
 }

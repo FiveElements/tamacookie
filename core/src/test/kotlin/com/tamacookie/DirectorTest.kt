@@ -120,6 +120,50 @@ class DirectorTest {
         assertTrue(dir.mayChaseFood(a))
     }
 
+    @Test fun nourriture_personneNEstServi_leperdantRapprocheLaReprend() {
+        val b = ctx.addPet("b", x = 900f, seed = 3)
+        val toys = ToyController(ctx)
+        toys.registerActs(ctx.acts)
+        a.body.fx = 200f
+        toys.feed(Food.CARROT)                                   // donnée au premier…
+        val food = ctx.world.props.single { it.food != null }
+        food.x = 850f; food.y = ctx.arena.groundY; food.onGround = true; food.vy = 0f
+        a.setAct(Act.GOTO_FOOD); b.setAct(Act.GOTO_FOOD)
+        ctx.world.asPet(a) { ctx.acts.handlerFor(a)!!.update(a, 0.05f) }
+        assertEquals(Act.IDLE, a.act)                            // … mais le compagnon est plus près : a renonce
+        assertFalse(dir.mayChaseFood(a))
+        // on déplace a tout contre la nourriture : il y retourne, et b renonce à son tour
+        a.body.fx = 860f
+        assertTrue(dir.mayChaseFood(a))
+        a.setAct(Act.GOTO_FOOD)
+        assertSame(a, dir.foodWinner(food))
+        dir.takeDisputes()
+        ctx.world.asPet(b) { ctx.acts.handlerFor(b)!!.update(b, 0.05f) }
+        assertEquals(Act.IDLE, b.act)
+        assertEquals(listOf(Director.Dispute(b.id, a.id)), dir.takeDisputes())
+    }
+
+    @Test fun nourriture_unCompagnonQuiMarcheOuEstAssisLaRemarque() {
+        val b = ctx.addPet("b", x = 820f, seed = 3)
+        val toys = ToyController(ctx)
+        toys.registerActs(ctx.acts)
+        val behavior = PetBehavior(ctx, object : PetBehavior.Hooks {
+            override fun chestVisible(p: Pet) = false
+            override val lastSelfServe = 0L
+            override fun goToChest(p: Pet, now: Long) {}
+            override fun seekAttention(p: Pet) = false
+            override fun startPageWander(p: Pet) {}
+            override fun hour() = 12
+        })
+        for (act in listOf(Act.WALK, Act.SIT)) {
+            ctx.world.props.toList().forEach { toys.removeProp(it) }
+            toys.feed(Food.CARROT)
+            b.setAct(act, 30f)
+            ctx.world.asPet(b) { behavior.update(b, 0.05f) }
+            assertEquals(act.name, Act.GOTO_FOOD, b.act)
+        }
+    }
+
     @Test fun nourriture_seul_ilGagneToujours() {
         val toys = ToyController(ctx)
         toys.feed(Food.CARROT)
