@@ -163,4 +163,4 @@ TamaCookie est un logiciel libre distribué sous licence
 **GNU Lesser General Public License v3.0 ou ultérieure** (LGPL-3.0-or-later) :
 voir [`LICENSE`](LICENSE), qui complète la [GNU GPL v3](COPYING).
 
-Copyright © 2026 FiveElements
+Copyright © 2026 tt-box
